@@ -309,6 +309,23 @@ export class MapManager {
         }
       }
     });
+
+    // Add click handler on map to close popups
+    this.map.on('click', (e) => {
+      // Get the clicked element
+      const clickedElement = e.originalEvent.target as HTMLElement;
+
+      // Check if click was on a marker, popup, or their children
+      const isMarkerClick = clickedElement.closest('.mapboxgl-marker');
+      const isPopupClick = clickedElement.closest('.mapboxgl-popup');
+
+      // Only close if click wasn't on a marker or popup
+      if (!isMarkerClick && !isPopupClick) {
+        // Close any open popups
+        const popups = document.querySelectorAll('.mapboxgl-popup');
+        popups.forEach(popup => popup.remove());
+      }
+    });
   }
 
   private async initializeMap() {

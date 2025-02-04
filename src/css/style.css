@@ -50,6 +50,11 @@ header {
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
+  pointer-events: none;
+}
+
+.satlas-marker * {
+  pointer-events: none;
 }
 
 .satlas-popup {
