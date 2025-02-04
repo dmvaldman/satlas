@@ -6,6 +6,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage } from './firebase';
+import { authManager } from './auth';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
@@ -138,6 +139,10 @@ class MapManager {
 
     if (addButton && modal) {
       addButton.addEventListener('click', () => {
+        if (!authManager.isAuthenticated()) {
+          this.showNotification('Please sign in to add a sit', 'error');
+          return;
+        }
         modal.classList.add('active');
       });
     }
@@ -343,6 +348,11 @@ class MapManager {
   }
 
   private async handlePhotoCapture(base64Image: string) {
+    if (!authManager.isAuthenticated()) {
+      this.showNotification('Please sign in to add a sit', 'error');
+      return;
+    }
+
     let tempMarker: mapboxgl.Marker | null = null;
     let tempMarkerId: string | null = null;
 
@@ -389,7 +399,7 @@ class MapManager {
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
 
-      // Create new Sit document
+      const currentUser = authManager.getCurrentUser();
       const sitData = {
         location: {
           latitude: coordinates.latitude,
@@ -397,8 +407,9 @@ class MapManager {
         },
         photoURL,
         upvotes: 0,
-        userId: 'temp_user_id',
-        userName: 'Anonymous',
+        userId: currentUser?.uid || 'anonymous',
+        userName: currentUser?.displayName || 'Anonymous',
+        userPhotoURL: currentUser?.photoURL || null,
         createdAt: serverTimestamp()
       };
 
