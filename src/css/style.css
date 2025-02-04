@@ -464,3 +464,43 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background: #31d53d;
   color: white;
 }
+
+.image-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.image-controls button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-controls button svg {
+  width: 20px;
+  height: 20px;
+  fill: white;
+}
+
+.image-controls button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.replace-photo:hover svg {
+  fill: #31d53d;
+}
+
+.delete-photo:hover svg {
+  fill: #ff3b30;
+}

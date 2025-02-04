@@ -175,14 +175,30 @@ export class MapManager {
 
     if (takePhotoBtn) {
       takePhotoBtn.addEventListener('click', () => {
-        this.capturePhoto();
+        const modal = document.getElementById('photo-modal');
+        const replaceSitId = modal?.dataset.replaceSitId;
+        const replaceImageId = modal?.dataset.replaceImageId;
+
+        if (replaceSitId && replaceImageId) {
+          this.replacePhoto(replaceSitId, replaceImageId, CameraSource.Camera);
+        } else {
+          this.capturePhoto();
+        }
         modal?.classList.remove('active');
       });
     }
 
     if (choosePhotoBtn) {
       choosePhotoBtn.addEventListener('click', () => {
-        this.selectPhoto();
+        const modal = document.getElementById('photo-modal');
+        const replaceSitId = modal?.dataset.replaceSitId;
+        const replaceImageId = modal?.dataset.replaceImageId;
+
+        if (replaceSitId && replaceImageId) {
+          this.replacePhoto(replaceSitId, replaceImageId, CameraSource.Photos);
+        } else {
+          this.selectPhoto();
+        }
         modal?.classList.remove('active');
       });
     }
@@ -223,6 +239,86 @@ export class MapManager {
         const sitId = target.dataset.sitId;
         if (sitId) {
           this.handleUploadToExistingSit(sitId);
+        }
+      }
+    });
+
+    // Add event listener for replace photo button
+    document.getElementById('map-container')?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      const replaceButton = target.closest('.replace-photo') as HTMLElement;
+      if (!replaceButton) return;
+
+      const sitId = replaceButton.dataset.sitId;
+      const imageId = replaceButton.dataset.imageId;
+      if (!sitId || !imageId) return;
+
+      // Show the photo modal for replacement
+      const modal = document.getElementById('photo-modal');
+      if (modal) {
+        // Store the sit and image IDs for the replacement
+        modal.dataset.replaceSitId = sitId;
+        modal.dataset.replaceImageId = imageId;
+        modal.classList.add('active');
+      }
+    });
+
+    // Add event listener for delete photo button
+    document.getElementById('map-container')?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      const deleteButton = target.closest('.delete-photo') as HTMLElement;
+      if (!deleteButton) return;
+
+      const sitId = deleteButton.dataset.sitId;
+      const imageId = deleteButton.dataset.imageId;
+      if (!sitId || !imageId) return;
+
+      if (confirm('Are you sure you want to delete this photo?')) {
+        try {
+          await this.sitManager.deleteImage(sitId, imageId);
+
+          // Get updated sit data (or null if the sit was deleted)
+          const sit = await this.sitManager.getSit(sitId);
+
+          if (sit) {
+            // If sit still exists (had multiple images), update the UI
+            const marker = this.markerManager.get(sitId);
+            if (marker) {
+              const coordinates = await this.getCurrentLocation();
+              const isFavorite = this.favoritesManager.isFavorite(sitId);
+              const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
+
+              // Update the marker's sit data
+              (marker as any).sit = sit;
+
+              // Update both the marker's popup and any open popup
+              const popupContent = this.popupManager.createPopupContent(
+                sit,
+                isFavorite,
+                favoriteCount,
+                coordinates
+              );
+              marker.getPopup()?.setHTML(popupContent);
+
+              // If there's an open popup for this sit, update it too
+              const openPopup = document.querySelector('.mapboxgl-popup');
+              if (openPopup && openPopup.querySelector(`[data-sit-id="${sitId}"]`)) {
+                marker.getPopup()?.addTo(this.map!);
+              }
+            }
+          } else {
+            // If sit was deleted (last image was removed), remove the marker
+            const marker = this.markerManager.get(sitId);
+            if (marker) {
+              marker.remove();
+              this.markerManager.delete(sitId);
+            }
+          }
+
+          this.showNotification('Photo deleted successfully');
+        } catch (error) {
+          console.error('Error deleting photo:', error);
+          this.showNotification('Error deleting photo', 'error');
         }
       }
     });
@@ -745,6 +841,94 @@ export class MapManager {
     } catch (error) {
       console.error('Error uploading photo:', error);
       this.showNotification('Error uploading photo', 'error');
+    }
+  }
+
+  private async replacePhoto(sitId: string, imageId: string, source: CameraSource) {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: source,
+        saveToGallery: false,
+        correctOrientation: true
+      });
+
+      if (image?.base64String) {
+        await this.handlePhotoReplacement(sitId, imageId, image.base64String);
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('User cancelled')) {
+        console.error('Error replacing photo:', error);
+        this.showNotification('Error replacing photo', 'error');
+      }
+    }
+  }
+
+  private async handlePhotoReplacement(sitId: string, imageId: string, base64Image: string) {
+    try {
+      // Get the current location and the sit's location
+      const currentLocation = await this.getCurrentLocation();
+      const sit = await this.sitManager.getSit(sitId);
+
+      if (!sit) {
+        this.showNotification('Could not find the Sit to update', 'error');
+        return;
+      }
+
+      // Check if the current location is close enough to the sit
+      const distance = getDistanceInFeet(currentLocation, sit.location);
+      const MAX_DISTANCE = 300; // 300 feet maximum distance
+
+      if (distance > MAX_DISTANCE) {
+        this.showNotification(
+          `You must be within ${MAX_DISTANCE} feet of the Sit to replace its photo. Current distance: ${Math.round(distance)} feet.`,
+          'error'
+        );
+        return;
+      }
+
+      // If location is valid, proceed with the replacement
+      const filename = `sit_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `sits/${filename}`);
+      const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      await uploadString(storageRef, base64WithoutPrefix, 'base64');
+      const photoURL = await getDownloadURL(storageRef);
+
+      // Update the image in Firestore
+      await this.sitManager.replaceImage(sitId, imageId, photoURL);
+
+      // Update the UI immediately
+      const marker = this.markerManager.get(sitId);
+      if (marker) {
+        const updatedSit = await this.sitManager.getSit(sitId);
+        if (updatedSit) {
+          const isFavorite = this.favoritesManager.isFavorite(sitId);
+          const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
+
+          // Update the marker's sit data
+          (marker as any).sit = updatedSit;
+
+          // Update both the marker's popup and any open popup
+          const popupContent = this.popupManager.createPopupContent(
+            updatedSit,
+            isFavorite,
+            favoriteCount,
+            currentLocation
+          );
+          marker.getPopup()?.setHTML(popupContent);
+
+          // If there's an open popup for this sit, update it too
+          const openPopup = document.querySelector('.mapboxgl-popup');
+          if (openPopup && openPopup.querySelector(`[data-sit-id="${sitId}"]`)) {
+            marker.getPopup()?.addTo(this.map!);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error replacing photo:', error);
+      this.showNotification('Error replacing photo', 'error');
     }
   }
 }

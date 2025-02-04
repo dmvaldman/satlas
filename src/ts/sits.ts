@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { Sit, Coordinates } from './types';
@@ -91,5 +91,37 @@ export class SitManager {
       return { ...sitDoc.data(), id: sitDoc.id } as Sit;
     }
     return null;
+  }
+
+  async replaceImage(sitId: string, imageId: string, newPhotoURL: string): Promise<void> {
+    const sitRef = doc(db, 'sits', sitId);
+    const sitDoc = await getDoc(sitRef);
+
+    if (sitDoc.exists()) {
+      const sit = sitDoc.data() as Sit;
+      const updatedImages = sit.images.map(img =>
+        img.id === imageId ? { ...img, photoURL: newPhotoURL } : img
+      );
+
+      await updateDoc(sitRef, { images: updatedImages });
+    }
+  }
+
+  async deleteImage(sitId: string, imageId: string): Promise<void> {
+    const sitRef = doc(db, 'sits', sitId);
+    const sitDoc = await getDoc(sitRef);
+
+    if (sitDoc.exists()) {
+      const sit = sitDoc.data() as Sit;
+      const updatedImages = sit.images.filter(img => img.id !== imageId);
+
+      // If this was the last image, delete the entire sit
+      if (updatedImages.length === 0) {
+        await deleteDoc(sitRef);
+      } else {
+        // Otherwise just update the images array
+        await updateDoc(sitRef, { images: updatedImages });
+      }
+    }
   }
 }
