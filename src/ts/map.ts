@@ -309,6 +309,30 @@ export class MapManager {
     });
   }
 
+  private cleanupWebCameraUI() {
+    // Find and cleanup any PWA camera elements
+    const cameraModal = document.querySelector('pwa-camera-modal');
+    const cameraModalContent = document.querySelector('pwa-camera-modal-instance');
+    const videoElement = document.querySelector('pwa-camera-modal video');
+
+    // Stop any active video streams
+    if (videoElement instanceof HTMLVideoElement) {
+      const stream = videoElement.srcObject as MediaStream;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      videoElement.srcObject = null;
+    }
+
+    // Remove the elements if they exist
+    if (cameraModalContent?.parentNode) {
+      cameraModalContent.parentNode.removeChild(cameraModalContent);
+    }
+    if (cameraModal?.parentNode) {
+      cameraModal.parentNode.removeChild(cameraModal);
+    }
+  }
+
   private async capturePhoto() {
     try {
       const image = await Camera.getPhoto({
@@ -318,7 +342,12 @@ export class MapManager {
         source: CameraSource.Camera,
         // Common options for both platforms
         saveToGallery: false,
-        correctOrientation: true
+        correctOrientation: true,
+        // Add these options to help with cleanup
+        promptLabelPhoto: 'Choose from Gallery',
+        promptLabelPicture: 'Take Picture',
+        promptLabelCancel: 'Cancel',
+        promptLabelHeader: 'Take a Photo'
       });
 
       // Process the image only if we actually got a base64String
@@ -326,6 +355,9 @@ export class MapManager {
         // Close the photo modal first
         const modal = document.getElementById('photo-modal');
         modal?.classList.remove('active');
+
+        // Clean up the web camera UI before processing the image
+        this.cleanupWebCameraUI();
 
         await this.handlePhotoCapture(image.base64String);
       }
@@ -338,6 +370,9 @@ export class MapManager {
       // Make sure to close modal on error too
       const modal = document.getElementById('photo-modal');
       modal?.classList.remove('active');
+
+      // Clean up the web camera UI on error too
+      this.cleanupWebCameraUI();
     }
   }
 
@@ -627,11 +662,9 @@ export class MapManager {
       if (existingSitId) {
         // Add image to existing sit
         await this.sitManager.addImageToSit(existingSitId, imageData);
-        this.showNotification('Photo added to existing Sit!');
       } else {
         // Create new sit with first image
         await this.sitManager.uploadSit(base64Image, coordinates, currentUser.uid, currentUser.displayName || 'Anonymous');
-        this.showNotification('New Sit created!');
       }
 
       // Refresh the map
