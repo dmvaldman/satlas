@@ -15,6 +15,7 @@ export class ProfileManager {
 
   constructor() {
     this.createProfileModal();
+    this.setupEventListeners();
   }
 
   private createProfileModal() {
@@ -51,7 +52,6 @@ export class ProfileManager {
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     this.modal = document.getElementById('profile-modal');
-    this.setupEventListeners();
   }
 
   private setupEventListeners() {
@@ -68,6 +68,17 @@ export class ProfileManager {
       this.pushNotificationsEnabled = (e.target as HTMLInputElement).checked;
     });
     logoutButton?.addEventListener('click', () => this.handleLogout());
+
+    // Add click handler for profile modal backdrop
+    const profileModal = document.getElementById('profile-modal');
+    if (profileModal) {
+      profileModal.addEventListener('click', (e) => {
+        // Only close if clicking the backdrop (not the modal content)
+        if (e.target === profileModal) {
+          profileModal.classList.remove('active');
+        }
+      });
+    }
   }
 
   private async loadUserPreferences() {
