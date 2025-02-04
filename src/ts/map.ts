@@ -1,5 +1,5 @@
 import { Geolocation } from '@capacitor/geolocation';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import mapboxgl from 'mapbox-gl';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -7,6 +7,7 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { storage } from './firebase';
 import { authManager } from './auth';
+import { getAuth } from 'firebase/auth';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
@@ -123,11 +124,21 @@ class MapManager {
   private map: mapboxgl.Map | null = null;
   private markers: Map<string, mapboxgl.Marker> = new Map();
   private loadedSitIds: Set<string> = new Set();
+  private userFavorites: Set<string> = new Set();
+  private auth = getAuth();
 
   constructor() {
     console.log('MapManager initialized');
     this.initializeMap();
     this.setupEventListeners();
+
+    // Add auth state listener
+    this.auth.onAuthStateChanged((user) => {
+      this.loadUserFavorites().then(() => {
+        // Refresh all markers with updated favorites
+        this.refreshMarkers();
+      });
+    });
   }
 
   private setupEventListeners() {
@@ -271,32 +282,24 @@ class MapManager {
         const sitId = doc.id;
         visibleSitIds.add(sitId);
 
-        // Only create marker if we haven't already loaded this Sit
         if (!this.loadedSitIds.has(sitId)) {
-          const sit = doc.data() as Sit;
+          const sit = { ...doc.data(), id: sitId } as Sit;
 
-          // Create marker element
           const el = document.createElement('div');
-          el.className = 'satlas-marker';
+          el.className = `satlas-marker${this.userFavorites.has(sitId) ? ' favorite' : ''}`;
 
-          // Create and add the marker
+          const popup = new mapboxgl.Popup({ offset: 25 })
+            .setHTML(this.createMarkerPopup(sit));
+
           const marker = new mapboxgl.Marker(el)
             .setLngLat([sit.location.longitude, sit.location.latitude])
-            .setPopup(
-              new mapboxgl.Popup({ offset: 25 })
-                .setHTML(`
-                  <div class="satlas-popup">
-                    <img src="${sit.photoURL}" alt="Sit view" />
-                    <div class="satlas-popup-info">
-                      <p class="author">Posted by: ${sit.userName}</p>
-                      <p>Upvotes: ${sit.upvotes}</p>
-                    </div>
-                  </div>
-                `)
-            )
-            .addTo(this.map);
+            .setPopup(popup)
+            .addTo(this.map!);
 
-          // Store the marker with its ID
+          // Store sit data with marker
+          (marker as any).sit = sit;
+
+          this.setupPopupEventListeners(popup, sitId);
           this.markers.set(sitId, marker);
           this.loadedSitIds.add(sitId);
         }
@@ -444,8 +447,6 @@ class MapManager {
         this.loadedSitIds.add(sitId);
       }
 
-      this.showNotification('Sit uploaded successfully!');
-
     } catch (error) {
       console.error('Error handling photo capture:', error);
 
@@ -470,6 +471,126 @@ class MapManager {
     setTimeout(() => {
       notification.remove();
     }, 3000);
+  }
+
+  private async loadUserFavorites(): Promise<void> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      this.userFavorites.clear();
+      return;
+    }
+
+    try {
+      const favoritesRef = collection(db, 'favorites');
+      const q = query(favoritesRef, where('userId', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+
+      this.userFavorites.clear();
+      querySnapshot.forEach((doc) => {
+        this.userFavorites.add(doc.data().sitId);
+      });
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  }
+
+  private async toggleFavorite(sitId: string) {
+    const user = this.auth.currentUser;
+    if (!user) {
+      this.showNotification('Please sign in to favorite sits', 'error');
+      return;
+    }
+
+    try {
+      const favoriteId = `${user.uid}_${sitId}`;
+      const favoriteRef = doc(db, 'favorites', favoriteId);
+      const isFavorite = this.userFavorites.has(sitId);
+
+      if (isFavorite) {
+        await deleteDoc(favoriteRef);
+        this.userFavorites.delete(sitId);
+      } else {
+        await setDoc(favoriteRef, {
+          userId: user.uid,
+          sitId: sitId,
+          createdAt: serverTimestamp()
+        });
+        this.userFavorites.add(sitId);
+      }
+
+      // Update marker appearance
+      const marker = this.markers.get(sitId);
+      if (marker) {
+        const el = marker.getElement();
+        el.className = 'satlas-marker';
+        if (this.userFavorites.has(sitId)) {
+          el.classList.add('favorite');
+        }
+      }
+
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      this.showNotification('Error updating favorite', 'error');
+    }
+  }
+
+  private createMarkerPopup(sit: Sit) {
+    const isFavorite = this.userFavorites.has(sit.id);
+    return `
+      <div class="satlas-popup">
+        <img src="${sit.photoURL}" alt="Sit view" />
+        <div class="satlas-popup-info">
+          <p class="author">Posted by: ${sit.userName}</p>
+          <p>Upvotes: ${sit.upvotes}</p>
+          <button class="favorite-button ${isFavorite ? 'active' : ''}" data-sit-id="${sit.id}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            ${isFavorite ? 'Favorited' : 'Favorite'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private setupPopupEventListeners(popup: mapboxgl.Popup, sitId: string) {
+    popup.on('open', () => {
+      const favoriteButton = document.querySelector(`.favorite-button[data-sit-id="${sitId}"]`);
+      if (favoriteButton) {
+        // Remove any existing event listeners
+        favoriteButton.replaceWith(favoriteButton.cloneNode(true));
+        const newButton = document.querySelector(`.favorite-button[data-sit-id="${sitId}"]`);
+        newButton?.addEventListener('click', async () => {
+          await this.toggleFavorite(sitId);
+          // Update button state after toggling
+          if (newButton) {
+            const isFavorite = this.userFavorites.has(sitId);
+            // Update button state
+            newButton.className = `favorite-button${isFavorite ? ' active' : ''}`;
+            // Update button content
+            newButton.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+              ${isFavorite ? 'Favorited' : 'Favorite'}
+            `;
+          }
+        });
+      }
+    });
+  }
+
+  // Add new method to refresh markers
+  private refreshMarkers() {
+    for (const [sitId, marker] of this.markers.entries()) {
+      const el = marker.getElement();
+      el.className = `satlas-marker${this.userFavorites.has(sitId) ? ' favorite' : ''}`;
+
+      // Also update the popup content if it exists
+      const popup = marker.getPopup();
+      const sit = { ...marker.sit, id: sitId } as Sit; // We'll need to store sit data
+      popup.setHTML(this.createMarkerPopup(sit));
+    }
   }
 }
 

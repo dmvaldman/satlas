@@ -370,3 +370,38 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .profile-button.danger:hover {
   background-color: #ff2d20;
 }
+
+.satlas-marker.favorite {
+  background-color: #ff3b30;
+}
+
+.favorite-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 8px;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.favorite-button svg {
+  width: 16px;
+  height: 16px;
+  fill: #ccc;
+  transition: fill 0.2s;
+}
+
+.favorite-button.active {
+  border-color: #ff3b30;
+  color: #ff3b30;
+}
+
+.favorite-button.active svg {
+  fill: #ff3b30;
+}
