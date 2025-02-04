@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { Sit, Coordinates } from './types';
@@ -83,5 +83,13 @@ export class SitManager {
         createdAt: Date.now() // Use numeric timestamp instead of serverTimestamp
       })
     });
+  }
+
+  async getSit(sitId: string): Promise<Sit | null> {
+    const sitDoc = await getDoc(doc(db, 'sits', sitId));
+    if (sitDoc.exists()) {
+      return { ...sitDoc.data(), id: sitDoc.id } as Sit;
+    }
+    return null;
   }
 }

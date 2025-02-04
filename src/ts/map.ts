@@ -147,11 +147,28 @@ export class MapManager {
     const cancelBtn = document.getElementById('cancel-photo');
 
     if (addButton && modal) {
-      addButton.addEventListener('click', () => {
+      addButton.addEventListener('click', async () => {
         if (!authManager.isAuthenticated()) {
           this.showNotification('Please sign in to add a sit', 'error');
           return;
         }
+
+        // Check if user has already uploaded a photo nearby
+        const coordinates = await this.getCurrentLocation();
+        const nearbySit = await this.sitManager.findNearbySit(coordinates);
+
+        if (nearbySit) {
+          const hasUserUploaded = nearbySit.images.some(
+            img => img.userId === authManager.getCurrentUser()?.uid
+          );
+
+          if (hasUserUploaded) {
+            this.showNotification('You have already uploaded a photo to a nearby Sit. You can change your photo but not add another.', 'error');
+            return;
+          }
+        }
+
+        // If no nearby upload found, show the photo modal
         modal.classList.add('active');
       });
     }
@@ -242,20 +259,44 @@ export class MapManager {
     }
   }
 
-  private async getCurrentLocation() {
+  private async getCurrentLocation(): Promise<Coordinates> {
     try {
-      const position = await Geolocation.getCurrentPosition();
+      // First try with high accuracy but short timeout
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      });
+
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
       };
     } catch (error) {
-      console.error('Error getting location:', error);
-      // Default to NYC coordinates
-      return {
-        latitude: 40.7128,
-        longitude: -74.006
-      };
+      console.log('High accuracy location failed, trying with lower accuracy...');
+
+      try {
+        // If high accuracy fails, try with lower accuracy and longer timeout
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 30000
+        });
+
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+      } catch (error) {
+        console.error('Error getting location:', error);
+
+        // Default to a fallback location (you can customize this)
+        this.showNotification('Could not get your location. Using default location.', 'error');
+        return {
+          latitude: 40.7128, // Default to NYC coordinates
+          longitude: -74.006
+        };
+      }
     }
   }
 
@@ -423,7 +464,17 @@ export class MapManager {
       // Check for nearby sits first
       const nearbySit = await this.sitManager.findNearbySit(coordinates);
       if (nearbySit) {
-        // If there's a nearby sit, add the photo to it
+        // Check if the user has already uploaded a photo to this sit
+        const hasUserUploaded = nearbySit.images.some(
+          img => img.userId === authManager.getCurrentUser()?.uid
+        );
+
+        if (hasUserUploaded) {
+          this.showNotification('You have already uploaded a photo to this Sit. You can change your photo but not add another.', 'error');
+          return;
+        }
+
+        // If there's a nearby sit and user hasn't uploaded, add the photo
         await this.handlePhotoUpload(base64Image, nearbySit.id);
         return;
       }
@@ -638,7 +689,29 @@ export class MapManager {
       if (!existingSitId) {
         const nearbySit = await this.sitManager.findNearbySit(coordinates);
         if (nearbySit) {
+          // Check if user has already uploaded to this sit
+          const hasUserUploaded = nearbySit.images.some(
+            img => img.userId === this.auth.currentUser?.uid
+          );
+
+          if (hasUserUploaded) {
+            this.showNotification('You have already uploaded a photo to this Sit. You can change your photo but not add another.', 'error');
+            return;
+          }
           existingSitId = nearbySit.id;
+        }
+      } else {
+        // If existingSitId is provided, check if user has already uploaded
+        const sitDoc = await this.sitManager.getSit(existingSitId);
+        if (sitDoc) {
+          const hasUserUploaded = sitDoc.images.some(
+            img => img.userId === this.auth.currentUser?.uid
+          );
+
+          if (hasUserUploaded) {
+            this.showNotification('You have already uploaded a photo to this Sit. You can change your photo but not add another.', 'error');
+            return;
+          }
         }
       }
 

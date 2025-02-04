@@ -1,17 +1,28 @@
 import mapboxgl from 'mapbox-gl';
 import { Sit, Coordinates } from './types';
 import { getDistanceInFeet } from './types';
+import { authManager } from './auth';
 
 export class PopupManager {
-  createSitPopup(sit: Sit, isFavorite: boolean, favoriteCount: number, userLocation?: Coordinates): mapboxgl.Popup {
-    return new mapboxgl.Popup({
-      offset: {
-        'bottom': [0, -40],
-        'top': [0, 0]
-      },
-      anchor: 'bottom'
-    })
-      .setHTML(this.createPopupHTML(sit, isFavorite, favoriteCount, userLocation));
+  createSitPopup(sit: Sit, isFavorite: boolean, favoriteCount: number, userCoords: Coordinates): mapboxgl.Popup {
+    const popup = new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      maxWidth: '300px'
+    });
+
+    const distance = getDistanceInFeet(userCoords, sit.location);
+    const isNearby = distance < 100;
+    const currentUser = authManager.getCurrentUser();
+    const hasUserUploaded = sit.images.some(img => img.userId === currentUser?.uid);
+
+    // Only show upload button if user is nearby AND hasn't already uploaded
+    const showUploadButton = isNearby && currentUser && !hasUserUploaded;
+
+    const content = this.createPopupContent(sit, isFavorite, favoriteCount, userCoords, showUploadButton);
+    popup.setHTML(content);
+
+    return popup;
   }
 
   createLoadingPopup(): mapboxgl.Popup {
@@ -25,13 +36,11 @@ export class PopupManager {
       .setHTML(this.createLoadingHTML());
   }
 
-  createPopupContent(sit: Sit, isFavorite: boolean, favoriteCount: number, userLocation?: Coordinates): string {
-    return this.createPopupHTML(sit, isFavorite, favoriteCount, userLocation);
-  }
-
-  private createPopupHTML(sit: Sit, isFavorite: boolean, favoriteCount: number, userLocation?: Coordinates): string {
-    const isNearby = userLocation ?
-      getDistanceInFeet(userLocation, sit.location) < 100 : false;
+  createPopupContent(sit: Sit, isFavorite: boolean, favoriteCount: number, userCoords: Coordinates, showUploadButton: boolean): string {
+    const distance = getDistanceInFeet(userCoords, sit.location);
+    const isNearby = distance < 100;
+    const currentUser = authManager.getCurrentUser();
+    const hasUserUploaded = sit.images.some(img => img.userId === currentUser?.uid);
 
     // Ensure sit.images exists and is an array
     const images = sit.images || [];
@@ -52,7 +61,7 @@ export class PopupManager {
         </div>
         <div class="satlas-popup-info">
           ${favoriteCount > 0 ? `<p>Favorited ${favoriteCount} ${favoriteCount === 1 ? 'time' : 'times'}</p>` : ''}
-          ${isNearby ? `
+          ${showUploadButton ? `
             <button class="upload-button" data-sit-id="${sit.id}">
               Add Photo to this Sit
             </button>
