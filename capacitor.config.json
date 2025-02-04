@@ -1,0 +1,10 @@
+{
+  "appId": "xyz.satlas",
+  "appName": "Satlas",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

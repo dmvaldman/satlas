@@ -1,0 +1,163 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  background: white;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 1000;
+}
+
+#profile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-left: auto;
+  cursor: pointer;
+}
+
+#profile-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#map-container {
+  flex: 1;
+  width: 100%;
+  min-height: 0; /* Important for flexbox */
+  position: relative;
+}
+
+.mapboxgl-map {
+  width: 100%;
+  height: 100%;
+}
+
+.satlas-marker {
+  width: 25px;
+  height: 25px;
+  background-color: #31d53d;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.satlas-popup {
+  padding: 10px;
+}
+
+.satlas-popup img {
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.satlas-popup p {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+/* Add these styles for the FAB */
+.fab {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #31d53d;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: transform 0.2s;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
+/* Add styles for the photo selection modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 2000;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.photo-options {
+  background: white;
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.modal-overlay.active .photo-options {
+  transform: translateY(0);
+}
+
+.photo-option-button {
+  width: 100%;
+  padding: 16px;
+  margin: 8px 0;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.photo-option-button:hover {
+  background: #eeeeee;
+}
+
+.photo-option-button svg {
+  width: 24px;
+  height: 24px;
+  fill: #31d53d;
+}
+
+.cancel-button {
+  background: white;
+  color: #ff3b30;
+  font-weight: bold;
+}
