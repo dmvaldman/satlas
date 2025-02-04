@@ -405,3 +405,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .favorite-button.active svg {
   fill: #ff3b30;
 }
+
+.satlas-marker.own-sit {
+  background-color: #4a90e2; /* Blue for user's own sits */
+}

@@ -287,7 +287,10 @@ class MapManager {
           newSitIds.push(sitId);
 
           const el = document.createElement('div');
-          el.className = `satlas-marker${this.userFavorites.has(sitId) ? ' favorite' : ''}`;
+          // Add classes based on ownership and favorite status
+          const isOwnSit = sit.userId === this.auth.currentUser?.uid;
+          const isFavorite = this.userFavorites.has(sitId);
+          el.className = `satlas-marker${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
 
           const popup = new mapboxgl.Popup({ offset: 25 })
             .setHTML(this.createMarkerPopup(sit));
@@ -433,6 +436,9 @@ class MapManager {
         const el = tempMarker.getElement();
         el.classList.remove('pending');
 
+        // Add own-sit class since this is a new upload by the current user
+        el.className = 'satlas-marker own-sit';
+
         tempMarker.setPopup(
           new mapboxgl.Popup({ offset: 25 })
             .setHTML(`
@@ -444,6 +450,12 @@ class MapManager {
               </div>
             `)
         );
+
+        // Store sit data with marker
+        (tempMarker as any).sit = {
+          id: sitId,
+          ...sitData
+        };
 
         // Update marker tracking with permanent ID
         this.markers.delete(tempMarkerId);
@@ -530,10 +542,10 @@ class MapManager {
       const marker = this.markers.get(sitId);
       if (marker) {
         const el = marker.getElement();
-        el.className = 'satlas-marker';
-        if (this.userFavorites.has(sitId)) {
-          el.classList.add('favorite');
-        }
+        const sit = marker.sit as Sit;
+        const isOwnSit = sit.userId === this.auth.currentUser?.uid;
+        const isFavorite = this.userFavorites.has(sitId);
+        el.className = `satlas-marker${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
       }
 
       // Update marker popup to reflect new count
@@ -598,11 +610,13 @@ class MapManager {
   private refreshMarkers() {
     for (const [sitId, marker] of this.markers.entries()) {
       const el = marker.getElement();
-      el.className = `satlas-marker${this.userFavorites.has(sitId) ? ' favorite' : ''}`;
+      const sit = marker.sit as Sit;
+      const isOwnSit = sit.userId === this.auth.currentUser?.uid;
+      const isFavorite = this.userFavorites.has(sitId);
+      el.className = `satlas-marker${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
 
       // Also update the popup content if it exists
       const popup = marker.getPopup();
-      const sit = { ...marker.sit, id: sitId } as Sit; // We'll need to store sit data
       popup.setHTML(this.createMarkerPopup(sit));
     }
   }
