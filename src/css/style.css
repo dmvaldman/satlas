@@ -371,6 +371,12 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background-color: #ff2d20;
 }
 
+.satlas-marker.own-sit {
+  background-color: #4a90e2;
+}
+
+/* More specific selector to override own-sit */
+.satlas-marker.own-sit.favorite,
 .satlas-marker.favorite {
   background-color: #ff3b30;
 }
@@ -404,8 +410,4 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .favorite-button.active svg {
   fill: #ff3b30;
-}
-
-.satlas-marker.own-sit {
-  background-color: #4a90e2; /* Blue for user's own sits */
 }
