@@ -19,7 +19,6 @@ interface Sit {
     longitude: number;
   };
   photoURL: string;
-  upvotes: number;
   userId: string;
   userName: string;
   createdAt: Date;
@@ -126,6 +125,7 @@ class MapManager {
   private loadedSitIds: Set<string> = new Set();
   private userFavorites: Set<string> = new Set();
   private auth = getAuth();
+  private favoritesCounts: Map<string, number> = new Map();
 
   constructor() {
     console.log('MapManager initialized');
@@ -277,13 +277,14 @@ class MapManager {
       const querySnapshot = await getDocs(q);
       console.log('Found sits:', querySnapshot.size);
 
-      // Process each Sit
+      const newSitIds: string[] = [];
       querySnapshot.forEach((doc) => {
         const sitId = doc.id;
         visibleSitIds.add(sitId);
 
         if (!this.loadedSitIds.has(sitId)) {
           const sit = { ...doc.data(), id: sitId } as Sit;
+          newSitIds.push(sitId);
 
           const el = document.createElement('div');
           el.className = `satlas-marker${this.userFavorites.has(sitId) ? ' favorite' : ''}`;
@@ -304,6 +305,11 @@ class MapManager {
           this.loadedSitIds.add(sitId);
         }
       });
+
+      // Load favorites counts for new sits
+      if (newSitIds.length > 0) {
+        await this.loadFavoritesCounts(newSitIds);
+      }
 
       // Remove markers that are no longer visible
       for (const [sitId, marker] of this.markers.entries()) {
@@ -412,7 +418,6 @@ class MapManager {
           longitude: coordinates.longitude
         },
         photoURL,
-        upvotes: 0,
         userId: currentUser?.uid || 'anonymous',
         userName: currentUser?.displayName || 'Anonymous',
         userPhotoURL: currentUser?.photoURL || null,
@@ -435,7 +440,6 @@ class MapManager {
                 <img src="${photoURL}" alt="Sit view" />
                 <div class="satlas-popup-info">
                   <p class="author">Posted by: ${currentUser?.displayName || 'Anonymous'}</p>
-                  <p>Upvotes: 0</p>
                 </div>
               </div>
             `)
@@ -518,6 +522,10 @@ class MapManager {
         this.userFavorites.add(sitId);
       }
 
+      // Update favorites count locally
+      const currentCount = this.favoritesCounts.get(sitId) || 0;
+      this.favoritesCounts.set(sitId, currentCount + (this.userFavorites.has(sitId) ? 1 : -1));
+
       // Update marker appearance
       const marker = this.markers.get(sitId);
       if (marker) {
@@ -528,6 +536,11 @@ class MapManager {
         }
       }
 
+      // Update marker popup to reflect new count
+      const popup = marker.getPopup();
+      const sit = { ...marker.sit, id: sitId } as Sit;
+      popup.setHTML(this.createMarkerPopup(sit));
+
     } catch (error) {
       console.error('Error toggling favorite:', error);
       this.showNotification('Error updating favorite', 'error');
@@ -536,12 +549,13 @@ class MapManager {
 
   private createMarkerPopup(sit: Sit) {
     const isFavorite = this.userFavorites.has(sit.id);
+    const favoriteCount = this.favoritesCounts.get(sit.id) || 0;
     return `
       <div class="satlas-popup">
         <img src="${sit.photoURL}" alt="Sit view" />
         <div class="satlas-popup-info">
           <p class="author">Posted by: ${sit.userName}</p>
-          <p>Upvotes: ${sit.upvotes}</p>
+          ${favoriteCount > 0 ? `<p>Favorited ${favoriteCount} ${favoriteCount === 1 ? 'time' : 'times'}</p>` : ''}
           <button class="favorite-button ${isFavorite ? 'active' : ''}" data-sit-id="${sit.id}">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
@@ -590,6 +604,26 @@ class MapManager {
       const popup = marker.getPopup();
       const sit = { ...marker.sit, id: sitId } as Sit; // We'll need to store sit data
       popup.setHTML(this.createMarkerPopup(sit));
+    }
+  }
+
+  // Add method to load favorites counts
+  private async loadFavoritesCounts(sitIds: string[]) {
+    try {
+      const favoritesRef = collection(db, 'favorites');
+      const q = query(favoritesRef, where('sitId', 'in', sitIds));
+      const querySnapshot = await getDocs(q);
+
+      // Reset counts for these sits
+      sitIds.forEach(id => this.favoritesCounts.set(id, 0));
+
+      // Count favorites
+      querySnapshot.forEach((doc) => {
+        const sitId = doc.data().sitId;
+        this.favoritesCounts.set(sitId, (this.favoritesCounts.get(sitId) || 0) + 1);
+      });
+    } catch (error) {
+      console.error('Error loading favorites counts:', error);
     }
   }
 }
