@@ -716,22 +716,47 @@ export class MapManager {
     if (!marker) return;
 
     const sit = (marker as any).sit;
-    const success = await this.favoritesManager.toggleFavorite(sitId, this.auth.currentUser.uid);
+    const userId = this.auth.currentUser.uid;
 
-    if (success) {
-      const coordinates = await this.getCurrentLocation();
-      const isFavorite = this.favoritesManager.isFavorite(sitId);
-      const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
+    // Optimistically update UI
+    const wasAlreadyFavorite = this.favoritesManager.isFavorite(sitId);
+    const oldFavoriteCount = this.favoritesManager.getFavoriteCount(sitId);
 
-      // Update marker and popup
-      this.markerManager.updateMarkerStyle(marker, sit.userId === this.auth.currentUser.uid, isFavorite);
+    // Update local state immediately
+    this.favoritesManager.updateLocalFavorite(sitId, userId, !wasAlreadyFavorite);
+
+    // Update UI immediately
+    const coordinates = await this.getCurrentLocation();
+    const isFavorite = this.favoritesManager.isFavorite(sitId);
+    const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
+
+    // Update marker and popup
+    this.markerManager.updateMarkerStyle(marker, sit.userId === userId, isFavorite);
+    marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
+      sit,
+      isFavorite,
+      favoriteCount,
+      coordinates
+    ));
+
+    try {
+      // Try to update server
+      await this.favoritesManager.toggleFavorite(sitId, userId);
+    } catch (error) {
+      console.error('Error updating favorite:', error);
+
+      // Revert local state on error
+      this.favoritesManager.updateLocalFavorite(sitId, userId, wasAlreadyFavorite);
+
+      // Revert UI
+      this.markerManager.updateMarkerStyle(marker, sit.userId === userId, wasAlreadyFavorite);
       marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
         sit,
-        isFavorite,
-        favoriteCount,
+        wasAlreadyFavorite,
+        oldFavoriteCount,
         coordinates
       ));
-    } else {
+
       this.showNotification('Error updating favorite', 'error');
     }
   }

@@ -43,7 +43,7 @@ export class FavoritesManager {
     }
   }
 
-  async toggleFavorite(sitId: string, userId: string): Promise<boolean> {
+  async toggleFavorite(sitId: string, userId: string): Promise<void> {
     const favoriteId = `${userId}_${sitId}`;
     const favoriteRef = doc(db, 'favorites', favoriteId);
     const isFavorite = this.userFavorites.has(sitId);
@@ -51,24 +51,16 @@ export class FavoritesManager {
     try {
       if (isFavorite) {
         await deleteDoc(favoriteRef);
-        this.userFavorites.delete(sitId);
       } else {
         await setDoc(favoriteRef, {
           userId,
           sitId,
           createdAt: serverTimestamp()
         });
-        this.userFavorites.add(sitId);
       }
-
-      // Update local count
-      const currentCount = this.favoritesCounts.get(sitId) || 0;
-      this.favoritesCounts.set(sitId, currentCount + (this.userFavorites.has(sitId) ? 1 : -1));
-
-      return true;
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      return false;
+      throw error;
     }
   }
 
@@ -78,5 +70,16 @@ export class FavoritesManager {
 
   getFavoriteCount(sitId: string): number {
     return this.favoritesCounts.get(sitId) || 0;
+  }
+
+  updateLocalFavorite(sitId: string, userId: string, isFavorite: boolean) {
+    // Update the local favorites map
+    if (isFavorite) {
+      this.userFavorites.add(sitId);
+      this.favoritesCounts.set(sitId, (this.favoritesCounts.get(sitId) || 0) + 1);
+    } else {
+      this.userFavorites.delete(sitId);
+      this.favoritesCounts.set(sitId, Math.max(0, (this.favoritesCounts.get(sitId) || 1) - 1));
+    }
   }
 }
