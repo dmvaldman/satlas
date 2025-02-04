@@ -35,12 +35,6 @@ export class AuthManager {
 
   private setupAuthStateListener() {
     onAuthStateChanged(this.auth, (user) => {
-      console.log('Auth state changed:', {
-        user,
-        photoURL: user?.photoURL,
-        displayName: user?.displayName,
-        providerData: user?.providerData
-      });
       this.currentUser = user;
       this.updateUI();
     });
@@ -51,42 +45,28 @@ export class AuthManager {
     const profileContainer = document.getElementById('profile-container');
     const profileImage = document.getElementById('profile-image') as HTMLImageElement;
 
-    console.log('Updating UI, current user:', this.currentUser);
-
     if (this.currentUser) {
-      console.log('Profile photo URL:', this.currentUser.photoURL);
       loginButton?.style.setProperty('display', 'none');
       profileContainer?.style.setProperty('display', 'block');
+
       if (profileImage) {
-        profileImage.onerror = (e) => {
-          console.error('Failed to load profile image:', e);
+        profileImage.onerror = () => {
           profileImage.src = this.defaultProfileImage;
         };
-        profileImage.onload = () => {
-          console.log('Profile image loaded successfully');
-        };
         profileImage.src = this.currentUser.photoURL || this.defaultProfileImage;
-        console.log('Set profile image to:', profileImage.src);
       }
     } else {
       loginButton?.style.setProperty('display', 'flex');
       profileContainer?.style.setProperty('display', 'none');
       if (profileImage) {
         profileImage.src = this.defaultProfileImage;
-        console.log('Set default profile image');
       }
     }
   }
 
   private async signIn() {
     try {
-      const result = await signInWithPopup(this.auth, this.provider);
-      console.log('Sign in result:', {
-        user: result.user,
-        photoURL: result.user?.photoURL,
-        credential: result.credential,
-        providerData: result.user?.providerData
-      });
+      await signInWithPopup(this.auth, this.provider);
     } catch (error) {
       console.error('Error signing in:', error);
     }

@@ -287,7 +287,10 @@ class MapManager {
                 .setHTML(`
                   <div class="satlas-popup">
                     <img src="${sit.photoURL}" alt="Sit view" />
-                    <p>Upvotes: ${sit.upvotes}</p>
+                    <div class="satlas-popup-info">
+                      <p class="author">Posted by: ${sit.userName}</p>
+                      <p>Upvotes: ${sit.upvotes}</p>
+                    </div>
                   </div>
                 `)
             )
@@ -427,7 +430,10 @@ class MapManager {
             .setHTML(`
               <div class="satlas-popup">
                 <img src="${photoURL}" alt="Sit view" />
-                <p>Upvotes: 0</p>
+                <div class="satlas-popup-info">
+                  <p class="author">Posted by: ${currentUser?.displayName || 'Anonymous'}</p>
+                  <p>Upvotes: 0</p>
+                </div>
               </div>
             `)
         );
