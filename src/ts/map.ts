@@ -3,11 +3,14 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import mapboxgl from 'mapbox-gl';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
+import { storage } from './firebase';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
 
-interface Satlas {
+interface Sit {
   id: string;
   location: {
     latitude: number;
@@ -20,9 +23,105 @@ interface Satlas {
   createdAt: Date;
 }
 
+// Add EXIF extraction function
+async function getImageLocation(base64String: string): Promise<{ latitude: number; longitude: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      // Create canvas to strip EXIF but keep GPS
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // Try to extract GPS data before stripping EXIF
+      EXIF.getData(img as any, function() {
+        const exif = EXIF.getAllTags(this);
+
+        if (exif?.GPSLatitude && exif?.GPSLongitude) {
+          const latitude = convertDMSToDD(exif.GPSLatitude, exif.GPSLatitudeRef);
+          const longitude = convertDMSToDD(exif.GPSLongitude, exif.GPSLongitudeRef);
+
+          if (isValidCoordinate(latitude, longitude)) {
+            resolve({ latitude, longitude });
+          } else {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      });
+    };
+
+    // Properly format the base64 string as a data URL if it isn't already
+    if (!base64String.startsWith('data:')) {
+      img.src = `data:image/jpeg;base64,${base64String}`;
+    } else {
+      img.src = base64String;
+    }
+  });
+}
+
+// Convert GPS coordinates from Degrees Minutes Seconds to Decimal Degrees
+function convertDMSToDD(dms: number[], dir: string): number {
+  const degrees = dms[0];
+  const minutes = dms[1];
+  const seconds = dms[2];
+
+  let dd = degrees + (minutes / 60) + (seconds / 3600);
+
+  if (dir === 'S' || dir === 'W') {
+    dd *= -1;
+  }
+
+  return dd;
+}
+
+// Validate coordinates
+function isValidCoordinate(lat: number, lng: number): boolean {
+  return !isNaN(lat) && !isNaN(lng) &&
+         lat >= -90 && lat <= 90 &&
+         lng >= -180 && lng <= 180;
+}
+
+// Strip EXIF data but keep the image
+function stripExif(base64String: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64String);
+        return;
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+
+    // Properly format the base64 string as a data URL if it isn't already
+    if (!base64String.startsWith('data:')) {
+      img.src = `data:image/jpeg;base64,${base64String}`;
+    } else {
+      img.src = base64String;
+    }
+  });
+}
+
 class MapManager {
   private map: mapboxgl.Map | null = null;
-  private markers: mapboxgl.Marker[] = [];
+  private markers: Map<string, mapboxgl.Marker> = new Map();
+  private loadedSitIds: Set<string> = new Set();
 
   constructor() {
     console.log('MapManager initialized');
@@ -146,50 +245,66 @@ class MapManager {
       return;
     }
 
-    // Clear existing markers
-    this.markers.forEach(marker => marker.remove());
-    this.markers = [];
-
     // Get the visible bounds of the map
     const bounds = this.map.getBounds();
+    const visibleSitIds = new Set<string>();
 
     try {
-      // Query Firebase for satlases within the visible bounds
-      const satlasesRef = collection(db, 'satlases');
+      // Query Firebase for sits within the visible bounds
+      const sitsRef = collection(db, 'sits');
       const q = query(
-        satlasesRef,
+        sitsRef,
         where('location.latitude', '>=', bounds.getSouth()),
         where('location.latitude', '<=', bounds.getNorth())
       );
 
       const querySnapshot = await getDocs(q);
-      console.log('Found satlases:', querySnapshot.size);
+      console.log('Found sits:', querySnapshot.size);
 
+      // Process each Sit
       querySnapshot.forEach((doc) => {
-        const satlas = doc.data() as Satlas;
+        const sitId = doc.id;
+        visibleSitIds.add(sitId);
 
-        // Create marker element
-        const el = document.createElement('div');
-        el.className = 'satlas-marker';
+        // Only create marker if we haven't already loaded this Sit
+        if (!this.loadedSitIds.has(sitId)) {
+          const sit = doc.data() as Sit;
 
-        // Create and add the marker
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([satlas.location.longitude, satlas.location.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 })
-              .setHTML(`
-                <div class="satlas-popup">
-                  <img src="${satlas.photoURL}" alt="Satlas view" />
-                  <p>Upvotes: ${satlas.upvotes}</p>
-                </div>
-              `)
-          )
-          .addTo(this.map);
+          // Create marker element
+          const el = document.createElement('div');
+          el.className = 'satlas-marker';
 
-        this.markers.push(marker);
+          // Create and add the marker
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat([sit.location.longitude, sit.location.latitude])
+            .setPopup(
+              new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`
+                  <div class="satlas-popup">
+                    <img src="${sit.photoURL}" alt="Sit view" />
+                    <p>Upvotes: ${sit.upvotes}</p>
+                  </div>
+                `)
+            )
+            .addTo(this.map);
+
+          // Store the marker with its ID
+          this.markers.set(sitId, marker);
+          this.loadedSitIds.add(sitId);
+        }
       });
+
+      // Remove markers that are no longer visible
+      for (const [sitId, marker] of this.markers.entries()) {
+        if (!visibleSitIds.has(sitId)) {
+          marker.remove();
+          this.markers.delete(sitId);
+          this.loadedSitIds.delete(sitId);
+        }
+      }
+
     } catch (error) {
-      console.error('Error loading satlases:', error);
+      console.error('Error loading sits:', error);
     }
   }
 
@@ -228,19 +343,116 @@ class MapManager {
   }
 
   private async handlePhotoCapture(base64Image: string) {
+    let tempMarker: mapboxgl.Marker | null = null;
+    let tempMarkerId: string | null = null;
+
     try {
-      // Get current location
-      const coordinates = await this.getCurrentLocation();
+      // Get location first
+      const exifLocation = await getImageLocation(base64Image);
+      console.log('EXIF Location:', exifLocation);
+      const coordinates = exifLocation || await this.getCurrentLocation();
+      console.log('Final coordinates:', coordinates);
 
-      // Here we'll implement uploading to Firebase Storage
-      // and creating a new Satlas document
-      console.log('Photo captured with coordinates:', coordinates);
+      // Create temporary marker immediately
+      if (this.map) {
+        const el = document.createElement('div');
+        el.className = 'satlas-marker pending';
 
-      // TODO: Implement Firebase upload and database entry
-      // We'll do this in the next step
+        tempMarker = new mapboxgl.Marker(el)
+          .setLngLat([coordinates.longitude, coordinates.latitude])
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 })
+              .setHTML(`
+                <div class="satlas-popup">
+                  <div class="satlas-popup-loading">
+                    <p>Uploading...</p>
+                  </div>
+                </div>
+              `)
+          )
+          .addTo(this.map);
+
+        // Generate a temporary ID
+        tempMarkerId = `temp_${Date.now()}`;
+        this.markers.set(tempMarkerId, tempMarker);
+      }
+
+      // Strip EXIF data from image
+      const strippedImage = await stripExif(base64Image);
+
+      // Create a unique filename using timestamp
+      const filename = `sit_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `sits/${filename}`);
+
+      // Upload the stripped image
+      const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
+      await uploadString(storageRef, base64WithoutPrefix, 'base64');
+      const photoURL = await getDownloadURL(storageRef);
+
+      // Create new Sit document
+      const sitData = {
+        location: {
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude
+        },
+        photoURL,
+        upvotes: 0,
+        userId: 'temp_user_id',
+        userName: 'Anonymous',
+        createdAt: serverTimestamp()
+      };
+
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, 'sits'), sitData);
+      const sitId = docRef.id;
+
+      // Update the temporary marker to be permanent
+      if (tempMarker && tempMarkerId) {
+        const el = tempMarker.getElement();
+        el.classList.remove('pending');
+
+        tempMarker.setPopup(
+          new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+              <div class="satlas-popup">
+                <img src="${photoURL}" alt="Sit view" />
+                <p>Upvotes: 0</p>
+              </div>
+            `)
+        );
+
+        // Update marker tracking with permanent ID
+        this.markers.delete(tempMarkerId);
+        this.markers.set(sitId, tempMarker);
+        this.loadedSitIds.add(sitId);
+      }
+
+      this.showNotification('Sit uploaded successfully!');
+
     } catch (error) {
       console.error('Error handling photo capture:', error);
+
+      // Remove temporary marker if it exists
+      if (tempMarker && tempMarkerId) {
+        tempMarker.remove();
+        this.markers.delete(tempMarkerId);
+      }
+
+      this.showNotification('Error uploading sit', 'error');
     }
+  }
+
+  private showNotification(message: string, type: 'success' | 'error' = 'success') {
+    // Add notification element to DOM
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      notification.remove();
+    }, 3000);
   }
 }
 
