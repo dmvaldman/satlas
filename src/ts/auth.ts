@@ -1,5 +1,6 @@
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { app } from './firebase';
+import { profileManager } from './profile';
 
 export class AuthManager {
   private auth = getAuth(app);
@@ -24,7 +25,11 @@ export class AuthManager {
     const profileContainer = document.getElementById('profile-container');
 
     loginButton?.addEventListener('click', () => this.signIn());
-    profileContainer?.addEventListener('click', () => this.handleProfileClick());
+    profileContainer?.addEventListener('click', () => {
+      if (this.isAuthenticated()) {
+        profileManager.showProfile();
+      }
+    });
 
     // Initialize with default profile image
     const profileImage = document.getElementById('profile-image') as HTMLImageElement;
