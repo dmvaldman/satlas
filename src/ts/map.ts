@@ -12,22 +12,11 @@ import { MarkerManager } from './markers';
 import { PopupManager } from './popups';
 import { FavoritesManager } from './favorites';
 import { SitManager } from './sits';
-import { Coordinates } from './types';
+import { Sit, Coordinates, getDistanceInFeet } from './types';
+import { Capacitor } from '@capacitor/core';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
-
-interface Sit {
-  id: string;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  photoURL: string;
-  userId: string;
-  userName: string;
-  createdAt: Date;
-}
 
 // Add EXIF extraction function
 async function getImageLocation(base64String: string): Promise<{ latitude: number; longitude: number } | null> {
@@ -186,6 +175,40 @@ export class MapManager {
         modal.classList.remove('active');
       });
     }
+
+    // Add carousel navigation
+    document.getElementById('map-container')?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+
+      // Handle carousel navigation
+      if (target.matches('.carousel-prev, .carousel-next')) {
+        e.preventDefault();
+        const carousel = target.closest('.image-carousel');
+        if (!carousel) return;
+
+        const slides = carousel.querySelectorAll('.carousel-slide');
+        const currentSlide = carousel.querySelector('.carousel-slide.active');
+        if (!currentSlide) return;
+
+        let nextIndex = Array.from(slides).indexOf(currentSlide);
+        if (target.matches('.carousel-next')) {
+          nextIndex = (nextIndex + 1) % slides.length;
+        } else {
+          nextIndex = (nextIndex - 1 + slides.length) % slides.length;
+        }
+
+        slides.forEach(slide => slide.classList.remove('active'));
+        slides[nextIndex].classList.add('active');
+      }
+
+      // Handle upload button
+      if (target.matches('.upload-button')) {
+        const sitId = target.dataset.sitId;
+        if (sitId) {
+          this.handleUploadToExistingSit(sitId);
+        }
+      }
+    });
   }
 
   private async initializeMap() {
@@ -257,6 +280,7 @@ export class MapManager {
     const bounds = this.map.getBounds();
     if (!bounds) return;
 
+    const coordinates = await this.getCurrentLocation();
     const sits = await this.sitManager.loadNearbySits({
       north: bounds.getNorth(),
       south: bounds.getSouth()
@@ -277,12 +301,10 @@ export class MapManager {
         const favoriteCount = this.favoritesManager.getFavoriteCount(sit.id);
 
         const marker = this.markerManager.createMarker(sit, isOwnSit, isFavorite);
-        const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount);
+        const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount, coordinates);
 
         marker.setPopup(popup);
         this.markerManager.set(sit.id, marker);
-
-        console.log('Initial marker position:', sit.id, marker.getLngLat());
       }
     });
   }
@@ -291,16 +313,31 @@ export class MapManager {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
-        allowEditing: true,
+        allowEditing: false,
         resultType: CameraResultType.Base64,
-        source: CameraSource.Camera
+        source: CameraSource.Camera,
+        // Common options for both platforms
+        saveToGallery: false,
+        correctOrientation: true
       });
 
-      if (image.base64String) {
+      // Process the image only if we actually got a base64String
+      if (image?.base64String) {
+        // Close the photo modal first
+        const modal = document.getElementById('photo-modal');
+        modal?.classList.remove('active');
+
         await this.handlePhotoCapture(image.base64String);
       }
     } catch (error) {
-      console.error('Error capturing photo:', error);
+      // Only show error if it's not a user cancellation
+      if (!(error instanceof Error) || !error.message.includes('User cancelled')) {
+        console.error('Error capturing photo:', error);
+        this.showNotification('Error capturing photo', 'error');
+      }
+      // Make sure to close modal on error too
+      const modal = document.getElementById('photo-modal');
+      modal?.classList.remove('active');
     }
   }
 
@@ -308,16 +345,27 @@ export class MapManager {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
-        allowEditing: true,
+        allowEditing: false,
         resultType: CameraResultType.Base64,
-        source: CameraSource.Photos
+        source: CameraSource.Photos,
       });
 
       if (image.base64String) {
+        // Close the photo modal first
+        const modal = document.getElementById('photo-modal');
+        modal?.classList.remove('active');
+
         await this.handlePhotoCapture(image.base64String);
       }
     } catch (error) {
-      console.error('Error selecting photo:', error);
+      // Only show error if it's not a user cancellation
+      if (!(error instanceof Error) || !error.message.includes('User cancelled')) {
+        console.error('Error selecting photo:', error);
+        this.showNotification('Error selecting photo', 'error');
+      }
+      // Make sure to close modal on error too
+      const modal = document.getElementById('photo-modal');
+      modal?.classList.remove('active');
     }
   }
 
@@ -337,26 +385,24 @@ export class MapManager {
       const coordinates = exifLocation || await this.getCurrentLocation();
       console.log('Final coordinates:', coordinates);
 
-      // Create temporary marker immediately
+      // Check for nearby sits first
+      const nearbySit = await this.sitManager.findNearbySit(coordinates);
+      if (nearbySit) {
+        // If there's a nearby sit, add the photo to it
+        await this.handlePhotoUpload(base64Image, nearbySit.id);
+        return;
+      }
+
+      // Create temporary marker for new sit
       if (this.map) {
         const el = document.createElement('div');
         el.className = 'satlas-marker pending';
 
         tempMarker = new mapboxgl.Marker(el)
           .setLngLat([coordinates.longitude, coordinates.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 25 })
-              .setHTML(`
-                <div class="satlas-popup">
-                  <div class="satlas-popup-loading">
-                    <p>Uploading...</p>
-                  </div>
-                </div>
-              `)
-          )
+          .setPopup(this.popupManager.createLoadingPopup())
           .addTo(this.map);
 
-        // Generate a temporary ID
         tempMarkerId = `temp_${Date.now()}`;
         this.markerManager.set(tempMarkerId, tempMarker);
       }
@@ -364,11 +410,9 @@ export class MapManager {
       // Strip EXIF data from image
       const strippedImage = await stripExif(base64Image);
 
-      // Create a unique filename using timestamp
+      // Upload image
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
-
-      // Upload the stripped image
       const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
@@ -379,10 +423,13 @@ export class MapManager {
           latitude: coordinates.latitude,
           longitude: coordinates.longitude
         },
-        photoURL,
-        userId: currentUser?.uid || 'anonymous',
-        userName: currentUser?.displayName || 'Anonymous',
-        userPhotoURL: currentUser?.photoURL || null,
+        images: [{
+          id: `${Date.now()}_${currentUser?.uid}`,
+          photoURL,
+          userId: currentUser?.uid || 'anonymous',
+          userName: currentUser?.displayName || 'Anonymous',
+          createdAt: Date.now()
+        }],
         createdAt: serverTimestamp()
       };
 
@@ -394,27 +441,19 @@ export class MapManager {
       if (tempMarker && tempMarkerId) {
         const el = tempMarker.getElement();
         el.classList.remove('pending');
-
-        // Add own-sit class since this is a new upload by the current user
         el.className = 'satlas-marker own-sit';
 
-        tempMarker.setPopup(
-          new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`
-              <div class="satlas-popup">
-                <img src="${photoURL}" alt="Sit view" />
-                <div class="satlas-popup-info">
-                  <p class="author">Posted by: ${currentUser?.displayName || 'Anonymous'}</p>
-                </div>
-              </div>
-            `)
-        );
+        const sit = { id: sitId, ...sitData };
+        (tempMarker as any).sit = sit;
 
-        // Store sit data with marker
-        (tempMarker as any).sit = {
-          id: sitId,
-          ...sitData
-        };
+        tempMarker.setPopup(
+          this.popupManager.createSitPopup(
+            sit,
+            false,
+            0,
+            coordinates
+          )
+        );
 
         // Update marker tracking with permanent ID
         this.markerManager.delete(tempMarkerId);
@@ -424,7 +463,6 @@ export class MapManager {
     } catch (error) {
       console.error('Error handling photo capture:', error);
 
-      // Remove temporary marker if it exists
       if (tempMarker && tempMarkerId) {
         tempMarker.remove();
         this.markerManager.delete(tempMarkerId);
@@ -456,6 +494,7 @@ export class MapManager {
   }
 
   private async refreshMarkers() {
+    const coordinates = await this.getCurrentLocation();
     const markers = this.markerManager.getAll();
     for (const [sitId, marker] of markers) {
       const sit = (marker as any).sit;
@@ -466,12 +505,11 @@ export class MapManager {
 
       const popup = marker.getPopup();
       const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
-      popup.setHTML(this.popupManager.createPopupContent(sit, isFavorite, favoriteCount));
+      popup.setHTML(this.popupManager.createPopupContent(sit, isFavorite, favoriteCount, coordinates));
     }
   }
 
   private setupFavoriteClickListener() {
-    // Use event delegation on the map container
     document.getElementById('map-container')?.addEventListener('click', async (e) => {
       const target = e.target as HTMLElement;
       const favoriteButton = target.closest('.favorite-button') as HTMLElement;
@@ -485,10 +523,16 @@ export class MapManager {
       // Update just this popup
       const marker = this.markerManager.get(sitId);
       if (marker) {
+        const coordinates = await this.getCurrentLocation();
         const sit = (marker as any).sit;
         const isFavorite = this.favoritesManager.isFavorite(sitId);
         const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
-        marker.getPopup().setHTML(this.popupManager.createPopupContent(sit, isFavorite, favoriteCount));
+        marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
+          sit,
+          isFavorite,
+          favoriteCount,
+          coordinates
+        ));
       }
     });
   }
@@ -506,14 +550,95 @@ export class MapManager {
     const success = await this.favoritesManager.toggleFavorite(sitId, this.auth.currentUser.uid);
 
     if (success) {
+      const coordinates = await this.getCurrentLocation();
       const isFavorite = this.favoritesManager.isFavorite(sitId);
       const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
 
       // Update marker and popup
       this.markerManager.updateMarkerStyle(marker, sit.userId === this.auth.currentUser.uid, isFavorite);
-      marker.getPopup().setHTML(this.popupManager.createPopupContent(sit, isFavorite, favoriteCount));
+      marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
+        sit,
+        isFavorite,
+        favoriteCount,
+        coordinates
+      ));
     } else {
       this.showNotification('Error updating favorite', 'error');
+    }
+  }
+
+  private async handleUploadToExistingSit(sitId: string) {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        saveToGallery: false,
+        correctOrientation: true
+      });
+
+      if (image.base64String) {
+        await this.handlePhotoUpload(image.base64String, sitId);
+      }
+    } catch (error) {
+      // Only show error if it's not a user cancellation
+      if (!(error instanceof Error) || !error.message.includes('User cancelled')) {
+        console.error('Error capturing photo:', error);
+        this.showNotification('Error uploading photo', 'error');
+      }
+    }
+  }
+
+  private async handlePhotoUpload(base64Image: string, existingSitId?: string) {
+    if (!this.auth.currentUser) {
+      this.showNotification('Please sign in to add photos', 'error');
+      return;
+    }
+
+    try {
+      const coordinates = await this.getCurrentLocation();
+
+      // If no existing sitId provided, check for nearby sits
+      if (!existingSitId) {
+        const nearbySit = await this.sitManager.findNearbySit(coordinates);
+        if (nearbySit) {
+          existingSitId = nearbySit.id;
+        }
+      }
+
+      // Strip EXIF data from image
+      const strippedImage = await stripExif(base64Image);
+
+      // Upload image
+      const filename = `sit_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `sits/${filename}`);
+      const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
+      await uploadString(storageRef, base64WithoutPrefix, 'base64');
+      const photoURL = await getDownloadURL(storageRef);
+
+      const currentUser = this.auth.currentUser;
+      const imageData = {
+        photoURL,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || 'Anonymous'
+      };
+
+      if (existingSitId) {
+        // Add image to existing sit
+        await this.sitManager.addImageToSit(existingSitId, imageData);
+        this.showNotification('Photo added to existing Sit!');
+      } else {
+        // Create new sit with first image
+        await this.sitManager.uploadSit(base64Image, coordinates, currentUser.uid, currentUser.displayName || 'Anonymous');
+        this.showNotification('New Sit created!');
+      }
+
+      // Refresh the map
+      this.loadNearbySits();
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      this.showNotification('Error uploading photo', 'error');
     }
   }
 }

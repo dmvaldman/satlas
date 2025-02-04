@@ -411,3 +411,56 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .favorite-button.active svg {
   fill: #ff3b30;
 }
+
+.image-carousel {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.carousel-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.carousel-slide {
+  display: none;
+}
+
+.carousel-slide.active {
+  display: block;
+}
+
+.carousel-prev,
+.carousel-next {
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.carousel-prev:disabled,
+.carousel-next:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.upload-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #31d53d;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 8px;
+  color: #31d53d;
+}
+
+.upload-button:hover {
+  background: #31d53d;
+  color: white;
+}
