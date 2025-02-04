@@ -123,20 +123,7 @@ export class MapManager {
 
   constructor() {
     console.log('MapManager initialized');
-    this.initializeMap().then(() => {
-      // Initialize managers after map is ready
-      this.markerManager = new MarkerManager(this.map);
-      this.popupManager = new PopupManager();
-      this.favoritesManager = new FavoritesManager();
-      this.sitManager = new SitManager();
-
-      this.setupEventListeners();
-      this.setupAuthListener();
-      this.setupFavoriteClickListener();
-
-      // Load initial sits
-      this.loadNearbySits();
-    });
+    this.initializeMap();
   }
 
   private setupEventListeners() {
@@ -326,9 +313,8 @@ export class MapManager {
 
   private async initializeMap() {
     try {
-      console.log('Initializing map...');
       const coordinates = await this.getCurrentLocation();
-      console.log('Got coordinates:', coordinates);
+      console.log('Initializing map at coordinates:', coordinates);
 
       this.map = new mapboxgl.Map({
         container: 'map-container',
@@ -337,21 +323,38 @@ export class MapManager {
         zoom: 13
       });
 
-      return new Promise<void>((resolve) => {
+      // Initialize managers after map is ready
+      await new Promise<void>((resolve) => {
         this.map.on('load', () => {
-          console.log('Map loaded');
+          this.markerManager = new MarkerManager(this.map);
+          this.popupManager = new PopupManager();
+          this.favoritesManager = new FavoritesManager();
+          this.sitManager = new SitManager();
+
+          this.setupEventListeners();
+          this.setupAuthListener();
+          this.setupFavoriteClickListener();
 
           // Add movement listener
           this.map.on('moveend', () => {
             this.loadNearbySits();
           });
 
+          // Load initial sits
+          this.loadNearbySits();
+
           resolve();
         });
       });
     } catch (error) {
       console.error('Error initializing map:', error);
-      this.initializeMapWithDefaultLocation();
+      // Use default NYC coordinates
+      this.map = new mapboxgl.Map({
+        container: 'map-container',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [-74.006, 40.7128],
+        zoom: 13
+      });
     }
   }
 
@@ -394,22 +397,6 @@ export class MapManager {
         };
       }
     }
-  }
-
-  private initializeMapWithDefaultLocation() {
-    console.log('Initializing map with default location');
-    const container = document.getElementById('map-container');
-    if (!container) {
-      console.error('Could not find map container');
-      return;
-    }
-
-    this.map = new mapboxgl.Map({
-      container: 'map-container',
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-74.006, 40.7128], // Default to NYC
-      zoom: 13
-    });
   }
 
   private async loadNearbySits() {
@@ -932,9 +919,3 @@ export class MapManager {
     }
   }
 }
-
-// Initialize the map when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM loaded, initializing MapManager');
-  new MapManager();
-});
