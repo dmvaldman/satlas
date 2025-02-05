@@ -7,7 +7,8 @@ export interface Sit {
     longitude: number;
   };
   imageCollectionId: string;  // Reference to ImageCollection
-  createdAt: Date | FieldValue;
+  createdAt: FieldValue | Date;
+  uploadedBy: string;
 }
 
 export interface ImageCollection {

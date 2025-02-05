@@ -2,30 +2,32 @@ import mapboxgl from 'mapbox-gl';
 import { Sit, Coordinates } from './types';
 import { getDistanceInFeet } from './types';
 import { authManager } from './auth';
+import { sitManager } from './sits';
 
 export class PopupManager {
   createSitPopup(
     sit: Sit,
     marks: Set<MarkType>,
-    markCounts: { [key in MarkType]: number },
-    userCoords: Coordinates
+    markCounts: { [key: string]: number },
+    currentLocation: Coordinates
   ): mapboxgl.Popup {
+    const currentUser = authManager.getCurrentUser();
+    const distance = getDistanceInFeet(currentLocation, sit.location);
+
     const popup = new mapboxgl.Popup({
-      closeButton: true,
-      closeOnClick: false,
+      closeButton: false,
       maxWidth: '300px'
     });
 
-    const distance = getDistanceInFeet(userCoords, sit.location);
-    const isNearby = distance < 100;
-    const currentUser = authManager.getCurrentUser();
-    const hasUserUploaded = sit.images.some(img => img.userId === currentUser?.uid);
+    // Load initial popup content
+    popup.setHTML(this.createLoadingPopupContent());
 
-    // Only show upload button if user is nearby AND hasn't already uploaded
-    const showUploadButton = isNearby && currentUser && !hasUserUploaded;
-
-    const content = this.createPopupContent(sit, marks, markCounts, userCoords, showUploadButton);
-    popup.setHTML(content);
+    // Get images and update popup content
+    sitManager.getImagesForSit(sit.imageCollectionId).then(images => {
+      const hasUserUploaded = images.some(img => img.userId === currentUser?.uid);
+      // Update popup content with images
+      popup.setHTML(this.createFullPopupContent(sit, images, marks, markCounts, distance, hasUserUploaded));
+    });
 
     return popup;
   }
@@ -41,27 +43,46 @@ export class PopupManager {
       .setHTML(this.createLoadingHTML());
   }
 
-  createPopupContent(
+  private createLoadingPopupContent(): string {
+    return `
+      <div class="satlas-popup">
+        <div class="satlas-popup-loading">
+          <p>Loading...</p>
+        </div>
+      </div>
+    `;
+  }
+
+  private createLoadingHTML(): string {
+    return `
+      <div class="satlas-popup">
+        <div class="satlas-popup-loading">
+          <p>Uploading...</p>
+        </div>
+      </div>
+    `;
+  }
+
+  private createFullPopupContent(
     sit: Sit,
+    images: Image[],
     marks: Set<MarkType>,
-    markCounts: { [key in MarkType]: number },
-    userCoords: Coordinates,
-    showUploadButton: boolean
+    markCounts: { [key: string]: number },
+    distance: number,
+    hasUserUploaded: boolean
   ): string {
-    const distance = getDistanceInFeet(userCoords, sit.location);
     const isNearby = distance < 100;
     const currentUser = authManager.getCurrentUser();
-    const hasUserUploaded = sit.images.some(img => img.userId === currentUser?.uid);
 
     // Ensure sit.images exists and is an array
-    const images = sit.images || [];
+    const imagesArray = images || [];
 
     let content = `
       <div class="satlas-popup">
         <div class="image-carousel">
-          <button class="carousel-prev" ${images.length <= 1 ? 'disabled' : ''}>←</button>
+          <button class="carousel-prev" ${imagesArray.length <= 1 ? 'disabled' : ''}>←</button>
           <div class="carousel-container">
-            ${images.map((image, index) => `
+            ${imagesArray.map((image, index) => `
               <div class="carousel-slide ${index === 0 ? 'active' : ''}">
                 <img src="${image.photoURL}" alt="Sit view" />
                 ${image.userId === currentUser?.uid ? `
@@ -82,13 +103,13 @@ export class PopupManager {
               </div>
             `).join('')}
           </div>
-          <button class="carousel-next" ${images.length <= 1 ? 'disabled' : ''}>→</button>
+          <button class="carousel-next" ${imagesArray.length <= 1 ? 'disabled' : ''}>→</button>
         </div>
         <div class="satlas-popup-info">
           ${markCounts['favorite'] > 0 ?
             `<p class="favorite-count-text">Favorited ${markCounts['favorite']} ${markCounts['favorite'] === 1 ? 'time' : 'times'}</p>`
             : ''}
-          ${showUploadButton ? `
+          ${hasUserUploaded ? `
             <button class="upload-button" data-sit-id="${sit.id}">
               Add Photo to this Sit
             </button>
@@ -121,15 +142,5 @@ export class PopupManager {
       </div>`;
 
     return content;
-  }
-
-  private createLoadingHTML(): string {
-    return `
-      <div class="satlas-popup">
-        <div class="satlas-popup-loading">
-          <p>Uploading...</p>
-        </div>
-      </div>
-    `;
   }
 }

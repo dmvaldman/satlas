@@ -151,7 +151,8 @@ export class MapManager {
         const nearbySit = await this.sitManager.findNearbySit(coordinates);
 
         if (nearbySit) {
-          const hasUserUploaded = nearbySit.images.some(
+          const images = await this.sitManager.getImagesForSit(nearbySit.imageCollectionId);
+          const hasUserUploaded = images.some(
             img => img.userId === authManager.getCurrentUser()?.uid
           );
 
@@ -471,7 +472,12 @@ export class MapManager {
   private isNewSit(sit: Sit): boolean {
     const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
     const cutoffTime = Math.min(this.lastVisit, oneWeekAgo);
-    return sit.createdAt.toMillis() > cutoffTime;
+
+    if (sit.createdAt instanceof Date) {
+      return sit.createdAt.getTime() > cutoffTime;
+    } else {
+      return (sit.createdAt as any).toMillis() > cutoffTime;
+    }
   }
 
   private async loadNearbySits() {
@@ -487,7 +493,7 @@ export class MapManager {
     console.log('Loaded sits with locations:', sits.map(sit => ({
       id: sit.id,
       location: sit.location,
-      images: sit.images.length
+      images: sit.imageCollectionId
     })));
 
     this.updateNearbySitsCache(sits);  // Update cache with new sits
@@ -505,10 +511,10 @@ export class MapManager {
 
     sits.forEach(sit => {
       if (!this.markerManager.has(sit.id)) {
-        const isOwnSit = sit.userId === this.auth.currentUser?.uid;
+        const isOwnSit = sit.uploadedBy === this.auth.currentUser?.uid;
         const isFavorite = this.favoritesManager.isFavorite(sit.id);
         const favoriteCount = this.favoritesManager.getFavoriteCount(sit.id);
-        const isNew = this.isNewSit(sit);
+        const isNew = !isOwnSit && this.isNewSit(sit);
         const marks = this.marksManager.getMarks(sit.id);
         const markCounts = {
           favorite: this.marksManager.getMarkCount(sit.id, 'favorite'),
@@ -516,7 +522,7 @@ export class MapManager {
           visited: this.marksManager.getMarkCount(sit.id, 'visited')
         };
 
-        const marker = this.markerManager.createMarker(sit, isOwnSit, marks.has('favorite'), this.isNewSit(sit));
+        const marker = this.markerManager.createMarker(sit, isOwnSit, marks.has('favorite'), isNew);
         const popup = this.popupManager.createSitPopup(sit, marks, markCounts, currentLocation);
 
         marker.setPopup(popup);
@@ -628,8 +634,11 @@ export class MapManager {
       // Check for nearby sits first
       const nearbySit = await this.sitManager.findNearbySit(coordinates);
       if (nearbySit) {
+        // Get images for this sit
+        const images = await this.sitManager.getImagesForSit(nearbySit.imageCollectionId);
+
         // Check if the user has already uploaded a photo to this sit
-        const hasUserUploaded = nearbySit.images.some(
+        const hasUserUploaded = images.some(
           img => img.userId === authManager.getCurrentUser()?.uid
         );
 
@@ -673,13 +682,8 @@ export class MapManager {
           latitude: coordinates.latitude,
           longitude: coordinates.longitude
         },
-        images: [{
-          id: `${Date.now()}_${currentUser?.uid}`,
-          photoURL,
-          userId: currentUser?.uid || 'anonymous',
-          userName: currentUser?.displayName || 'Anonymous',
-          createdAt: Date.now()
-        }],
+        imageCollectionId: `${Date.now()}_${currentUser?.uid}`, // Generate a new collection ID
+        uploadedBy: currentUser?.uid || 'anonymous',
         createdAt: serverTimestamp()
       };
 
@@ -761,7 +765,7 @@ export class MapManager {
           };
 
           // Update marker style
-          this.markerManager.updateMarkerStyle(marker, sit.userId === user.uid, marks.has('favorite'));
+          this.markerManager.updateMarkerStyle(marker, sit.uploadedBy === user.uid, marks.has('favorite'));
 
           // Update popup
           marker.setPopup(this.popupManager.createSitPopup(
@@ -852,7 +856,7 @@ export class MapManager {
     const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
 
     // Update marker and popup
-    this.markerManager.updateMarkerStyle(marker, sit.userId === userId, isFavorite);
+    this.markerManager.updateMarkerStyle(marker, sit.uploadedBy === userId, isFavorite);
     marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
       sit,
       isFavorite,
@@ -870,7 +874,7 @@ export class MapManager {
       this.favoritesManager.updateLocalFavorite(sitId, userId, wasAlreadyFavorite);
 
       // Revert UI
-      this.markerManager.updateMarkerStyle(marker, sit.userId === userId, wasAlreadyFavorite);
+      this.markerManager.updateMarkerStyle(marker, sit.uploadedBy === userId, wasAlreadyFavorite);
       marker.getPopup()?.setHTML(this.popupManager.createPopupContent(
         sit,
         wasAlreadyFavorite,
@@ -905,23 +909,36 @@ export class MapManager {
     }
   }
 
-  private async handlePhotoUpload(base64Image: string) {
+  private async handlePhotoUpload(base64Image: string, existingSitId?: string) {
     if (!this.auth.currentUser) {
       this.showNotification('Please sign in to add photos', 'error');
       return;
     }
 
     try {
-      // 1 & 2: Get location from EXIF or current location
       const exifLocation = await getImageLocation(base64Image);
       const coordinates = exifLocation || await this.getCurrentLocation();
+
+      if (existingSitId) {
+        // Add photo to existing sit
+        const existingSit = this.nearbySitsCache.get(existingSitId);
+        if (existingSit) {
+          await this.addPhotoToExistingSit(base64Image, existingSit);
+        }
+        return;
+      }
 
       // Check if a sit already exists at this location
       const nearbySit = Array.from(this.nearbySitsCache.values())
         .find(sit => getDistanceInFeet(coordinates, sit.location) < 100);
 
       if (nearbySit) {
-        if (nearbySit.images.some(img => img.userId === this.auth.currentUser!.uid)) {
+        const images = await this.sitManager.getImagesForSit(nearbySit.imageCollectionId);
+        const hasUserUploaded = images.some(
+          img => img.userId === this.auth.currentUser!.uid
+        );
+
+        if (hasUserUploaded) {
           this.showNotification('You have already uploaded a photo to this Sit', 'error');
           return;
         }
@@ -930,16 +947,15 @@ export class MapManager {
         return;
       }
 
-      // 3: Create marker at location (without photo data yet)
+      // Create new sit...
       const el = document.createElement('div');
-      el.className = this.markerManager.getMarkerClasses(true, false); // true for own sit, not favorited
+      el.className = this.markerManager.getMarkerClasses(true, false);
 
       const marker = new mapboxgl.Marker(el)
         .setLngLat([coordinates.longitude, coordinates.latitude])
         .addTo(this.map!);
 
       try {
-        // 4: Upload photo and sit data to Firebase
         const sit = await this.sitManager.uploadSit(
           base64Image,
           coordinates,
@@ -947,15 +963,11 @@ export class MapManager {
           this.auth.currentUser.displayName || 'Anonymous'
         );
 
-        // 5: Update marker with sit data
         (marker as any).sit = sit;
 
-        // No need to update className since it's already correct
-
-        // Add popup
         marker.setPopup(this.popupManager.createSitPopup(
           sit,
-          new Set<MarkType>(),  // No marks for new sit
+          new Set<MarkType>(),
           {
             favorite: 0,
             visited: 0,
@@ -964,15 +976,13 @@ export class MapManager {
           coordinates
         ));
 
-        // Add to managers
         this.markerManager.set(sit.id, marker);
         this.nearbySitsCache.set(sit.id, sit);
 
         this.showNotification('Photo uploaded successfully');
       } catch (error) {
-        // 6: Remove marker on failure
         marker.remove();
-        throw error;  // Re-throw to be caught by outer catch
+        throw error;
       }
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -1170,7 +1180,7 @@ export class MapManager {
         // Update marker style
         this.markerManager.updateMarkerStyle(
           marker,
-          sit.userId === userId,
+          sit.uploadedBy === userId,
           !isMarked
         );
       }
@@ -1196,7 +1206,7 @@ export class MapManager {
 
           this.markerManager.updateMarkerStyle(
             marker,
-            sit.userId === userId,
+            sit.uploadedBy === userId,
             isMarked
           );
         }
@@ -1217,16 +1227,16 @@ export class MapManager {
 
       sits.forEach(sit => {
         if (!this.markerManager.has(sit.id)) {
-          const isOwnSit = sit.userId === currentUser?.uid;
+          const isOwnSit = sit.uploadedBy === currentUser?.uid;
           const marks = this.marksManager.getMarks(sit.id);
           const isFavorite = marks.has('favorite');
 
-          // Calculate if sit is new based on creation time vs last visit OR within a week
           const sitCreatedAt = sit.createdAt instanceof Date ?
             sit.createdAt.getTime() :
             (sit.createdAt as any).toMillis();
 
-          const isNew = sitCreatedAt > this.lastVisit || sitCreatedAt > oneWeekAgo;
+          // Only show new if it's not the user's own sit
+          const isNew = !isOwnSit && (sitCreatedAt > this.lastVisit || sitCreatedAt > oneWeekAgo);
 
           const marker = this.markerManager.createMarker(
             sit,

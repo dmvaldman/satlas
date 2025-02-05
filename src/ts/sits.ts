@@ -26,29 +26,37 @@ export class SitManager {
     // Strip EXIF data from image
     const strippedImage = await this.stripExif(base64Image);
 
-    // Upload image
+    // Upload image to storage
     const filename = `sit_${Date.now()}.jpg`;
     const storageRef = ref(storage, `sits/${filename}`);
     const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
     await uploadString(storageRef, base64WithoutPrefix, 'base64');
     const photoURL = await getDownloadURL(storageRef);
 
-    // Create sit data with timestamp as number
+    // Generate imageCollectionId
+    const imageCollectionId = `${Date.now()}_${userId}`;
+
+    // Create sit data
     const sitData = {
       location: coordinates,
-      images: [{
-        id: `${Date.now()}_${userId}`,
-        photoURL,
-        userId,
-        userName,
-        createdAt: Date.now() // Use numeric timestamp instead of serverTimestamp
-      }],
-      createdAt: serverTimestamp() // Keep serverTimestamp for the document's creation
+      imageCollectionId,
+      uploadedBy: userId,
+      createdAt: serverTimestamp()
     };
 
-    // Add to Firestore
+    // Add sit to Firestore
     const docRef = await addDoc(collection(db, 'sits'), sitData);
-    return { ...sitData, id: docRef.id } as Sit;
+    const sit = { ...sitData, id: docRef.id } as Sit;
+
+    // Add image to images collection
+    await this.addImageToSit(imageCollectionId, {
+      photoURL,
+      userId,
+      userName,
+      createdAt: serverTimestamp()
+    });
+
+    return sit;
   }
 
   private async stripExif(base64Image: string): Promise<string> {
@@ -70,21 +78,6 @@ export class SitManager {
     return null;
   }
 
-  async addImageToSit(sitId: string, imageData: {
-    photoURL: string;
-    userId: string;
-    userName: string;
-  }): Promise<void> {
-    const sitRef = doc(db, 'sits', sitId);
-    await updateDoc(sitRef, {
-      images: arrayUnion({
-        id: `${Date.now()}_${imageData.userId}`,
-        ...imageData,
-        createdAt: Date.now() // Use numeric timestamp instead of serverTimestamp
-      })
-    });
-  }
-
   async getSit(sitId: string): Promise<Sit | null> {
     const sitDoc = await getDoc(doc(db, 'sits', sitId));
     if (sitDoc.exists()) {
@@ -94,34 +87,47 @@ export class SitManager {
   }
 
   async replaceImage(sitId: string, imageId: string, newPhotoURL: string): Promise<void> {
-    const sitRef = doc(db, 'sits', sitId);
-    const sitDoc = await getDoc(sitRef);
-
-    if (sitDoc.exists()) {
-      const sit = sitDoc.data() as Sit;
-      const updatedImages = sit.images.map(img =>
-        img.id === imageId ? { ...img, photoURL: newPhotoURL } : img
-      );
-
-      await updateDoc(sitRef, { images: updatedImages });
-    }
+    const imageRef = doc(db, 'images', imageId);
+    await updateDoc(imageRef, { photoURL: newPhotoURL });
   }
 
   async deleteImage(sitId: string, imageId: string): Promise<void> {
-    const sitRef = doc(db, 'sits', sitId);
-    const sitDoc = await getDoc(sitRef);
+    const imageRef = doc(db, 'images', imageId);
+    await deleteDoc(imageRef);
 
-    if (sitDoc.exists()) {
-      const sit = sitDoc.data() as Sit;
-      const updatedImages = sit.images.filter(img => img.id !== imageId);
+    // Get remaining images for this sit
+    const sit = await this.getSit(sitId);
+    if (!sit) return;
 
-      // If this was the last image, delete the entire sit
-      if (updatedImages.length === 0) {
-        await deleteDoc(sitRef);
-      } else {
-        // Otherwise just update the images array
-        await updateDoc(sitRef, { images: updatedImages });
-      }
+    const remainingImages = await this.getImagesForSit(sit.imageCollectionId);
+
+    // If this was the last image, delete the entire sit
+    if (remainingImages.length === 0) {
+      const sitRef = doc(db, 'sits', sitId);
+      await deleteDoc(sitRef);
     }
   }
+
+  async getImagesForSit(imageCollectionId: string): Promise<Image[]> {
+    if (!imageCollectionId) {
+      console.warn('No imageCollectionId provided to getImagesForSit');
+      return [];
+    }
+
+    const imagesRef = collection(db, 'images');
+    const q = query(imagesRef, where('collectionId', '==', imageCollectionId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Image));
+  }
+
+  async addImageToSit(imageCollectionId: string, imageData: Partial<Image>): Promise<void> {
+    const imageRef = collection(db, 'images');
+    await addDoc(imageRef, {
+      ...imageData,
+      collectionId: imageCollectionId,
+      createdAt: serverTimestamp()
+    });
+  }
 }
+
+export const sitManager = new SitManager();
