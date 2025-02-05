@@ -4,7 +4,12 @@ import { getDistanceInFeet } from './types';
 import { authManager } from './auth';
 
 export class PopupManager {
-  createSitPopup(sit: Sit, isFavorite: boolean, favoriteCount: number, userCoords: Coordinates): mapboxgl.Popup {
+  createSitPopup(
+    sit: Sit,
+    marks: Set<MarkType>,
+    markCounts: { [key in MarkType]: number },
+    userCoords: Coordinates
+  ): mapboxgl.Popup {
     const popup = new mapboxgl.Popup({
       closeButton: true,
       closeOnClick: false,
@@ -19,7 +24,7 @@ export class PopupManager {
     // Only show upload button if user is nearby AND hasn't already uploaded
     const showUploadButton = isNearby && currentUser && !hasUserUploaded;
 
-    const content = this.createPopupContent(sit, isFavorite, favoriteCount, userCoords, showUploadButton);
+    const content = this.createPopupContent(sit, marks, markCounts, userCoords, showUploadButton);
     popup.setHTML(content);
 
     return popup;
@@ -36,7 +41,13 @@ export class PopupManager {
       .setHTML(this.createLoadingHTML());
   }
 
-  createPopupContent(sit: Sit, isFavorite: boolean, favoriteCount: number, userCoords: Coordinates, showUploadButton: boolean): string {
+  createPopupContent(
+    sit: Sit,
+    marks: Set<MarkType>,
+    markCounts: { [key in MarkType]: number },
+    userCoords: Coordinates,
+    showUploadButton: boolean
+  ): string {
     const distance = getDistanceInFeet(userCoords, sit.location);
     const isNearby = distance < 100;
     const currentUser = authManager.getCurrentUser();
@@ -45,7 +56,7 @@ export class PopupManager {
     // Ensure sit.images exists and is an array
     const images = sit.images || [];
 
-    return `
+    let content = `
       <div class="satlas-popup">
         <div class="image-carousel">
           <button class="carousel-prev" ${images.length <= 1 ? 'disabled' : ''}>←</button>
@@ -74,21 +85,42 @@ export class PopupManager {
           <button class="carousel-next" ${images.length <= 1 ? 'disabled' : ''}>→</button>
         </div>
         <div class="satlas-popup-info">
-          ${favoriteCount > 0 ? `<p>Favorited ${favoriteCount} ${favoriteCount === 1 ? 'time' : 'times'}</p>` : ''}
+          ${markCounts['favorite'] > 0 ?
+            `<p class="favorite-count-text">Favorited ${markCounts['favorite']} ${markCounts['favorite'] === 1 ? 'time' : 'times'}</p>`
+            : ''}
           ${showUploadButton ? `
             <button class="upload-button" data-sit-id="${sit.id}">
               Add Photo to this Sit
             </button>
           ` : ''}
-          <button class="favorite-button ${isFavorite ? 'active' : ''}" data-sit-id="${sit.id}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-            ${isFavorite ? 'Favorited' : 'Favorite'}
-          </button>
         </div>
       </div>
     `;
+
+    // Add mark buttons
+    content += `
+      <div class="mark-buttons">
+        <button class="mark-button favorite${marks.has('favorite') ? ' active' : ''}" data-sit-id="${sit.id}" data-mark-type="favorite">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          ${markCounts['favorite'] || ''}
+        </button>
+        <button class="mark-button wantToGo${marks.has('wantToGo') ? ' active' : ''}" data-sit-id="${sit.id}" data-mark-type="wantToGo">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+          </svg>
+          ${markCounts['wantToGo'] || ''}
+        </button>
+        <button class="mark-button visited${marks.has('visited') ? ' active' : ''}" data-sit-id="${sit.id}" data-mark-type="visited">
+          <svg viewBox="0 0 24 24">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          ${markCounts['visited'] || ''}
+        </button>
+      </div>`;
+
+    return content;
   }
 
   private createLoadingHTML(): string {

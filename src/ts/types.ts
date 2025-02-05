@@ -1,4 +1,4 @@
-import { FieldValue } from 'firebase/firestore';
+import { FieldValue, Timestamp } from 'firebase/firestore';
 
 export interface SitImage {
   id: string;
@@ -27,6 +27,15 @@ export interface UserPreferences {
   nickname: string;
   pushNotificationsEnabled: boolean;
   lastVisit: number;  // Unix timestamp
+}
+
+export type MarkType = 'favorite' | 'wantToGo' | 'visited';
+
+export interface UserSitMark {
+  userId: string;
+  sitId: string;
+  type: MarkType;
+  createdAt: Timestamp;
 }
 
 // Helper function to calculate distance between coordinates

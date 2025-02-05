@@ -546,3 +546,57 @@ input[type="checkbox"]:checked + .toggle-slider:before {
     -1px  1px 0 #000,
      1px  1px 0 #000;  /* Black outline effect */
 }
+
+.mark-buttons {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.mark-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.mark-button svg {
+  width: 16px;
+  height: 16px;
+  fill: #ccc;
+  transition: fill 0.2s;
+}
+
+.mark-button.favorite.active {
+  border-color: #ff3b30;
+  color: #ff3b30;
+}
+
+.mark-button.favorite.active svg {
+  fill: #ff3b30;
+}
+
+.mark-button.wantToGo.active {
+  border-color: #007AFF;
+  color: #007AFF;
+}
+
+.mark-button.wantToGo.active svg {
+  fill: #007AFF;
+}
+
+.mark-button.visited.active {
+  border-color: #34C759;
+  color: #34C759;
+}
+
+.mark-button.visited.active svg {
+  fill: #34C759;
+}

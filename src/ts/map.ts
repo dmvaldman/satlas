@@ -14,6 +14,7 @@ import { FavoritesManager } from './favorites';
 import { SitManager } from './sits';
 import { Sit, Coordinates, getDistanceInFeet, UserPreferences } from './types';
 import { Capacitor } from '@capacitor/core';
+import { MarksManager } from './marks';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
@@ -120,6 +121,7 @@ export class MapManager {
   private popupManager!: PopupManager;
   private favoritesManager!: FavoritesManager;
   private sitManager!: SitManager;
+  private marksManager!: MarksManager;
   private nearbySitsCache: Map<string, Sit> = new Map();  // Add cache for sits
   private lastKnownLocation: Coordinates | null = null;  // Add this to class properties
   private lastVisit: number = 0;  // Add this property
@@ -363,10 +365,12 @@ export class MapManager {
           this.popupManager = new PopupManager();
           this.favoritesManager = new FavoritesManager();
           this.sitManager = new SitManager();
+          this.marksManager = new MarksManager();
 
           this.setupEventListeners();
           this.setupAuthListener();
           this.setupFavoriteClickListener();
+          this.setupMarkClickListener();
 
           // Add movement listener
           this.map.on('moveend', () => {
@@ -505,9 +509,15 @@ export class MapManager {
         const isFavorite = this.favoritesManager.isFavorite(sit.id);
         const favoriteCount = this.favoritesManager.getFavoriteCount(sit.id);
         const isNew = this.isNewSit(sit);
+        const marks = this.marksManager.getMarks(sit.id);
+        const markCounts = {
+          favorite: this.marksManager.getMarkCount(sit.id, 'favorite'),
+          wantToGo: this.marksManager.getMarkCount(sit.id, 'wantToGo'),
+          visited: this.marksManager.getMarkCount(sit.id, 'visited')
+        };
 
-        const marker = this.markerManager.createMarker(sit, isOwnSit, isFavorite, isNew);
-        const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount, currentLocation);
+        const marker = this.markerManager.createMarker(sit, isOwnSit, marks.has('favorite'), this.isNewSit(sit));
+        const popup = this.popupManager.createSitPopup(sit, marks, markCounts, currentLocation);
 
         marker.setPopup(popup);
         this.markerManager.set(sit.id, marker);
@@ -726,27 +736,61 @@ export class MapManager {
   }
 
   private setupAuthListener() {
-    this.auth.onAuthStateChanged((user) => {
-      this.favoritesManager.loadUserFavorites(user?.uid || null).then(() => {
-        this.refreshMarkers();
-      });
+    this.auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        // Load user data
+        await Promise.all([
+          this.marksManager.loadUserMarks(user.uid),
+          this.loadLastVisit()
+        ]);
+
+        // Refresh all markers with new mark state
+        const currentLocation = await this.getCurrentLocation();
+        this.markerManager.getAll().forEach(([sitId, marker]) => {
+          const sit = (marker as any).sit as Sit;
+          if (!sit) return;
+
+          const marks = this.marksManager.getMarks(sitId);
+          const markCounts = {
+            favorite: this.marksManager.getMarkCount(sitId, 'favorite'),
+            wantToGo: this.marksManager.getMarkCount(sitId, 'wantToGo'),
+            visited: this.marksManager.getMarkCount(sitId, 'visited')
+          };
+
+          // Update marker style
+          this.markerManager.updateMarkerStyle(marker, sit.userId === user.uid, marks.has('favorite'));
+
+          // Update popup
+          marker.setPopup(this.popupManager.createSitPopup(
+            sit,
+            marks,
+            markCounts,
+            currentLocation
+          ));
+        });
+      } else {
+        // Clear marks on sign out
+        this.marksManager.clear();
+
+        // Reset markers to unsigned-in state
+        const currentLocation = await this.getCurrentLocation();
+        this.markerManager.getAll().forEach(([sitId, marker]) => {
+          const sit = (marker as any).sit as Sit;
+          if (!sit) return;
+
+          // Update marker style
+          this.markerManager.updateMarkerStyle(marker, false, false);
+
+          // Update popup with empty marks
+          marker.setPopup(this.popupManager.createSitPopup(
+            sit,
+            new Set(),
+            { favorite: 0, wantToGo: 0, visited: 0 },
+            currentLocation
+          ));
+        });
+      }
     });
-  }
-
-  private async refreshMarkers() {
-    const coordinates = await this.getCurrentLocation();
-    const markers = this.markerManager.getAll();
-    for (const [sitId, marker] of markers) {
-      const sit = (marker as any).sit;
-      const isOwnSit = sit.userId === this.auth.currentUser?.uid;
-      const isFavorite = this.favoritesManager.isFavorite(sitId);
-
-      this.markerManager.updateMarkerStyle(marker, isOwnSit, isFavorite);
-
-      const popup = marker.getPopup();
-      const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
-      popup.setHTML(this.popupManager.createPopupContent(sit, isFavorite, favoriteCount, coordinates));
-    }
   }
 
   private setupFavoriteClickListener() {
@@ -1060,6 +1104,93 @@ export class MapManager {
   private updateNearbySitsCache(sits: Sit[]) {
     sits.forEach(sit => {
       this.nearbySitsCache.set(sit.id, sit);
+    });
+  }
+
+  private setupMarkClickListener() {
+    document.getElementById('map-container')?.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      const markButton = target.closest('.mark-button') as HTMLElement;
+      if (!markButton) return;
+
+      e.stopPropagation();
+
+      const sitId = markButton.dataset.sitId;
+      const markType = markButton.dataset.markType as MarkType;
+      if (!sitId || !markType) return;
+
+      const userId = this.auth.currentUser?.uid;
+      if (!userId) {
+        this.showNotification('Please sign in to mark sits', 'error');
+        return;
+      }
+
+      const sit = this.nearbySitsCache.get(sitId);
+      if (!sit) return;
+
+      const marker = this.markerManager.get(sitId);
+      if (!marker) return;
+
+      // Optimistically update UI
+      const isMarked = markButton.classList.contains('active');
+      markButton.classList.toggle('active');
+
+      // Update count display
+      const countSpan = markButton.querySelector('.mark-count');
+      const currentCount = parseInt(countSpan?.textContent || '0');
+      const newCount = isMarked ? currentCount - 1 : currentCount + 1;
+      if (countSpan) {
+        countSpan.textContent = newCount.toString();
+      }
+
+      // Update favorite count text if this is a favorite mark
+      if (markType === 'favorite') {
+        const favoriteText = marker.getPopup()?.getElement()?.querySelector('.favorite-count-text');
+        if (favoriteText) {
+          if (newCount > 0) {
+            favoriteText.textContent = `Favorited ${newCount} ${newCount === 1 ? 'time' : 'times'}`;
+          } else {
+            favoriteText.textContent = '';
+          }
+        }
+
+        // Update marker style
+        this.markerManager.updateMarkerStyle(
+          marker,
+          sit.userId === userId,
+          !isMarked
+        );
+      }
+
+      try {
+        await this.marksManager.toggleMark(sitId, userId, markType);
+      } catch (error) {
+        // Revert all UI changes on error
+        markButton.classList.toggle('active');
+        if (countSpan) {
+          countSpan.textContent = currentCount.toString();
+        }
+
+        if (markType === 'favorite') {
+          const favoriteText = marker.getPopup()?.getElement()?.querySelector('.favorite-count-text');
+          if (favoriteText) {
+            if (currentCount > 0) {
+              favoriteText.textContent = `Favorited ${currentCount} ${currentCount === 1 ? 'time' : 'times'}`;
+            } else {
+              favoriteText.textContent = '';
+            }
+          }
+
+          this.markerManager.updateMarkerStyle(
+            marker,
+            sit.userId === userId,
+            isMarked
+          );
+        }
+
+        console.error('Error updating mark:', error);
+        this.showNotification('Error updating mark', 'error');
+      }
     });
   }
 }
