@@ -1,20 +1,26 @@
 import { FieldValue, Timestamp } from 'firebase/firestore';
 
-export interface SitImage {
-  id: string;
-  photoURL: string;
-  userId: string;
-  userName: string;
-  createdAt: Date | FieldValue;
-}
-
 export interface Sit {
   id: string;
   location: {
     latitude: number;
     longitude: number;
   };
-  images: SitImage[];
+  imageCollectionId: string;  // Reference to ImageCollection
+  createdAt: Date | FieldValue;
+}
+
+export interface ImageCollection {
+  id: string;
+  sitId: string;  // Back reference to Sit
+}
+
+export interface SitImage {
+  id: string;
+  collectionId: string;  // Reference to ImageCollection
+  photoURL: string;
+  userId: string;
+  userName: string;
   createdAt: Date | FieldValue;
 }
 
@@ -29,7 +35,7 @@ export interface UserPreferences {
   lastVisit: number;  // Unix timestamp
 }
 
-export type MarkType = 'favorite' | 'wantToGo' | 'visited';
+export type MarkType = 'favorite' | 'visited';
 
 export interface UserSitMark {
   userId: string;

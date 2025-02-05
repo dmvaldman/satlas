@@ -699,9 +699,12 @@ export class MapManager {
         tempMarker.setPopup(
           this.popupManager.createSitPopup(
             sit,
-            false,
-            0,
-            sit.location
+            new Set<MarkType>(),  // No marks for new sit
+            {
+              favorite: 0,
+              visited: 0
+            },
+            coordinates
           )
         );
 
@@ -784,8 +787,11 @@ export class MapManager {
           // Update popup with empty marks
           marker.setPopup(this.popupManager.createSitPopup(
             sit,
-            new Set(),
-            { favorite: 0, wantToGo: 0, visited: 0 },
+            new Set<MarkType>(),  // No marks for new sit
+            {
+              favorite: 0,
+              visited: 0
+            },
             currentLocation
           ));
         });
@@ -949,8 +955,11 @@ export class MapManager {
         // Add popup
         marker.setPopup(this.popupManager.createSitPopup(
           sit,
-          false,
-          0,
+          new Set<MarkType>(),  // No marks for new sit
+          {
+            favorite: 0,
+            visited: 0
+          },
           coordinates
         ));
 
@@ -989,8 +998,11 @@ export class MapManager {
           (marker as any).sit = updatedSit;
           marker.setPopup(this.popupManager.createSitPopup(
             updatedSit,
-            this.favoritesManager.isFavorite(existingSit.id),
-            this.favoritesManager.getFavoriteCount(existingSit.id),
+            this.marksManager.getMarks(existingSit.id),
+            {
+              favorite: this.marksManager.getMarkCount(existingSit.id, 'favorite'),
+              visited: this.marksManager.getMarkCount(existingSit.id, 'visited')
+            },
             updatedSit.location
           ));
         }

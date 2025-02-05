@@ -3,8 +3,8 @@ import { db } from './firebase';
 import { UserSitMark, MarkType } from './types';
 
 export class MarksManager {
-  private marks: Map<string, Set<MarkType>> = new Map();  // sitId -> Set of mark types
-  private counts: Map<string, Map<MarkType, number>> = new Map();  // sitId -> (markType -> count)
+  private marks: Map<string, Set<MarkType>> = new Map();
+  private counts: Map<string, Map<MarkType, number>> = new Map();
 
   constructor() {}
 
@@ -14,13 +14,26 @@ export class MarksManager {
 
     if (!userId) return;
 
-    const marksRef = collection(db, 'userSitMarks');
-    const q = query(marksRef, where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
+    // Load favorites
+    const favoritesRef = collection(db, 'favorites');
+    const favoritesQuery = query(favoritesRef, where('userId', '==', userId));
+    const favoritesSnapshot = await getDocs(favoritesQuery);
 
-    querySnapshot.forEach((doc) => {
+    // Load visited
+    const visitedRef = collection(db, 'visited');
+    const visitedQuery = query(visitedRef, where('userId', '==', userId));
+    const visitedSnapshot = await getDocs(visitedQuery);
+
+    // Process favorites
+    favoritesSnapshot.forEach((doc) => {
       const mark = doc.data() as UserSitMark;
-      this.updateLocalMark(mark.sitId, mark.type, true);
+      this.updateLocalMark(mark.sitId, 'favorite', true);
+    });
+
+    // Process visited
+    visitedSnapshot.forEach((doc) => {
+      const mark = doc.data() as UserSitMark;
+      this.updateLocalMark(mark.sitId, 'visited', true);
     });
 
     // Load counts for all mark types
@@ -28,22 +41,39 @@ export class MarksManager {
   }
 
   private async loadMarksCounts() {
-    const marksRef = collection(db, 'userSitMarks');
-    const querySnapshot = await getDocs(marksRef);
+    // Load favorite counts
+    const favoritesRef = collection(db, 'favorites');
+    const favoritesSnapshot = await getDocs(favoritesRef);
 
-    querySnapshot.forEach((doc) => {
+    // Load visited counts
+    const visitedRef = collection(db, 'visited');
+    const visitedSnapshot = await getDocs(visitedRef);
+
+    // Process favorites
+    favoritesSnapshot.forEach((doc) => {
       const mark = doc.data() as UserSitMark;
       if (!this.counts.has(mark.sitId)) {
         this.counts.set(mark.sitId, new Map());
       }
       const sitCounts = this.counts.get(mark.sitId)!;
-      sitCounts.set(mark.type, (sitCounts.get(mark.type) || 0) + 1);
+      sitCounts.set('favorite', (sitCounts.get('favorite') || 0) + 1);
+    });
+
+    // Process visited
+    visitedSnapshot.forEach((doc) => {
+      const mark = doc.data() as UserSitMark;
+      if (!this.counts.has(mark.sitId)) {
+        this.counts.set(mark.sitId, new Map());
+      }
+      const sitCounts = this.counts.get(mark.sitId)!;
+      sitCounts.set('visited', (sitCounts.get('visited') || 0) + 1);
     });
   }
 
   async toggleMark(sitId: string, userId: string, type: MarkType) {
     const hasType = this.hasMark(sitId, type);
-    const markRef = doc(db, 'userSitMarks', `${userId}_${sitId}_${type}`);
+    const collectionName = type === 'favorite' ? 'favorites' : 'visited';
+    const markRef = doc(db, collectionName, `${userId}_${sitId}`);
 
     if (hasType) {
       await deleteDoc(markRef);
@@ -57,7 +87,6 @@ export class MarksManager {
       await setDoc(markRef, mark);
     }
 
-    // Update local state
     this.updateLocalMark(sitId, type, !hasType);
     this.updateCount(sitId, type, hasType ? -1 : 1);
   }

@@ -583,15 +583,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   fill: #ff3b30;
 }
 
-.mark-button.wantToGo.active {
-  border-color: #007AFF;
-  color: #007AFF;
-}
-
-.mark-button.wantToGo.active svg {
-  fill: #007AFF;
-}
-
 .mark-button.visited.active {
   border-color: #34C759;
   color: #34C759;
