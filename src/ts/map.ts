@@ -120,6 +120,8 @@ export class MapManager {
   private popupManager!: PopupManager;
   private favoritesManager!: FavoritesManager;
   private sitManager!: SitManager;
+  private nearbySitsCache: Map<string, Sit> = new Map();  // Add cache for sits
+  private lastKnownLocation: Coordinates | null = null;  // Add this to class properties
 
   constructor() {
     console.log('MapManager initialized');
@@ -294,11 +296,12 @@ export class MapManager {
               }
             }
           } else {
-            // If sit was deleted (last image was removed), remove the marker
+            // If sit was deleted (last image was removed), remove the marker and from cache
             const marker = this.markerManager.get(sitId);
             if (marker) {
               marker.remove();
               this.markerManager.delete(sitId);
+              this.nearbySitsCache.delete(sitId);  // Remove from cache
             }
           }
 
@@ -388,41 +391,56 @@ export class MapManager {
 
   private async getCurrentLocation(): Promise<Coordinates> {
     try {
-      // First try with high accuracy but short timeout
+      // Try high accuracy first with longer timeout
       const position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
+        timeout: 10000,
+        maximumAge: 30000
       });
 
-      return {
+      this.lastKnownLocation = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
       };
+      return this.lastKnownLocation;
+
     } catch (error) {
-      console.log('High accuracy location failed, trying with lower accuracy...');
+      console.log('High accuracy location failed, trying with lower accuracy...', error);
 
       try {
-        // If high accuracy fails, try with lower accuracy and longer timeout
+        // Try lower accuracy with longer timeout
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 30000
+          timeout: 15000,
+          maximumAge: 60000
         });
 
-        return {
+        this.lastKnownLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
+        return this.lastKnownLocation;
+
       } catch (error) {
         console.error('Error getting location:', error);
 
-        // Default to a fallback location (you can customize this)
-        this.showNotification('Could not get your location. Using default location.', 'error');
-        return {
-          latitude: 40.7128, // Default to NYC coordinates
-          longitude: -74.006
-        };
+        // Try to use last known location first
+        if (this.lastKnownLocation) {
+          return this.lastKnownLocation;
+        }
+
+        // Then try to use map center if available
+        if (this.map) {
+          const center = this.map.getCenter();
+          return {
+            latitude: center.lat,
+            longitude: center.lng
+          };
+        }
+
+        // If all else fails, throw an error
+        this.showNotification('Location services are required. Please enable location services and refresh the page.', 'error');
+        throw new Error('Could not get location. Location services may be disabled.');
       }
     }
   }
@@ -432,11 +450,18 @@ export class MapManager {
     const bounds = this.map.getBounds();
     if (!bounds) return;
 
-    const coordinates = await this.getCurrentLocation();
     const sits = await this.sitManager.loadNearbySits({
       north: bounds.getNorth(),
       south: bounds.getSouth()
     });
+
+    console.log('Loaded sits with locations:', sits.map(sit => ({
+      id: sit.id,
+      location: sit.location,
+      images: sit.images.length
+    })));
+
+    this.updateNearbySitsCache(sits);  // Update cache with new sits
 
     const newSitIds = sits
       .filter(sit => !this.markerManager.has(sit.id))
@@ -446,6 +471,9 @@ export class MapManager {
       await this.favoritesManager.loadFavoritesCounts(newSitIds);
     }
 
+    // Get current location once for all markers
+    const currentLocation = await this.getCurrentLocation();
+
     sits.forEach(sit => {
       if (!this.markerManager.has(sit.id)) {
         const isOwnSit = sit.userId === this.auth.currentUser?.uid;
@@ -453,7 +481,7 @@ export class MapManager {
         const favoriteCount = this.favoritesManager.getFavoriteCount(sit.id);
 
         const marker = this.markerManager.createMarker(sit, isOwnSit, isFavorite);
-        const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount, coordinates);
+        const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount, currentLocation);
 
         marker.setPopup(popup);
         this.markerManager.set(sit.id, marker);
@@ -500,6 +528,7 @@ export class MapManager {
         console.log('Photo captured, starting upload...');
         // Create a temporary marker first
         const coordinates = await this.getCurrentLocation();
+        const tempMarkerId = `temp_${Date.now()}`;
         const tempMarker = this.markerManager.createMarker(
           { location: coordinates } as Sit,  // Create minimal sit object for temp marker
           true,
@@ -800,136 +829,118 @@ export class MapManager {
     }
   }
 
-  private async handlePhotoUpload(base64Image: string, existingSitId?: string) {
+  private async handlePhotoUpload(base64Image: string) {
     if (!this.auth.currentUser) {
       this.showNotification('Please sign in to add photos', 'error');
       return;
     }
 
     try {
-      console.log('Starting photo upload...', { existingSitId });
-      const coordinates = await this.getCurrentLocation();
-      console.log('Got coordinates:', coordinates);
+      // 1 & 2: Get location from EXIF or current location
+      const exifLocation = await getImageLocation(base64Image);
+      const coordinates = exifLocation || await this.getCurrentLocation();
 
-      let sitId: string;
-      let sit: Sit;
+      // Check if a sit already exists at this location
+      const nearbySit = Array.from(this.nearbySitsCache.values())
+        .find(sit => getDistanceInFeet(coordinates, sit.location) < 100);
 
-      if (!existingSitId) {
-        console.log('No existing sitId, checking for nearby sits...');
-        const nearbySit = await this.sitManager.findNearbySit(coordinates);
-        console.log('Found nearby sit:', nearbySit);
-        if (nearbySit) {
-          // Check if user has already uploaded to this sit
-          const hasUserUploaded = nearbySit.images.some(
-            img => img.userId === this.auth.currentUser?.uid
-          );
-
-          if (hasUserUploaded) {
-            this.showNotification('You have already uploaded a photo to this Sit. You can change your photo but not add another.', 'error');
-            return;
-          }
-          existingSitId = nearbySit.id;
+      if (nearbySit) {
+        if (nearbySit.images.some(img => img.userId === this.auth.currentUser!.uid)) {
+          this.showNotification('You have already uploaded a photo to this Sit', 'error');
+          return;
         }
-      } else {
-        // If existingSitId is provided, check if user has already uploaded
-        const sitDoc = await this.sitManager.getSit(existingSitId);
-        if (sitDoc) {
-          const hasUserUploaded = sitDoc.images.some(
-            img => img.userId === this.auth.currentUser?.uid
-          );
-
-          if (hasUserUploaded) {
-            this.showNotification('You have already uploaded a photo to this Sit. You can change your photo but not add another.', 'error');
-            return;
-          }
-        }
+        // Add photo to existing sit
+        await this.addPhotoToExistingSit(base64Image, nearbySit);
+        return;
       }
 
-      // Upload image and get URL
-      const strippedImage = await stripExif(base64Image);
-      const filename = `sit_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `sits/${filename}`);
-      const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
-      await uploadString(storageRef, base64WithoutPrefix, 'base64');
-      const photoURL = await getDownloadURL(storageRef);
+      // 3: Create marker at location (without photo data yet)
+      const el = document.createElement('div');
+      el.className = 'satlas-marker own-sit';
 
-      const currentUser = this.auth.currentUser;
-      const imageData = {
-        photoURL,
-        userId: currentUser.uid,
-        userName: currentUser.displayName || 'Anonymous'
-      };
+      const marker = new mapboxgl.Marker(el)  // Pass our custom element
+        .setLngLat([coordinates.longitude, coordinates.latitude])
+        .addTo(this.map!);
 
-      if (existingSitId) {
-        console.log('Adding to existing sit:', existingSitId);
-        await this.sitManager.addImageToSit(existingSitId, imageData);
-        sit = await this.sitManager.getSit(existingSitId) as Sit;
-        sitId = existingSitId;
-        console.log('Updated sit:', sit);
-
-        const existingMarker = this.markerManager.get(sitId);
-        console.log('Found existing marker:', !!existingMarker);
-        if (existingMarker) {
-          // Update the marker's sit data
-          (existingMarker as any).sit = sit;
-
-          // Update popup content
-          const isFavorite = this.favoritesManager.isFavorite(sitId);
-          const favoriteCount = this.favoritesManager.getFavoriteCount(sitId);
-          const popup = this.popupManager.createSitPopup(
-            sit,
-            isFavorite,
-            favoriteCount,
-            sit.location
-          );
-          existingMarker.setPopup(popup);
-
-          // If popup is open, refresh it
-          const openPopup = document.querySelector('.mapboxgl-popup');
-          if (openPopup && openPopup.querySelector(`[data-sit-id="${sitId}"]`)) {
-            existingMarker.getPopup()?.addTo(this.map!);
-          }
-          console.log('Marker and popup updated');
-        }
-      } else {
-        console.log('Creating new sit...');
-        sit = await this.sitManager.uploadSit(base64Image, coordinates, currentUser.uid, currentUser.displayName || 'Anonymous');
-        sitId = sit.id;
-        console.log('New sit created:', { sitId, sit });
-
-        // Create marker logging
-        const marker = this.markerManager.createMarker(
-          sit,
-          sit.userId === currentUser.uid,
-          false
+      try {
+        // 4: Upload photo and sit data to Firebase
+        const sit = await this.sitManager.uploadSit(
+          base64Image,
+          coordinates,
+          this.auth.currentUser.uid,
+          this.auth.currentUser.displayName || 'Anonymous'
         );
-        console.log('New marker created');
 
+        // 5: Update marker with sit data
         (marker as any).sit = sit;
-        console.log('Sit data added to marker');
+        const el = marker.getElement();
+        el.className = 'satlas-marker own-sit';
 
-        const popup = this.popupManager.createSitPopup(
+        // Add popup
+        marker.setPopup(this.popupManager.createSitPopup(
           sit,
           false,
           0,
-          sit.location
-        );
-        marker.setPopup(popup);
-        console.log('Popup created and set');
+          coordinates
+        ));
 
-        marker.addTo(this.map!);
-        this.markerManager.set(sitId, marker);
-        console.log('Marker added to map and manager');
+        // Add to managers
+        this.markerManager.set(sit.id, marker);
+        this.nearbySitsCache.set(sit.id, sit);
+
+        this.showNotification('Photo uploaded successfully');
+      } catch (error) {
+        // 6: Remove marker on failure
+        marker.remove();
+        throw error;  // Re-throw to be caught by outer catch
       }
-
-      await this.favoritesManager.loadFavoritesCounts([sitId]);
-      console.log('Favorites loaded');
-
-      this.showNotification('Photo uploaded successfully');
     } catch (error) {
-      console.error('Error in handlePhotoUpload:', error);
+      console.error('Error uploading photo:', error);
       this.showNotification('Error uploading photo', 'error');
     }
+  }
+
+  private async addPhotoToExistingSit(base64Image: string, existingSit: Sit) {
+    try {
+      // Upload photo and add to existing sit
+      const imageData = {
+        photoURL: await this.uploadPhotoToStorage(base64Image),
+        userId: this.auth.currentUser!.uid,
+        userName: this.auth.currentUser!.displayName || 'Anonymous'
+      };
+
+      await this.sitManager.addImageToSit(existingSit.id, imageData);
+
+      // Update marker with new sit data
+      const updatedSit = await this.sitManager.getSit(existingSit.id);
+      if (updatedSit) {
+        const marker = this.markerManager.get(existingSit.id);
+        if (marker) {
+          (marker as any).sit = updatedSit;
+          marker.setPopup(this.popupManager.createSitPopup(
+            updatedSit,
+            this.favoritesManager.isFavorite(existingSit.id),
+            this.favoritesManager.getFavoriteCount(existingSit.id),
+            updatedSit.location
+          ));
+        }
+        this.nearbySitsCache.set(existingSit.id, updatedSit);
+      }
+
+      this.showNotification('Photo added successfully');
+    } catch (error) {
+      console.error('Error adding photo to existing sit:', error);
+      this.showNotification('Error adding photo', 'error');
+    }
+  }
+
+  private async uploadPhotoToStorage(base64Image: string): Promise<string> {
+    const strippedImage = await stripExif(base64Image);
+    const filename = `sit_${Date.now()}.jpg`;
+    const storageRef = ref(storage, `sits/${filename}`);
+    const base64WithoutPrefix = strippedImage.replace(/^data:image\/\w+;base64,/, '');
+    await uploadString(storageRef, base64WithoutPrefix, 'base64');
+    return getDownloadURL(storageRef);
   }
 
   private async replacePhoto(sitId: string, imageId: string, source: CameraSource) {
@@ -1018,5 +1029,11 @@ export class MapManager {
       console.error('Error replacing photo:', error);
       this.showNotification('Error replacing photo', 'error');
     }
+  }
+
+  private updateNearbySitsCache(sits: Sit[]) {
+    sits.forEach(sit => {
+      this.nearbySitsCache.set(sit.id, sit);
+    });
   }
 }
