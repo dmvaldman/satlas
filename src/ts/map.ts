@@ -1,5 +1,5 @@
 import { Geolocation } from '@capacitor/geolocation';
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import mapboxgl from 'mapbox-gl';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -12,7 +12,7 @@ import { MarkerManager } from './markers';
 import { PopupManager } from './popups';
 import { FavoritesManager } from './favorites';
 import { SitManager } from './sits';
-import { Sit, Coordinates, getDistanceInFeet } from './types';
+import { Sit, Coordinates, getDistanceInFeet, UserPreferences } from './types';
 import { Capacitor } from '@capacitor/core';
 
 // Replace with your Mapbox access token
@@ -122,10 +122,12 @@ export class MapManager {
   private sitManager!: SitManager;
   private nearbySitsCache: Map<string, Sit> = new Map();  // Add cache for sits
   private lastKnownLocation: Coordinates | null = null;  // Add this to class properties
+  private lastVisit: number = 0;  // Add this property
 
   constructor() {
     console.log('MapManager initialized');
     this.initializeMap();
+    this.loadLastVisit();
   }
 
   private setupEventListeners() {
@@ -445,6 +447,29 @@ export class MapManager {
     }
   }
 
+  private async loadLastVisit() {
+    if (!this.auth.currentUser) return;
+
+    const userDoc = await getDoc(doc(db, 'userPreferences', this.auth.currentUser.uid));
+    if (userDoc.exists()) {
+      const prefs = userDoc.data() as UserPreferences;
+      this.lastVisit = prefs.lastVisit || 0;
+    }
+
+    // Update lastVisit to now
+    const now = Date.now();
+    await setDoc(doc(db, 'userPreferences', this.auth.currentUser.uid),
+      { lastVisit: now },
+      { merge: true }
+    );
+  }
+
+  private isNewSit(sit: Sit): boolean {
+    const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const cutoffTime = Math.max(this.lastVisit, oneWeekAgo);
+    return sit.createdAt.toMillis() > cutoffTime;
+  }
+
   private async loadNearbySits() {
     if (!this.map) return;
     const bounds = this.map.getBounds();
@@ -479,8 +504,9 @@ export class MapManager {
         const isOwnSit = sit.userId === this.auth.currentUser?.uid;
         const isFavorite = this.favoritesManager.isFavorite(sit.id);
         const favoriteCount = this.favoritesManager.getFavoriteCount(sit.id);
+        const isNew = this.isNewSit(sit);
 
-        const marker = this.markerManager.createMarker(sit, isOwnSit, isFavorite);
+        const marker = this.markerManager.createMarker(sit, isOwnSit, isFavorite, isNew);
         const popup = this.popupManager.createSitPopup(sit, isFavorite, favoriteCount, currentLocation);
 
         marker.setPopup(popup);

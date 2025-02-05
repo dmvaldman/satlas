@@ -4,20 +4,24 @@ import { Sit } from './types';
 export class MarkerManager {
   private markers: Map<string, mapboxgl.Marker> = new Map();
   private loadedSitIds: Set<string> = new Set();
+  private map: mapboxgl.Map;
 
-  constructor(private map: mapboxgl.Map) {}
+  constructor(map: mapboxgl.Map) {
+    this.map = map;
+  }
 
-  createMarker(sit: Sit, isOwnSit: boolean, isFavorite: boolean): mapboxgl.Marker {
+  createMarker(sit: Sit, isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false): mapboxgl.Marker {
     const el = document.createElement('div');
-    el.className = this.getMarkerClassName(isOwnSit, isFavorite);
+    el.className = 'satlas-marker';
+    if (isOwnSit) el.classList.add('own-sit');
+    if (isFavorite) el.classList.add('favorite');
+    if (isNew) el.classList.add('new');
 
     const marker = new mapboxgl.Marker(el)
-      .setLngLat([sit.location.longitude, sit.location.latitude])
-      .addTo(this.map);
+      .setLngLat([sit.location.longitude, sit.location.latitude]);
 
-    // Store sit data with marker
     (marker as any).sit = sit;
-
+    marker.addTo(this.map);
     return marker;
   }
 
@@ -39,14 +43,12 @@ export class MarkerManager {
     return `satlas-marker${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
   }
 
-  updateMarkerStyle(marker: mapboxgl.Marker, isOwnSit: boolean, isFavorite: boolean) {
+  updateMarkerStyle(marker: mapboxgl.Marker, isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false) {
     const el = marker.getElement();
-    // Preserve Mapbox classes while updating our custom classes
-    const mapboxClasses = Array.from(el.classList)
-      .filter(cls => cls.startsWith('mapboxgl-'))
-      .join(' ');
-
-    el.className = `satlas-marker ${mapboxClasses}${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
+    el.className = 'satlas-marker';
+    if (isOwnSit) el.classList.add('own-sit');
+    if (isFavorite) el.classList.add('favorite');
+    if (isNew) el.classList.add('new');
   }
 
   has(sitId: string): boolean {

@@ -23,6 +23,12 @@ export interface Coordinates {
   longitude: number;
 }
 
+export interface UserPreferences {
+  nickname: string;
+  pushNotificationsEnabled: boolean;
+  lastVisit: number;  // Unix timestamp
+}
+
 // Helper function to calculate distance between coordinates
 export function getDistanceInFeet(coord1: Coordinates, coord2: Coordinates): number {
   const R = 20902231; // Earth radius in feet
