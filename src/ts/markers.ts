@@ -12,10 +12,7 @@ export class MarkerManager {
 
   createMarker(sit: Sit, isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false): mapboxgl.Marker {
     const el = document.createElement('div');
-    el.className = 'satlas-marker';
-    if (isOwnSit) el.classList.add('own-sit');
-    if (isFavorite) el.classList.add('favorite');
-    if (isNew) el.classList.add('new');
+    el.className = this.getMarkerClasses(isOwnSit, isFavorite, isNew);
 
     const marker = new mapboxgl.Marker(el)
       .setLngLat([sit.location.longitude, sit.location.latitude]);
@@ -40,15 +37,31 @@ export class MarkerManager {
   }
 
   getMarkerClassName(isOwnSit: boolean, isFavorite: boolean): string {
-    return `satlas-marker${isOwnSit ? ' own-sit' : ''}${isFavorite ? ' favorite' : ''}`;
+    return this.getMarkerClasses(isOwnSit, isFavorite);
   }
 
-  updateMarkerStyle(marker: mapboxgl.Marker, isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false) {
+  updateMarkerStyle(marker: mapboxgl.Marker, isOwnSit: boolean, isFavorite: boolean) {
     const el = marker.getElement();
-    el.className = 'satlas-marker';
-    if (isOwnSit) el.classList.add('own-sit');
-    if (isFavorite) el.classList.add('favorite');
-    if (isNew) el.classList.add('new');
+    const wasNew = el.classList.contains('new');  // Preserve new state
+    el.className = this.getMarkerClasses(isOwnSit, isFavorite, wasNew);
+  }
+
+  private getMarkerClasses(isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false): string {
+    const classes = ['satlas-marker'];
+
+    if (isFavorite) {
+      classes.push('favorite');
+    } else if (isOwnSit) {
+      classes.push('own-sit');
+    } else {
+      classes.push('other-sit');
+    }
+
+    if (isNew) {
+      classes.push('new');
+    }
+
+    return classes.join(' ');
   }
 
   has(sitId: string): boolean {

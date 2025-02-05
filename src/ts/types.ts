@@ -35,7 +35,7 @@ export interface UserPreferences {
   lastVisit: number;  // Unix timestamp
 }
 
-export type MarkType = 'favorite' | 'visited';
+export type MarkType = 'favorite' | 'wantToGo' | 'visited';
 
 export interface UserSitMark {
   userId: string;

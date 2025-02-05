@@ -46,7 +46,7 @@ header {
 .satlas-marker {
   width: 25px;
   height: 25px;
-  background-color: #31d53d;
+  background-color: #31d53d;  /* Default green color for other people's sits */
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
@@ -380,13 +380,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .satlas-marker.own-sit {
-  background-color: #4a90e2;
+  background-color: #007AFF;  /* Blue for own sits */
 }
 
 /* More specific selector to override own-sit */
 .satlas-marker.own-sit.favorite,
 .satlas-marker.favorite {
-  background-color: #ff3b30;
+  background-color: #ff3b30;  /* Red for favorites */
 }
 
 .favorite-button {
@@ -590,4 +590,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .mark-button.visited.active svg {
   fill: #34C759;
+}
+
+.mark-button.wantToGo.active {
+  border-color: #007AFF;
+  color: #007AFF;
+}
+
+.mark-button.wantToGo.active svg {
+  fill: #007AFF;
 }

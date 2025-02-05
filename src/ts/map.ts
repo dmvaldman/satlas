@@ -470,7 +470,7 @@ export class MapManager {
 
   private isNewSit(sit: Sit): boolean {
     const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const cutoffTime = Math.max(this.lastVisit, oneWeekAgo);
+    const cutoffTime = Math.min(this.lastVisit, oneWeekAgo);
     return sit.createdAt.toMillis() > cutoffTime;
   }
 
@@ -932,9 +932,9 @@ export class MapManager {
 
       // 3: Create marker at location (without photo data yet)
       const el = document.createElement('div');
-      el.className = 'satlas-marker own-sit';
+      el.className = this.markerManager.getMarkerClasses(true, false); // true for own sit, not favorited
 
-      const marker = new mapboxgl.Marker(el)  // Pass our custom element
+      const marker = new mapboxgl.Marker(el)
         .setLngLat([coordinates.longitude, coordinates.latitude])
         .addTo(this.map!);
 
@@ -949,8 +949,8 @@ export class MapManager {
 
         // 5: Update marker with sit data
         (marker as any).sit = sit;
-        const el = marker.getElement();
-        el.className = 'satlas-marker own-sit';
+
+        // No need to update className since it's already correct
 
         // Add popup
         marker.setPopup(this.popupManager.createSitPopup(
@@ -958,7 +958,8 @@ export class MapManager {
           new Set<MarkType>(),  // No marks for new sit
           {
             favorite: 0,
-            visited: 0
+            visited: 0,
+            wantToGo: 0
           },
           coordinates
         ));
@@ -1204,5 +1205,54 @@ export class MapManager {
         this.showNotification('Error updating mark', 'error');
       }
     });
+  }
+
+  private async loadSits() {
+    try {
+      const sits = await this.sitManager.loadNearbySits(this.map.getCenter());
+      this.updateNearbySitsCache(sits);
+
+      const currentUser = this.auth.currentUser;
+      const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days in milliseconds
+
+      sits.forEach(sit => {
+        if (!this.markerManager.has(sit.id)) {
+          const isOwnSit = sit.userId === currentUser?.uid;
+          const marks = this.marksManager.getMarks(sit.id);
+          const isFavorite = marks.has('favorite');
+
+          // Calculate if sit is new based on creation time vs last visit OR within a week
+          const sitCreatedAt = sit.createdAt instanceof Date ?
+            sit.createdAt.getTime() :
+            (sit.createdAt as any).toMillis();
+
+          const isNew = sitCreatedAt > this.lastVisit || sitCreatedAt > oneWeekAgo;
+
+          const marker = this.markerManager.createMarker(
+            sit,
+            isOwnSit,
+            isFavorite,
+            isNew
+          );
+
+          // Add popup
+          marker.setPopup(this.popupManager.createSitPopup(
+            sit,
+            marks,
+            {
+              favorite: this.marksManager.getMarkCount(sit.id, 'favorite'),
+              visited: this.marksManager.getMarkCount(sit.id, 'visited'),
+              wantToGo: this.marksManager.getMarkCount(sit.id, 'wantToGo')
+            },
+            this.map.getCenter()
+          ));
+
+          (marker as any).sit = sit;
+          this.markerManager.set(sit.id, marker);
+        }
+      });
+    } catch (error) {
+      console.error('Error loading sits:', error);
+    }
   }
 }

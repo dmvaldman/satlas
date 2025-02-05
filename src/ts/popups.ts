@@ -106,6 +106,12 @@ export class PopupManager {
           </svg>
           ${markCounts['favorite'] || ''}
         </button>
+        <button class="mark-button wantToGo${marks.has('wantToGo') ? ' active' : ''}" data-sit-id="${sit.id}" data-mark-type="wantToGo">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+          </svg>
+          ${markCounts['wantToGo'] || ''}
+        </button>
         <button class="mark-button visited${marks.has('visited') ? ' active' : ''}" data-sit-id="${sit.id}" data-mark-type="visited">
           <svg viewBox="0 0 24 24">
             <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
