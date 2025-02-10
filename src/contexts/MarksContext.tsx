@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserSitMark, MarkType } from '../types';
 import { useAuth } from './AuthContext';
@@ -57,9 +57,16 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const visitedQuery = query(visitedRef, where('userId', '==', userId));
     const visitedSnapshot = await getDocs(visitedQuery);
 
-    // Process marks and counts
-    [favoritesSnapshot, visitedSnapshot].forEach((snapshot, index) => {
-      const type: MarkType = index === 0 ? 'favorite' : 'visited';
+    // Load wantToGo marks (new collection)
+    const wantToGoRef = collection(db, 'wantToGo');
+    const wantToGoQuery = query(wantToGoRef, where('userId', '==', userId));
+    const wantToGoSnapshot = await getDocs(wantToGoQuery);
+
+    // Process all three types of marks
+    [favoritesSnapshot, visitedSnapshot, wantToGoSnapshot].forEach((snapshot, index) => {
+      // Determine mark type based on snapshot order:
+      // index 0: favorite, index 1: visited, index 2: wantToGo
+      const type: MarkType = index === 0 ? 'favorite' : index === 1 ? 'visited' : 'wantToGo';
       snapshot.forEach((doc) => {
         const mark = doc.data() as UserSitMark;
         // Update marks
@@ -88,7 +95,16 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const hasType = marks.get(sitId)?.has(type) || false;
     console.log('Before toggle:', { sitId, type, hasType, marks: new Map(marks) });
 
-    const collectionName = type === 'favorite' ? 'favorites' : 'visited';
+    // Determine the collection name based on the mark type
+    let collectionName = '';
+    if (type === 'favorite') {
+      collectionName = 'favorites';
+    } else if (type === 'visited') {
+      collectionName = 'visited';
+    } else if (type === 'wantToGo') {
+      collectionName = 'wantToGo';
+    }
+
     const markRef = doc(db, collectionName, `${user.uid}_${sitId}`);
 
     try {
@@ -116,7 +132,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         counts: new Map(newCounts)
       });
 
-      // Perform the actual update
+      // Use a locally computed timestamp instead of serverTimestamp
       if (hasType) {
         await deleteDoc(markRef);
       } else {
@@ -124,7 +140,8 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           userId: user.uid,
           sitId,
           type,
-          createdAt: serverTimestamp()
+          // Compute timestamp locally
+          createdAt: new Date()
         };
         await setDoc(markRef, mark);
       }
