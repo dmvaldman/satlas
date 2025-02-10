@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserSitMark, MarkType } from '../types';
@@ -31,6 +31,125 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [counts, setCounts] = useState<Map<string, Map<MarkType, number>>>(new Map());
   const { user } = useAuth();
 
+  const loadUserMarks = useCallback(async (userId: string | null) => {
+    if (!userId) {
+      setMarks(new Map());
+      setCounts(new Map());
+      return;
+    }
+
+    const newMarks = new Map();
+    const newCounts = new Map();
+
+    // Load favorites
+    const favoritesRef = collection(db, 'favorites');
+    const favoritesQuery = query(favoritesRef, where('userId', '==', userId));
+    const favoritesSnapshot = await getDocs(favoritesQuery);
+
+    // Load visited
+    const visitedRef = collection(db, 'visited');
+    const visitedQuery = query(visitedRef, where('userId', '==', userId));
+    const visitedSnapshot = await getDocs(visitedQuery);
+
+    // Process marks and counts
+    [favoritesSnapshot, visitedSnapshot].forEach((snapshot, index) => {
+      const type: MarkType = index === 0 ? 'favorite' : 'visited';
+      snapshot.forEach((doc) => {
+        const mark = doc.data() as UserSitMark;
+        // Update marks
+        if (!newMarks.has(mark.sitId)) {
+          newMarks.set(mark.sitId, new Set());
+        }
+        newMarks.get(mark.sitId)!.add(type);
+
+        // Update counts
+        if (!newCounts.has(mark.sitId)) {
+          newCounts.set(mark.sitId, new Map());
+        }
+        const sitCounts = newCounts.get(mark.sitId)!;
+        sitCounts.set(type, (sitCounts.get(type) || 0) + 1);
+      });
+    });
+
+    setMarks(newMarks);
+    setCounts(newCounts);
+  }, []);
+
+  const toggleMark = useCallback(async (sitId: string, type: MarkType) => {
+    if (!user) return;
+
+    const hasType = marks.get(sitId)?.has(type) || false;
+    console.log('Before toggle:', { sitId, type, hasType, marks: new Map(marks) });
+
+    const collectionName = type === 'favorite' ? 'favorites' : 'visited';
+    const markRef = doc(db, collectionName, `${user.uid}_${sitId}`);
+
+    try {
+      // Optimistic update
+      const newMarks = new Map(marks);
+      if (!newMarks.has(sitId)) {
+        newMarks.set(sitId, new Set());
+      }
+      const sitMarks = newMarks.get(sitId)!;
+      hasType ? sitMarks.delete(type) : sitMarks.add(type);
+      setMarks(newMarks);
+
+      // Update counts optimistically
+      const newCounts = new Map(counts);
+      if (!newCounts.has(sitId)) {
+        newCounts.set(sitId, new Map());
+      }
+      const sitCounts = newCounts.get(sitId)!;
+      const currentCount = sitCounts.get(type) || 0;
+      sitCounts.set(type, currentCount + (hasType ? -1 : 1));
+      setCounts(newCounts);
+
+      // Perform the actual update
+      if (hasType) {
+        await deleteDoc(markRef);
+      } else {
+        const mark: UserSitMark = {
+          userId: user.uid,
+          sitId,
+          type,
+          createdAt: serverTimestamp()
+        };
+        await setDoc(markRef, mark);
+      }
+    } catch (error) {
+      console.error('Error toggling mark:', error);
+      // Revert optimistic updates on error
+      const newMarks = new Map(marks);
+      const sitMarks = newMarks.get(sitId);
+      if (sitMarks) {
+        hasType ? sitMarks.add(type) : sitMarks.delete(type);
+        setMarks(newMarks);
+      }
+
+      const newCounts = new Map(counts);
+      const sitCounts = newCounts.get(sitId);
+      if (sitCounts) {
+        const currentCount = sitCounts.get(type) || 0;
+        sitCounts.set(type, currentCount + (hasType ? 1 : -1));
+        setCounts(newCounts);
+      }
+    }
+
+    console.log('After toggle:', { sitId, type, hasType: !hasType, marks: newMarks });
+  }, [user, marks, counts]);
+
+  const hasMark = (sitId: string, type: MarkType): boolean => {
+    return marks.get(sitId)?.has(type) || false;
+  };
+
+  const getMarkCount = (sitId: string, type: MarkType): number => {
+    return counts.get(sitId)?.get(type) || 0;
+  };
+
+  const getMarks = (sitId: string): Set<MarkType> => {
+    return marks.get(sitId) || new Set();
+  };
+
   // Load user's marks when auth state changes
   useEffect(() => {
     let unsubscribed = false;
@@ -49,126 +168,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       unsubscribed = true;
     };
-  }, [user]);
-
-  const loadUserMarks = async (userId: string | null) => {
-    if (!userId) {
-      setMarks(new Map());
-      setCounts(new Map());
-      return;
-    }
-
-    const newMarks = new Map<string, Set<MarkType>>();
-    const newCounts = new Map<string, Map<MarkType, number>>();
-
-    // Load all mark types
-    const markTypes: MarkType[] = ['favorite', 'visited', 'wantToGo'];
-
-    for (const type of markTypes) {
-      const collectionName = type === 'favorite' ? 'favorites' : type + 's';
-      const marksRef = collection(db, collectionName);
-      const q = query(marksRef, where('userId', '==', userId));
-      const snapshot = await getDocs(q);
-
-      // Process user's marks
-      snapshot.forEach((doc) => {
-        const mark = doc.data() as UserSitMark;
-        if (!newMarks.has(mark.sitId)) {
-          newMarks.set(mark.sitId, new Set());
-        }
-        newMarks.get(mark.sitId)!.add(type);
-      });
-
-      // Load counts for each type
-      const countsQuery = query(marksRef);
-      const countsSnapshot = await getDocs(countsQuery);
-
-      countsSnapshot.forEach((doc) => {
-        const mark = doc.data() as UserSitMark;
-        if (!newCounts.has(mark.sitId)) {
-          newCounts.set(mark.sitId, new Map());
-        }
-        const sitCounts = newCounts.get(mark.sitId)!;
-        sitCounts.set(type, (sitCounts.get(type) || 0) + 1);
-      });
-    }
-
-    setMarks(newMarks);
-    setCounts(newCounts);
-  };
-
-  const toggleMark = async (sitId: string, type: MarkType) => {
-    if (!user) {
-      throw new Error('Must be logged in to mark sits');
-    }
-
-    const collectionName = type === 'favorite' ? 'favorites' : type + 's';
-    const markId = `${user.uid}_${sitId}`;
-    const markRef = doc(db, collectionName, markId);
-    const hasType = hasMark(sitId, type);
-
-    // Optimistically update UI
-    const newMarks = new Map(marks);
-    if (!newMarks.has(sitId)) {
-      newMarks.set(sitId, new Set());
-    }
-    const sitMarks = newMarks.get(sitId)!;
-
-    const newCounts = new Map(counts);
-    if (!newCounts.has(sitId)) {
-      newCounts.set(sitId, new Map());
-    }
-    const sitCounts = newCounts.get(sitId)!;
-
-    if (hasType) {
-      sitMarks.delete(type);
-      sitCounts.set(type, Math.max(0, (sitCounts.get(type) || 1) - 1));
-    } else {
-      sitMarks.add(type);
-      sitCounts.set(type, (sitCounts.get(type) || 0) + 1);
-    }
-
-    setMarks(newMarks);
-    setCounts(newCounts);
-
-    try {
-      if (hasType) {
-        await deleteDoc(markRef);
-      } else {
-        const mark: UserSitMark = {
-          userId: user.uid,
-          sitId,
-          type,
-          createdAt: serverTimestamp()
-        };
-        await setDoc(markRef, mark);
-      }
-    } catch (error) {
-      // Revert optimistic update on error
-      if (hasType) {
-        sitMarks.add(type);
-        sitCounts.set(type, (sitCounts.get(type) || 0) + 1);
-      } else {
-        sitMarks.delete(type);
-        sitCounts.set(type, Math.max(0, (sitCounts.get(type) || 1) - 1));
-      }
-      setMarks(newMarks);
-      setCounts(newCounts);
-      throw error;
-    }
-  };
-
-  const hasMark = (sitId: string, type: MarkType): boolean => {
-    return marks.get(sitId)?.has(type) || false;
-  };
-
-  const getMarkCount = (sitId: string, type: MarkType): number => {
-    return counts.get(sitId)?.get(type) || 0;
-  };
-
-  const getMarks = (sitId: string): Set<MarkType> => {
-    return marks.get(sitId) || new Set();
-  };
+  }, [user, loadUserMarks]);
 
   return (
     <MarksContext.Provider
