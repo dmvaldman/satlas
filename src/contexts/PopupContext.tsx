@@ -44,14 +44,12 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.render(
         <AuthProvider>
           <MarksProvider>
-            <PhotoUploadProvider>
-              <PopupContent
-                key={`${sit.id}-${Date.now()}`}
-                sit={sit}
-                images={images}
-                currentLocation={currentLocation}
-              />
-            </PhotoUploadProvider>
+            <PopupContent
+              key={`${sit.id}-${Date.now()}`}
+              sit={sit}
+              images={images}
+              currentLocation={currentLocation}
+            />
           </MarksProvider>
         </AuthProvider>
       );
@@ -86,13 +84,11 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.render(
         <AuthProvider>
           <MarksProvider>
-            <PhotoUploadProvider>
-              <PopupContent
-                sit={sit}
-                images={images}
-                currentLocation={currentLocation}
-              />
-            </PhotoUploadProvider>
+            <PopupContent
+              sit={sit}
+              images={images}
+              currentLocation={currentLocation}
+            />
           </MarksProvider>
         </AuthProvider>
       );
@@ -101,15 +97,13 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <PhotoUploadProvider>
-      <PopupContext.Provider
-        value={{
-          createPopup,
-          updatePopupContent,
-        }}
-      >
-        {children}
-      </PopupContext.Provider>
-    </PhotoUploadProvider>
+    <PopupContext.Provider
+      value={{
+        createPopup,
+        updatePopupContent,
+      }}
+    >
+      {children}
+    </PopupContext.Provider>
   );
 };

@@ -11,17 +11,22 @@ import { MarkerProvider } from './contexts/MarkerContext';
 import { PopupProvider } from './contexts/PopupContext';
 import { MarksProvider } from './contexts/MarksContext';
 import { AddSitButton } from './components/Map/AddSitButton';
+import React from 'react';
 
 function App() {
+  console.log('App rendering, about to render PhotoUploadModal', {
+    isDevelopment: process.env.NODE_ENV === 'development',
+    isStrictMode: React.StrictMode !== undefined
+  });
   return (
     <AuthProvider>
       <ProfileProvider>
         <MapProvider>
           <SitsProvider>
             <MarksProvider>
-              <PopupProvider>
-                <MarkerProvider>
-                  <PhotoUploadProvider>
+              <PhotoUploadProvider>
+                <PopupProvider>
+                  <MarkerProvider>
                     <div className="app">
                       <header>
                         <AuthContainer />
@@ -29,11 +34,13 @@ function App() {
                       <MapContainer />
                       <AddSitButton />
                       <ProfileModal />
+                      {console.log('About to render PhotoUploadModal in JSX')}
                       <PhotoUploadModal />
+                      {console.log('Rendered PhotoUploadModal in JSX')}
                     </div>
-                  </PhotoUploadProvider>
-                </MarkerProvider>
-              </PopupProvider>
+                  </MarkerProvider>
+                </PopupProvider>
+              </PhotoUploadProvider>
             </MarksProvider>
           </SitsProvider>
         </MapProvider>

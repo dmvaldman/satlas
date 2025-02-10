@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
@@ -28,6 +28,8 @@ const PhotoUploadContext = createContext<PhotoUploadContextType>({
 export const usePhotoUpload = () => useContext(PhotoUploadContext);
 
 export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  console.log('PhotoUploadProvider render');  // Keep this
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [replaceInfo, setReplaceInfo] = useState<{ sitId: string; imageId: string } | null>(null);
@@ -37,16 +39,10 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const { createPendingMarker, updateMarker, removeMarker, createMarker, markers } = useMarkers();
   const { map } = useMap();
 
-  // Add an effect to watch state changes
-  useEffect(() => {
-    console.log('isModalOpen state changed:', isModalOpen);
-  }, [isModalOpen]);
-
   const openModal = useCallback((info?: { sitId: string; imageId: string }) => {
-    console.log('openModal called with:', info);
+    console.log('PhotoUploadContext openModal called with:', info);
     setReplaceInfo(info || null);
     setIsModalOpen(true);
-    console.log('Modal state after open:', { isModalOpen: true, replaceInfo: info || null });
   }, []);
 
   const closeModal = useCallback(() => {
@@ -62,7 +58,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTimeout(() => notification.remove(), 3000);
   };
 
-  // Add this helper function to convert DMS to decimal degrees
   const convertDMSToDD = (dms: number[], direction: string): number => {
     const degrees = dms[0];
     const minutes = dms[1];
@@ -205,7 +200,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const takePhoto = async () => {
+  const takePhoto = useCallback(async () => {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
@@ -223,9 +218,9 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         showNotification('Error taking photo', 'error');
       }
     }
-  };
+  }, [handlePhotoUpload, closeModal]);
 
-  const chooseFromGallery = async () => {
+  const chooseFromGallery = useCallback(async () => {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
@@ -244,23 +239,22 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         showNotification('Error choosing photo', 'error');
       }
     }
-  };
+  }, [handlePhotoUpload, closeModal]);
 
-  // Add this log to see what value we're providing
-  const value = {
-    isModalOpen,
-    isUploading,
-    openModal,
-    closeModal,
-    takePhoto,
-    chooseFromGallery,
-  };
-
-  console.log('Creating PhotoUploadContext value:', value);
+  const value = useMemo(() => {
+    console.log('PhotoUploadContext value recreated');  // Keep this
+    return {
+      isModalOpen,
+      isUploading,
+      openModal,
+      closeModal,
+      takePhoto,
+      chooseFromGallery,
+    };
+  }, [isModalOpen, isUploading, openModal, closeModal, takePhoto, chooseFromGallery]);
 
   return (
     <PhotoUploadContext.Provider value={value}>
-      {console.log('PhotoUploadContext rendering with:', { isModalOpen, isUploading })}
       {children}
     </PhotoUploadContext.Provider>
   );

@@ -13,6 +13,8 @@ interface PopupContentProps {
 }
 
 export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, currentLocation }) => {
+  console.log('PopupContent render');  // Track popup content renders
+
   const { hasMark, getMarkCount, toggleMark } = useMarks();
   const { deleteImage, replaceImage } = useSits();
   const photoUploadContext = usePhotoUpload();
@@ -34,7 +36,7 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
   };
 
   const handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
-    console.log('handleImageAction called:', { action, imageId, user });
+    console.log('handleImageAction start:', { action, imageId, user });
     if (!user) return;
 
     try {
@@ -43,9 +45,9 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
           await deleteImage(sit.id, imageId);
         }
       } else if (action === 'replace') {
-        console.log('Attempting to open modal for replacement:', { sitId: sit.id, imageId });
-        console.log('Using openModal function:', openModal);
+        console.log('Calling openModal with:', { sitId: sit.id, imageId });
         openModal({ sitId: sit.id, imageId });
+        console.log('openModal called');
       }
     } catch (error) {
       console.error(`Error ${action}ing image:`, error);
