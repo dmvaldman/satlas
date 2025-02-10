@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Sit, Image, MarkType } from '../types';
 import { useAuth } from './AuthContext';
@@ -84,35 +84,38 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return container;
   };
 
-  const createPopup = (
-    sit: Sit,
-    currentLocation: { latitude: number; longitude: number }
-  ): mapboxgl.Popup => {
+  const createPopup = useCallback((sit: Sit, currentLocation: { latitude: number; longitude: number }): mapboxgl.Popup => {
+    console.log('PopupContext: Creating popup for sit:', sit.id);
+
     const popup = new mapboxgl.Popup({
-      closeButton: false,
+      closeButton: true,
       maxWidth: '300px',
+      offset: 25,
+      anchor: 'bottom',
       className: 'satlas-popup-container'
     });
 
-    // Set initial loading state
-    const loadingContainer = document.createElement('div');
-    loadingContainer.innerHTML = `
-      <div class="satlas-popup">
-        <div class="satlas-popup-loading">
-          <p>Loading...</p>
-        </div>
+    // Set simple content first
+    popup.setHTML(`
+      <div style="padding: 20px; background: white;">
+        <h3>Sit ${sit.id}</h3>
+        <p>Loading content...</p>
       </div>
-    `;
-    popup.setDOMContent(loadingContainer);
+    `);
 
-    // Load images and update content
-    getImagesForSit(sit.imageCollectionId).then(images => {
-      const content = createPopupContent(sit, images, currentLocation);
-      popup.setDOMContent(content);
+    // Add popup events for debugging
+    popup.on('open', () => {
+      console.log('PopupContext: Popup opened for sit:', sit.id);
+      // Load full content when popup opens
+      getImagesForSit(sit.imageCollectionId).then(images => {
+        console.log('PopupContext: Loaded images:', images.length);
+        const container = createPopupContent(sit, images, currentLocation);
+        popup.setDOMContent(container);
+      });
     });
 
     return popup;
-  };
+  }, [getImagesForSit, createPopupContent]);
 
   const updatePopupContent = (
     popup: mapboxgl.Popup,

@@ -45,6 +45,8 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createMarker = (sit: Sit): mapboxgl.Marker => {
+    console.log('MarkerContext: Creating marker for sit:', sit.id);
+
     const el = document.createElement('div');
     el.className = getMarkerClasses(sit);
 
@@ -52,12 +54,10 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .setLngLat([sit.location.longitude, sit.location.latitude]);
 
     if (map && currentLocation) {
+      console.log('MarkerContext: About to call createPopup');
       const popup = createPopup(sit, currentLocation);
+      console.log('MarkerContext: Got popup from createPopup:', popup);
       marker.setPopup(popup);
-    }
-
-    if (map) {
-      marker.addTo(map);
     }
 
     return marker;
@@ -73,9 +73,12 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Update markers when sits change
   useEffect(() => {
-    if (!map || !currentLocation) return;
+    if (!map || !currentLocation) {
+      console.log('MarkerContext: Missing map or location:', { map: !!map, currentLocation });
+      return;
+    }
 
-    console.log('Updating markers with sits:', sits);
+    console.log('MarkerContext: Updating markers with sits:', sits.size);
 
     // Remove markers that no longer exist
     markers.forEach((marker, sitId) => {
@@ -90,19 +93,22 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       let marker = markers.get(sit.id);
 
       if (!marker) {
-        // Create new marker
         marker = createMarker(sit);
         marker.addTo(map);
         markers.set(sit.id, marker);
       } else {
-        // Update existing marker position
+        // Update existing marker
         marker.setLngLat([sit.location.longitude, sit.location.latitude]);
+        // Update popup if needed
+        if (marker.getPopup()) {
+          const popup = createPopup(sit, currentLocation);
+          marker.setPopup(popup);
+        }
       }
     });
 
-    // Update state with current markers
     setMarkers(new Map(markers));
-  }, [map, sits, currentLocation]);
+  }, [map, sits, currentLocation, createPopup]);
 
   return (
     <MarkerContext.Provider

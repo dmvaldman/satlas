@@ -51,12 +51,6 @@ header {
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
-  pointer-events: none;
-  transform-origin: center;
-}
-
-.satlas-marker * {
-  pointer-events: none;
 }
 
 .satlas-popup {
@@ -652,5 +646,40 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 /* Keep existing marker and popup styles unchanged since they're working */
 .satlas-marker {
   /* ... existing styles ... */
-  pointer-events: none; /* This was key for marker clicks working */
+  /* pointer-events: none; */
+}
+
+.satlas-popup-container {
+  z-index: 1000;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.satlas-popup {
+  padding: 10px;
+  min-width: 200px;
+}
+
+.satlas-popup-loading,
+.satlas-popup-error {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.satlas-popup-error {
+  color: #ff3b30;
+}
+
+/* Make sure popups are above markers */
+.mapboxgl-popup {
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+.mapboxgl-popup-content {
+  background: white !important;
+  min-width: 200px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
 }

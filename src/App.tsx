@@ -19,8 +19,8 @@ function App() {
         <MapProvider>
           <SitsProvider>
             <MarksProvider>
-              <MarkerProvider>
-                <PopupProvider>
+              <PopupProvider>
+                <MarkerProvider>
                   <PhotoUploadProvider>
                     <div className="app">
                       <header>
@@ -36,8 +36,8 @@ function App() {
                       <PhotoUploadModal />
                     </div>
                   </PhotoUploadProvider>
-                </PopupProvider>
-              </MarkerProvider>
+                </MarkerProvider>
+              </PopupProvider>
             </MarksProvider>
           </SitsProvider>
         </MapProvider>
