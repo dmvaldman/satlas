@@ -52,8 +52,11 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const el = document.createElement('div');
     el.className = getMarkerClasses(sit);
 
-    const marker = new mapboxgl.Marker(el)
-      .setLngLat([sit.location.longitude, sit.location.latitude]);
+    console.log('Creating marker with coordinates:', [sit.location.longitude, sit.location.latitude]);
+
+    const marker = new mapboxgl.Marker(el);
+
+    marker.setLngLat([sit.location.longitude, sit.location.latitude]);
 
     if (map && currentLocation) {
       marker.setPopup(createPopup(sit, currentLocation));

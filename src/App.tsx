@@ -24,9 +24,9 @@ function App() {
         <MapProvider>
           <SitsProvider>
             <MarksProvider>
-              <PhotoUploadProvider>
-                <PopupProvider>
-                  <MarkerProvider>
+              <PopupProvider>
+                <MarkerProvider>
+                  <PhotoUploadProvider>
                     <div className="app">
                       <header>
                         <AuthContainer />
@@ -34,13 +34,11 @@ function App() {
                       <MapContainer />
                       <AddSitButton />
                       <ProfileModal />
-                      {console.log('About to render PhotoUploadModal in JSX')}
                       <PhotoUploadModal />
-                      {console.log('Rendered PhotoUploadModal in JSX')}
                     </div>
-                  </MarkerProvider>
-                </PopupProvider>
-              </PhotoUploadProvider>
+                  </PhotoUploadProvider>
+                </MarkerProvider>
+              </PopupProvider>
             </MarksProvider>
           </SitsProvider>
         </MapProvider>
