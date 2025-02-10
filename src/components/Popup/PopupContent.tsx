@@ -45,9 +45,9 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
           await deleteImage(sit.id, imageId);
         }
       } else if (action === 'replace') {
-        console.log('Calling openModal with:', { sitId: sit.id, imageId });
-        openModal({ sitId: sit.id, imageId });
-        console.log('openModal called');
+        console.log('Dispatching event to open PhotoUpload modal with:', { sitId: sit.id, imageId });
+        // Dispatch a global event — the PhotoUploadProvider will pick this up
+        window.dispatchEvent(new CustomEvent('openPhotoUploadModal', { detail: { sitId: sit.id, imageId } }));
       }
     } catch (error) {
       console.error(`Error ${action}ing image:`, error);

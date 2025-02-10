@@ -241,6 +241,20 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [handlePhotoUpload, closeModal]);
 
+  // Add this effect to listen for the global event to open the modal
+  useEffect(() => {
+    const handleGlobalOpenEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{ sitId: string, imageId: string }>;
+      console.log('Received global open photo upload event:', customEvent.detail);
+      setReplaceInfo(customEvent.detail);
+      setIsModalOpen(true);
+    };
+    window.addEventListener('openPhotoUploadModal', handleGlobalOpenEvent as EventListener);
+    return () => {
+      window.removeEventListener('openPhotoUploadModal', handleGlobalOpenEvent as EventListener);
+    };
+  }, []);
+
   const value = useMemo(() => {
     console.log('PhotoUploadContext value recreated');  // Keep this
     return {
