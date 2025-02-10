@@ -8,6 +8,7 @@ import { ProfileModal } from './components/Profile/ProfileModal';
 import { MapContainer } from './components/Map/MapContainer';
 import { PhotoUploadModal } from './components/PhotoUpload/PhotoUploadModal';
 import { MarkerProvider } from './contexts/MarkerContext';
+import { PopupProvider } from './contexts/PopupContext';
 
 function App() {
   return (
@@ -16,16 +17,18 @@ function App() {
         <MapProvider>
           <SitsProvider>
             <MarkerProvider>
-              <PhotoUploadProvider>
-                <div className="app">
-                  <header>
-                    <AuthContainer />
-                  </header>
-                  <MapContainer />
-                  <ProfileModal />
-                  <PhotoUploadModal />
-                </div>
-              </PhotoUploadProvider>
+              <PopupProvider>
+                <PhotoUploadProvider>
+                  <div className="app">
+                    <header>
+                      <AuthContainer />
+                    </header>
+                    <MapContainer />
+                    <ProfileModal />
+                    <PhotoUploadModal />
+                  </div>
+                </PhotoUploadProvider>
+              </PopupProvider>
             </MarkerProvider>
           </SitsProvider>
         </MapProvider>

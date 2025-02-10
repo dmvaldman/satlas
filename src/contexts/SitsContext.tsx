@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { Sit, Coordinates } from '../types';
+import { Sit, Coordinates, Image } from '../types';
 import { useAuth } from './AuthContext';
 import { getDistanceInFeet } from '../types';
 
@@ -13,6 +13,7 @@ interface SitsContextType {
   addImageToSit: (sitId: string, base64Image: string) => Promise<void>;
   getSit: (sitId: string) => Promise<Sit | null>;
   findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
+  getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
 }
 
 const SitsContext = createContext<SitsContextType>({
@@ -28,6 +29,7 @@ const SitsContext = createContext<SitsContextType>({
   addImageToSit: async () => {},
   getSit: async () => null,
   findNearbySit: async () => null,
+  getImagesForSit: async () => [],
 });
 
 export const useSits = () => useContext(SitsContext);
@@ -154,6 +156,22 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
+  const getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
+    if (!imageCollectionId) {
+      console.warn('No imageCollectionId provided to getImagesForSit');
+      return [];
+    }
+
+    const imagesRef = collection(db, 'images');
+    const q = query(imagesRef, where('collectionId', '==', imageCollectionId));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Image));
+  };
+
   return (
     <SitsContext.Provider
       value={{
@@ -163,6 +181,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addImageToSit,
         getSit,
         findNearbySit,
+        getImagesForSit,
       }}
     >
       {children}

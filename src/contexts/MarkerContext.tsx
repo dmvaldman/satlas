@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
+import { usePopups } from './PopupContext';
 import { useAuth } from './AuthContext';
 import { Sit } from '../types';
 
@@ -23,9 +24,10 @@ export const useMarkers = () => useContext(MarkerContext);
 
 export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [markers, setMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
-  const { map } = useMap();
+  const { map, currentLocation } = useMap();
   const { sits } = useSits();
   const { user } = useAuth();
+  const { createPopup } = usePopups();
 
   const getMarkerClasses = (isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false): string => {
     const classes = ['satlas-marker'];
@@ -54,6 +56,11 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const marker = new mapboxgl.Marker(el)
       .setLngLat([sit.location.longitude, sit.location.latitude]);
+
+    if (map && currentLocation) {
+      const popup = createPopup(sit, currentLocation);
+      marker.setPopup(popup);
+    }
 
     if (map) {
       marker.addTo(map);
