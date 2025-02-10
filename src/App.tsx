@@ -1,4 +1,3 @@
-import React from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { MapProvider } from './contexts/MapContext';
