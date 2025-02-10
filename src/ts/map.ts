@@ -13,11 +13,12 @@ import { PopupManager } from './popups';
 import { FavoritesManager } from './favorites';
 import { SitManager } from './sits';
 import { Sit, Coordinates, getDistanceInFeet, UserPreferences } from './types';
-import { Capacitor } from '@capacitor/core';
 import { MarksManager } from './marks';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
+
+declare const EXIF: any;
 
 // Add EXIF extraction function
 async function getImageLocation(base64String: string): Promise<{ latitude: number; longitude: number } | null> {
