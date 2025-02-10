@@ -27,7 +27,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { sits } = useSits();
   const { user } = useAuth();
   const { createPopup } = usePopups();
-  const { hasMark } = useMarks();
+  const { hasMark, marks } = useMarks();
 
   const getMarkerClasses = (sit: Sit): string => {
     const classes = ['satlas-marker'];
@@ -66,7 +66,6 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Update markers when sits change
   useEffect(() => {
     if (!map || !currentLocation) return;
 
@@ -99,6 +98,36 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setMarkers(new Map(markers));
   }, [map, sits, currentLocation, createPopup]);
+
+  useEffect(() => {
+    if (!map || !sits) return;
+
+    // Remove existing markers
+    const existingMarkers = document.getElementsByClassName('marker');
+    while (existingMarkers.length > 0) {
+      existingMarkers[0].remove();
+    }
+
+    // Create markers
+    sits.forEach(sit => {
+      const el = document.createElement('div');
+      el.className = 'marker';
+
+      // Add mark-based classes
+      const sitMarks = marks.get(sit.id) || new Set();
+      if (sitMarks.has('favorite')) {
+        el.classList.add('favorite');
+      }
+      if (sitMarks.has('visited')) {
+        el.classList.add('visited');
+      }
+      if (sitMarks.has('wantToGo')) {
+        el.classList.add('want-to-go');
+      }
+
+      // ... rest of marker creation code ...
+    });
+  }, [map, sits, marks]);
 
   return (
     <MarkerContext.Provider

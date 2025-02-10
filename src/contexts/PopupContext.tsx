@@ -8,6 +8,8 @@ import { createRoot } from 'react-dom/client';
 import { Carousel } from '../components/Carousel/Carousel';
 import { useMarks } from './MarksContext';
 import { PopupContent } from '../components/Popup/PopupContent';
+import { MarksProvider } from './MarksContext';
+import { AuthProvider } from './AuthContext';
 
 interface PopupContextType {
   createPopup: (sit: Sit, currentLocation: { latitude: number; longitude: number }) => mapboxgl.Popup;
@@ -39,12 +41,16 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const renderContent = (images: Image[]) => {
       root.render(
-        <PopupContent
-          key={`${sit.id}-${Date.now()}`}
-          sit={sit}
-          images={images}
-          currentLocation={currentLocation}
-        />
+        <AuthProvider>
+          <MarksProvider>
+            <PopupContent
+              key={`${sit.id}-${Date.now()}`}
+              sit={sit}
+              images={images}
+              currentLocation={currentLocation}
+            />
+          </MarksProvider>
+        </AuthProvider>
       );
     };
 

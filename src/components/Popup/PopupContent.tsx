@@ -11,6 +11,17 @@ interface PopupContentProps {
 export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, currentLocation }) => {
   const { hasMark, getMarkCount, toggleMark } = useMarks();
 
+  const handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
+    console.log('Mark button clicked:', { type, sitId: sit.id });
+    e.stopPropagation();
+    try {
+      await toggleMark(sit.id, type);
+      console.log('Mark toggle completed');
+    } catch (error) {
+      console.error('Error in handleMarkClick:', error);
+    }
+  };
+
   return (
     <div className="satlas-popup">
       <Carousel
@@ -29,15 +40,11 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
         )}
         <div className="mark-buttons">
           {(['favorite', 'visited', 'wantToGo'] as MarkType[]).map(type => {
-            console.log(`Mark ${type} for sit ${sit.id}: ${hasMark(sit.id, type)}`);
             return (
               <button
                 key={type}
                 className={`mark-button ${type}${hasMark(sit.id, type) ? ' active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleMark(sit.id, type);
-                }}
+                onClick={(e) => handleMarkClick(e, type)}
               >
                 {type === 'favorite' && (
                   <svg viewBox="0 0 24 24">

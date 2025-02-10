@@ -24,7 +24,13 @@ const MarksContext = createContext<MarksContextType>({
   getMarks: () => new Set(),
 });
 
-export const useMarks = () => useContext(MarksContext);
+export const useMarks = () => {
+  const context = useContext(MarksContext);
+  if (context === undefined) {
+    throw new Error('useMarks must be used within a MarksProvider');
+  }
+  return context;
+};
 
 export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [marks, setMarks] = useState<Map<string, Set<MarkType>>>(new Map());
@@ -76,6 +82,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const toggleMark = useCallback(async (sitId: string, type: MarkType) => {
+    console.log('toggleMark called:', { sitId, type, user });
     if (!user) return;
 
     const hasType = marks.get(sitId)?.has(type) || false;
@@ -104,6 +111,11 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sitCounts.set(type, currentCount + (hasType ? -1 : 1));
       setCounts(newCounts);
 
+      console.log('After optimistic update:', {
+        marks: new Map(newMarks),
+        counts: new Map(newCounts)
+      });
+
       // Perform the actual update
       if (hasType) {
         await deleteDoc(markRef);
@@ -116,6 +128,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
         await setDoc(markRef, mark);
       }
+      console.log('Database update complete');
     } catch (error) {
       console.error('Error toggling mark:', error);
       // Revert optimistic updates on error
@@ -134,8 +147,6 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCounts(newCounts);
       }
     }
-
-    console.log('After toggle:', { sitId, type, hasType: !hasType, marks: newMarks });
   }, [user, marks, counts]);
 
   const hasMark = (sitId: string, type: MarkType): boolean => {
