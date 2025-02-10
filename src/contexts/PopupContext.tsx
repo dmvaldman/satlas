@@ -40,7 +40,8 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           images={images}
           sitId={sit.id}
           onImageAction={(action, imageId) => {
-            console.log(action, imageId);
+            // Remove this console.log too
+            // console.log(action, imageId);
           }}
         />
         <div className="satlas-popup-info">
@@ -85,33 +86,26 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createPopup = useCallback((sit: Sit, currentLocation: { latitude: number; longitude: number }): mapboxgl.Popup => {
-    console.log('PopupContext: Creating popup for sit:', sit.id);
-
     const popup = new mapboxgl.Popup({
-      closeButton: true,
+      closeButton: false,
       maxWidth: '300px',
       offset: 25,
-      anchor: 'bottom',
-      className: 'satlas-popup-container'
+      anchor: 'bottom'
     });
 
-    // Set simple content first
+    // Set initial loading state
     popup.setHTML(`
-      <div style="padding: 20px; background: white;">
-        <h3>Sit ${sit.id}</h3>
-        <p>Loading content...</p>
+      <div class="satlas-popup">
+        <div class="satlas-popup-loading">
+          <p>Loading...</p>
+        </div>
       </div>
     `);
 
-    // Add popup events for debugging
-    popup.on('open', () => {
-      console.log('PopupContext: Popup opened for sit:', sit.id);
-      // Load full content when popup opens
-      getImagesForSit(sit.imageCollectionId).then(images => {
-        console.log('PopupContext: Loaded images:', images.length);
-        const container = createPopupContent(sit, images, currentLocation);
-        popup.setDOMContent(container);
-      });
+    // Load images and update content
+    getImagesForSit(sit.imageCollectionId).then(images => {
+      const container = createPopupContent(sit, images, currentLocation);
+      popup.setDOMContent(container);
     });
 
     return popup;

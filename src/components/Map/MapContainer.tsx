@@ -35,21 +35,6 @@ export const MapContainer = () => {
     };
   }, [map, loadNearbySits]);
 
-  useEffect(() => {
-    if (!map) return;
-
-    const handleClick = (e: mapboxgl.MapMouseEvent) => {
-      console.log('MapContainer: Map clicked at:', e.lngLat);
-      console.log('MapContainer: Target:', e.originalEvent.target);
-    };
-
-    map.on('click', handleClick);
-
-    return () => {
-      map.off('click', handleClick);
-    };
-  }, [map]);
-
   return (
     <>
       <div id="map-container" />

@@ -674,12 +674,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* Make sure popups are above markers */
 .mapboxgl-popup {
-  z-index: 9999 !important;
-  pointer-events: auto !important;
+  z-index: 2;  /* Keep this to ensure popups are above markers */
 }
 
 .mapboxgl-popup-content {
-  background: white !important;
-  min-width: 200px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  padding: 0;
+  overflow: hidden;
 }

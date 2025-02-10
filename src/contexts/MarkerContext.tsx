@@ -45,8 +45,6 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createMarker = (sit: Sit): mapboxgl.Marker => {
-    console.log('MarkerContext: Creating marker for sit:', sit.id);
-
     const el = document.createElement('div');
     el.className = getMarkerClasses(sit);
 
@@ -54,10 +52,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .setLngLat([sit.location.longitude, sit.location.latitude]);
 
     if (map && currentLocation) {
-      console.log('MarkerContext: About to call createPopup');
-      const popup = createPopup(sit, currentLocation);
-      console.log('MarkerContext: Got popup from createPopup:', popup);
-      marker.setPopup(popup);
+      marker.setPopup(createPopup(sit, currentLocation));
     }
 
     return marker;
@@ -73,12 +68,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Update markers when sits change
   useEffect(() => {
-    if (!map || !currentLocation) {
-      console.log('MarkerContext: Missing map or location:', { map: !!map, currentLocation });
-      return;
-    }
-
-    console.log('MarkerContext: Updating markers with sits:', sits.size);
+    if (!map || !currentLocation) return;
 
     // Remove markers that no longer exist
     markers.forEach((marker, sitId) => {
