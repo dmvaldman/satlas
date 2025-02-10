@@ -1,44 +1,43 @@
 import { usePhotoUpload } from '../../contexts/PhotoUploadContext';
 
-export const PhotoUploadModal = () => {
-  const { isModalOpen, closeModal, takePhoto, choosePhoto, isUploading } = usePhotoUpload();
+export const PhotoUploadModal: React.FC = () => {
+  const { isModalOpen, closeModal, takePhoto, chooseFromGallery } = usePhotoUpload();
+
+  const handleTakePhoto = async () => {
+    const base64Image = await takePhoto();
+    if (base64Image) {
+      // Handle the photo - we'll need to pass this up to a parent component
+      closeModal();
+    }
+  };
+
+  const handleChoosePhoto = async () => {
+    const base64Image = await chooseFromGallery();
+    if (base64Image) {
+      // Handle the photo - we'll need to pass this up to a parent component
+      closeModal();
+    }
+  };
 
   if (!isModalOpen) return null;
 
   return (
-    <div
-      className={`modal-overlay ${isModalOpen ? 'active' : ''}`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeModal();
-      }}
-    >
+    <div className="modal-overlay active">
       <div className="photo-options">
-        <button
-          className="photo-option-button"
-          onClick={takePhoto}
-          disabled={isUploading}
-        >
-          <svg viewBox="0 0 24 24">
-            <path d="M12 15.2C13.7673 15.2 15.2 13.7673 15.2 12C15.2 10.2327 13.7673 8.8 12 8.8C10.2327 8.8 8.8 10.2327 8.8 12C8.8 13.7673 10.2327 15.2 12 15.2Z"/>
-            <path d="M9 2L7.17 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4H16.83L15 2H9ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17Z"/>
+        <button className="photo-option-button" onClick={handleTakePhoto}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
+            <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
           </svg>
           Take Photo
         </button>
-        <button
-          className="photo-option-button"
-          onClick={choosePhoto}
-          disabled={isUploading}
-        >
-          <svg viewBox="0 0 24 24">
+        <button className="photo-option-button" onClick={handleChoosePhoto}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
           </svg>
           Choose from Gallery
         </button>
-        <button
-          className="photo-option-button cancel-button"
-          onClick={closeModal}
-          disabled={isUploading}
-        >
+        <button className="photo-option-button cancel-button" onClick={closeModal}>
           Cancel
         </button>
       </div>

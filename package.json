@@ -18,18 +18,19 @@
     "@capacitor/geolocation": "^7.0.0",
     "@capacitor/splash-screen": "latest",
     "@types/node": "^22.13.1",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "firebase": "^11.2.0",
     "mapbox-gl": "^3.9.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "typescript": "^5.7.3"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",
     "@types/mapbox-gl": "^3.4.1",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "@vitejs/plugin-react": "^4.0.0"
   },
   "author": "",
   "license": "ISC"

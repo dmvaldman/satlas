@@ -1,3 +1,4 @@
+import React from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { MapProvider } from './contexts/MapContext';
@@ -9,6 +10,7 @@ import { MapContainer } from './components/Map/MapContainer';
 import { PhotoUploadModal } from './components/PhotoUpload/PhotoUploadModal';
 import { MarkerProvider } from './contexts/MarkerContext';
 import { PopupProvider } from './contexts/PopupContext';
+import { MarksProvider } from './contexts/MarksContext';
 
 function App() {
   return (
@@ -16,20 +18,22 @@ function App() {
       <ProfileProvider>
         <MapProvider>
           <SitsProvider>
-            <MarkerProvider>
-              <PopupProvider>
-                <PhotoUploadProvider>
-                  <div className="app">
-                    <header>
-                      <AuthContainer />
-                    </header>
-                    <MapContainer />
-                    <ProfileModal />
-                    <PhotoUploadModal />
-                  </div>
-                </PhotoUploadProvider>
-              </PopupProvider>
-            </MarkerProvider>
+            <MarksProvider>
+              <MarkerProvider>
+                <PopupProvider>
+                  <PhotoUploadProvider>
+                    <div className="app">
+                      <header>
+                        <AuthContainer />
+                      </header>
+                      <MapContainer />
+                      <ProfileModal />
+                      <PhotoUploadModal />
+                    </div>
+                  </PhotoUploadProvider>
+                </PopupProvider>
+              </MarkerProvider>
+            </MarksProvider>
           </SitsProvider>
         </MapProvider>
       </ProfileProvider>

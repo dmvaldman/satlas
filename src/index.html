@@ -32,58 +32,62 @@
     <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
   </head>
   <body>
-    <header>
-      <!-- Replace the profile icon div with this -->
-      <div id="auth-container">
-        <button id="login-button" class="auth-button" style="display: none;">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-          </svg>
-          Sign in with Google
-        </button>
-        <div id="profile-container" style="display: none;">
-          <img id="profile-image" src="./assets/imgs/profile_blank.jpg" alt="Profile" />
+    <!-- React root -->
+    <div id="root"></div>
+
+    <!-- Legacy app container (will be removed after refactor) -->
+    <div id="legacy-app">
+      <header>
+        <!-- Replace the profile icon div with this -->
+        <div id="auth-container">
+          <button id="login-button" class="auth-button" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            </svg>
+            Sign in with Google
+          </button>
+          <div id="profile-container" style="display: none;">
+            <img id="profile-image" src="./assets/imgs/profile_blank.jpg" alt="Profile" />
+          </div>
+        </div>
+      </header>
+      <div id="map-container"></div>
+
+      <!-- Floating Action Button for adding new Satlases -->
+      <button class="fab" id="add-satlas-btn" aria-label="Add new Satlas">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+      </button>
+
+      <!-- App Scripts -->
+      <script src="./ts/map.ts" type="module"></script>
+
+      <!-- Add this before the closing body tag -->
+      <div class="modal-overlay" id="photo-modal">
+        <div class="photo-options">
+          <button class="photo-option-button" id="take-photo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
+              <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+            </svg>
+            Take Photo
+          </button>
+          <button class="photo-option-button" id="choose-photo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+            </svg>
+            Choose from Gallery
+          </button>
+          <button class="photo-option-button cancel-button" id="cancel-photo">
+            Cancel
+          </button>
         </div>
       </div>
-    </header>
-
-    <!-- Map container for displaying nearby satlases -->
-    <div id="map-container">
     </div>
 
-    <!-- Floating Action Button for adding new Satlases -->
-    <button class="fab" id="add-satlas-btn" aria-label="Add new Satlas">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-      </svg>
-    </button>
-
-    <!-- App Scripts -->
-    <script src="./ts/map.ts" type="module"></script>
-
-    <!-- Add this before the closing body tag -->
-    <div class="modal-overlay" id="photo-modal">
-      <div class="photo-options">
-        <button class="photo-option-button" id="take-photo">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
-            <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-          </svg>
-          Take Photo
-        </button>
-        <button class="photo-option-button" id="choose-photo">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-          </svg>
-          Choose from Gallery
-        </button>
-        <button class="photo-option-button cancel-button" id="cancel-photo">
-          Cancel
-        </button>
-      </div>
-    </div>
-
-    <!-- Before the closing body tag -->
-    <script src="./ts/main.ts" type="module"></script>
+    <!-- Load both React and legacy app -->
+    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./ts/main.ts"></script>
   </body>
 </html>

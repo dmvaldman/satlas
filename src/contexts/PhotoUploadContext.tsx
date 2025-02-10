@@ -8,34 +8,59 @@ interface PhotoUploadContextType {
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
-  takePhoto: () => Promise<void>;
-  choosePhoto: () => Promise<void>;
-  isUploading: boolean;
+  takePhoto: () => Promise<string | null>;
+  chooseFromGallery: () => Promise<string | null>;
 }
 
 const PhotoUploadContext = createContext<PhotoUploadContextType>({
   isModalOpen: false,
   openModal: () => {},
   closeModal: () => {},
-  takePhoto: async () => {},
-  choosePhoto: async () => {},
-  isUploading: false,
+  takePhoto: async () => null,
+  chooseFromGallery: async () => null,
 });
 
 export const usePhotoUpload = () => useContext(PhotoUploadContext);
 
 export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const { getCurrentLocation } = useMap();
   const { uploadSit } = useSits();
   const { isAuthenticated } = useAuth();
 
-  const handlePhotoCapture = async (source: CameraSource) => {
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+
+  const takePhoto = async (): Promise<string | null> => {
     if (!isAuthenticated) {
       // TODO: Add notification system
       console.error('Please sign in to add a sit');
-      return;
+      return null;
+    }
+
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64
+      });
+      if (!image.base64String) return null;
+
+      const coordinates = await getCurrentLocation();
+      await uploadSit(image.base64String, coordinates);
+
+      return image.base64String;
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      return null;
+    }
+  };
+
+  const chooseFromGallery = async (): Promise<string | null> => {
+    if (!isAuthenticated) {
+      // TODO: Add notification system
+      console.error('Please sign in to add a sit');
+      return null;
     }
 
     try {
@@ -43,20 +68,17 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Base64,
-        source,
+        source: CameraSource.Photos
       });
+      if (!image.base64String) return null;
 
-      if (!image.base64String) return;
-
-      setIsUploading(true);
       const coordinates = await getCurrentLocation();
       await uploadSit(image.base64String, coordinates);
 
-      setIsModalOpen(false);
+      return image.base64String;
     } catch (error) {
-      console.error('Error capturing photo:', error);
-    } finally {
-      setIsUploading(false);
+      console.error('Error choosing photo:', error);
+      return null;
     }
   };
 
@@ -64,11 +86,10 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     <PhotoUploadContext.Provider
       value={{
         isModalOpen,
-        openModal: () => setIsModalOpen(true),
-        closeModal: () => setIsModalOpen(false),
-        takePhoto: () => handlePhotoCapture(CameraSource.Camera),
-        choosePhoto: () => handlePhotoCapture(CameraSource.Photos),
-        isUploading,
+        openModal,
+        closeModal,
+        takePhoto,
+        chooseFromGallery,
       }}
     >
       {children}

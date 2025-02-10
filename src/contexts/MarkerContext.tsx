@@ -4,19 +4,18 @@ import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
 import { usePopups } from './PopupContext';
 import { useAuth } from './AuthContext';
+import { useMarks } from './MarksContext';
 import { Sit } from '../types';
 
 interface MarkerContextType {
   markers: Map<string, mapboxgl.Marker>;
   createMarker: (sit: Sit) => mapboxgl.Marker;
-  updateMarkerStyle: (marker: mapboxgl.Marker, isOwnSit: boolean, isFavorite: boolean) => void;
   removeMarker: (sitId: string) => void;
 }
 
 const MarkerContext = createContext<MarkerContextType>({
   markers: new Map(),
   createMarker: () => new mapboxgl.Marker(),
-  updateMarkerStyle: () => {},
   removeMarker: () => {},
 });
 
@@ -28,20 +27,16 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { sits } = useSits();
   const { user } = useAuth();
   const { createPopup } = usePopups();
+  const { marks } = useMarks();
 
-  const getMarkerClasses = (isOwnSit: boolean, isFavorite: boolean, isNew: boolean = false): string => {
+  const getMarkerClasses = (sit: Sit): string => {
     const classes = ['satlas-marker'];
+    const isOwnSit = sit.uploadedBy === user?.uid;
 
-    if (isFavorite) {
-      classes.push('favorite');
-    } else if (isOwnSit) {
+    if (isOwnSit) {
       classes.push('own-sit');
     } else {
       classes.push('other-sit');
-    }
-
-    if (isNew) {
-      classes.push('new');
     }
 
     return classes.join(' ');
@@ -49,10 +44,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const createMarker = (sit: Sit): mapboxgl.Marker => {
     const el = document.createElement('div');
-    const isOwnSit = sit.uploadedBy === user?.uid;
-    const isFavorite = false; // TODO: Get from MarksContext
-
-    el.className = getMarkerClasses(isOwnSit, isFavorite);
+    el.className = getMarkerClasses(sit);
 
     const marker = new mapboxgl.Marker(el)
       .setLngLat([sit.location.longitude, sit.location.latitude]);
@@ -67,16 +59,6 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     return marker;
-  };
-
-  const updateMarkerStyle = (
-    marker: mapboxgl.Marker,
-    isOwnSit: boolean,
-    isFavorite: boolean
-  ) => {
-    const el = marker.getElement();
-    const wasNew = el.classList.contains('new');
-    el.className = getMarkerClasses(isOwnSit, isFavorite, wasNew);
   };
 
   const removeMarker = (sitId: string) => {
@@ -119,7 +101,6 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         markers,
         createMarker,
-        updateMarkerStyle,
         removeMarker,
       }}
     >
