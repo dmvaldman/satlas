@@ -1,5 +1,5 @@
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { app } from './firebase';
+import { app } from '../firebase';
 import { profileManager } from './profile';
 
 export class AuthManager {

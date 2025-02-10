@@ -1,6 +1,6 @@
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
-import { UserSitMark, MarkType } from './types';
+import { db } from '../firebase';
+import { UserSitMark, MarkType } from '../types';
 
 export class MarksManager {
   private marks: Map<string, Set<MarkType>> = new Map();

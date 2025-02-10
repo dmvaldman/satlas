@@ -1,6 +1,6 @@
 import { getAuth, updateProfile, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../firebase';
 
 interface UserPreferences {
   nickname: string;

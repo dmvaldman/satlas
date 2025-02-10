@@ -1,8 +1,8 @@
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, getDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebase';
-import { Sit, Coordinates } from './types';
-import { getDistanceInFeet } from './types';
+import { db, storage } from '../firebase';
+import { Sit, Coordinates } from '../types';
+import { getDistanceInFeet } from '../types';
 
 export class SitManager {
   async loadNearbySits(bounds: { north: number; south: number }): Promise<Sit[]> {

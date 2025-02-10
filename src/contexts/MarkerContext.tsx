@@ -27,16 +27,18 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { sits } = useSits();
   const { user } = useAuth();
   const { createPopup } = usePopups();
-  const { marks } = useMarks();
+  const { hasMark } = useMarks();
 
   const getMarkerClasses = (sit: Sit): string => {
     const classes = ['satlas-marker'];
     const isOwnSit = sit.uploadedBy === user?.uid;
+    const isFavorite = hasMark(sit.id, 'favorite');
 
     if (isOwnSit) {
       classes.push('own-sit');
-    } else {
-      classes.push('other-sit');
+    }
+    if (isFavorite) {
+      classes.push('favorite');
     }
 
     return classes.join(' ');
@@ -71,7 +73,9 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Update markers when sits change
   useEffect(() => {
-    if (!map) return;
+    if (!map || !currentLocation) return;
+
+    console.log('Updating markers with sits:', sits);
 
     // Remove markers that no longer exist
     markers.forEach((marker, sitId) => {
@@ -88,13 +92,17 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!marker) {
         // Create new marker
         marker = createMarker(sit);
-        setMarkers(new Map(markers.set(sit.id, marker)));
+        marker.addTo(map);
+        markers.set(sit.id, marker);
       } else {
         // Update existing marker position
         marker.setLngLat([sit.location.longitude, sit.location.latitude]);
       }
     });
-  }, [map, sits]);
+
+    // Update state with current markers
+    setMarkers(new Map(markers));
+  }, [map, sits, currentLocation]);
 
   return (
     <MarkerContext.Provider

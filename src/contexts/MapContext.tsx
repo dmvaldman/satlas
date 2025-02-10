@@ -1,7 +1,8 @@
 import { createContext, useContext, useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Coordinates } from '../types';
+import { Coordinates, MarkType } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
+import { useMarks } from './MarksContext';
 
 // Replace with your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
@@ -28,6 +29,7 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toggleMark } = useMarks();
 
   const getCurrentLocation = async (): Promise<Coordinates> => {
     try {
@@ -124,6 +126,38 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mapRef.current?.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const handleMarkClick = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const markButton = target.closest('.mark-button') as HTMLElement;
+      if (!markButton) return;
+
+      const sitId = markButton.dataset.sitId;
+      const markType = markButton.dataset.markType as MarkType;
+      if (!sitId || !markType) return;
+
+      try {
+        await toggleMark(sitId, markType);
+      } catch (error) {
+        console.error('Error toggling mark:', error);
+        // Add error notification
+        const notification = document.createElement('div');
+        notification.className = 'notification error';
+        notification.textContent = 'Error updating mark';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      }
+    };
+
+    mapRef.current.getContainer().addEventListener('click', handleMarkClick);
+
+    return () => {
+      mapRef.current?.getContainer().removeEventListener('click', handleMarkClick);
+    };
+  }, [toggleMark]);
 
   const getBounds = () => {
     if (!mapRef.current) return null;

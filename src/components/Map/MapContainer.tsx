@@ -1,31 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useMap } from '../../contexts/MapContext';
 import { useSits } from '../../contexts/SitsContext';
 import { AddSitButton } from './AddSitButton';
 
 export const MapContainer = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { map, isLoading: isMapLoading } = useMap();
+  const { map, isLoading } = useMap();
   const { loadNearbySits } = useSits();
-  const [isLoadingSits, setIsLoadingSits] = useState(false);
 
+  // Add effect to load sits when map moves
   useEffect(() => {
     if (!map) return;
 
     const handleMoveEnd = async () => {
       const bounds = map.getBounds();
-      setIsLoadingSits(true);
       try {
         await loadNearbySits({
           north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          // Note: We're not using east/west bounds yet due to Firestore query limitations
-          // We'll need to handle this in the application layer
+          south: bounds.getSouth()
         });
       } catch (error) {
         console.error('Error loading sits:', error);
-      } finally {
-        setIsLoadingSits(false);
       }
     };
 
@@ -43,13 +37,12 @@ export const MapContainer = () => {
 
   return (
     <>
-      <div id="map-container" ref={containerRef}>
-        {(isMapLoading || isLoadingSits) && (
-          <div className="map-loading">
-            <p>{isMapLoading ? 'Loading map...' : 'Loading sits...'}</p>
-          </div>
-        )}
-      </div>
+      <div id="map-container" />
+      {isLoading && (
+        <div className="map-loading">
+          <p>Loading map...</p>
+        </div>
+      )}
       <AddSitButton />
     </>
   );

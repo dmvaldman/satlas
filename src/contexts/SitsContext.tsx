@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -38,7 +38,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sits, setSits] = useState<Map<string, Sit>>(new Map());
   const { user } = useAuth();
 
-  const loadNearbySits = async (bounds: { north: number; south: number }) => {
+  const loadNearbySits = useCallback(async (bounds: { north: number; south: number }) => {
     const sitsRef = collection(db, 'sits');
     const q = query(
       sitsRef,
@@ -48,14 +48,20 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const querySnapshot = await getDocs(q);
     const newSits = new Map(sits);
+    let hasChanges = false;
 
     querySnapshot.docs.forEach(doc => {
       const sit = { ...doc.data(), id: doc.id } as Sit;
-      newSits.set(sit.id, sit);
+      if (!newSits.has(sit.id) || JSON.stringify(newSits.get(sit.id)) !== JSON.stringify(sit)) {
+        newSits.set(sit.id, sit);
+        hasChanges = true;
+      }
     });
 
-    setSits(newSits);
-  };
+    if (hasChanges) {
+      setSits(newSits);
+    }
+  }, []);
 
   const uploadSit = async (base64Image: string, coordinates: Coordinates): Promise<Sit> => {
     if (!user) throw new Error('Must be logged in to upload');
@@ -172,18 +178,18 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } as Image));
   };
 
+  const value = useMemo(() => ({
+    sits,
+    loadNearbySits,
+    uploadSit,
+    addImageToSit,
+    getSit,
+    findNearbySit,
+    getImagesForSit,
+  }), [sits, loadNearbySits]);
+
   return (
-    <SitsContext.Provider
-      value={{
-        sits,
-        loadNearbySits,
-        uploadSit,
-        addImageToSit,
-        getSit,
-        findNearbySit,
-        getImagesForSit,
-      }}
-    >
+    <SitsContext.Provider value={value}>
       {children}
     </SitsContext.Provider>
   );

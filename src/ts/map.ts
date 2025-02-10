@@ -1,18 +1,18 @@
 import { Geolocation } from '@capacitor/geolocation';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../firebase';
 import mapboxgl from 'mapbox-gl';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
-import { storage } from './firebase';
+import { storage } from '../firebase';
 import { authManager } from './auth';
 import { getAuth } from 'firebase/auth';
 import { MarkerManager } from './markers';
 import { PopupManager } from './popups';
 import { FavoritesManager } from './favorites';
 import { SitManager } from './sits';
-import { Sit, Coordinates, getDistanceInFeet, UserPreferences } from './types';
+import { Sit, Coordinates, getDistanceInFeet, UserPreferences } from '../types';
 import { MarksManager } from './marks';
 
 // Replace with your Mapbox access token

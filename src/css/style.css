@@ -630,7 +630,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* React app styles */
 #root {
-  display: none; /* Will be shown when React app is ready */
+  display: flex;
   height: 100%;
   width: 100%;
 }
