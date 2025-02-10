@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
@@ -10,7 +10,7 @@ import * as mapboxgl from 'mapbox-gl';
 interface PhotoUploadContextType {
   isModalOpen: boolean;
   isUploading: boolean;
-  openModal: () => void;
+  openModal: (replaceInfo?: { sitId: string; imageId: string }) => void;
   closeModal: () => void;
   takePhoto: () => Promise<void>;
   chooseFromGallery: () => Promise<void>;
@@ -30,14 +30,29 @@ export const usePhotoUpload = () => useContext(PhotoUploadContext);
 export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [replaceInfo, setReplaceInfo] = useState<{ sitId: string; imageId: string } | null>(null);
   const { getCurrentLocation } = useMap();
-  const { uploadSit, findNearbySit } = useSits();
+  const { uploadSit, findNearbySit, replaceImage } = useSits();
   const { isAuthenticated, user } = useAuth();
   const { createPendingMarker, updateMarker, removeMarker, createMarker, markers } = useMarkers();
   const { map } = useMap();
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  // Add an effect to watch state changes
+  useEffect(() => {
+    console.log('isModalOpen state changed:', isModalOpen);
+  }, [isModalOpen]);
+
+  const openModal = useCallback((info?: { sitId: string; imageId: string }) => {
+    console.log('openModal called with:', info);
+    setReplaceInfo(info || null);
+    setIsModalOpen(true);
+    console.log('Modal state after open:', { isModalOpen: true, replaceInfo: info || null });
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setReplaceInfo(null);
+  }, []);
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     const notification = document.createElement('div');
@@ -111,10 +126,11 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const handlePhotoUpload = async (base64Image: string) => {
-    console.log('Upload attempted. Auth state:', {
+    console.log('handlePhotoUpload called:', {
       isAuthenticated,
-      user,
-      userId: user?.uid
+      hasUser: !!user,
+      hasReplaceInfo: !!replaceInfo,
+      replaceInfo
     });
 
     if (!isAuthenticated || !user) {
@@ -123,74 +139,74 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     setIsUploading(true);
-    let sitId = `sit_${Date.now()}`;
 
     try {
-      // Get location first
-      let coordinates = await getImageLocation(base64Image);
-      if (!coordinates) {
-        coordinates = await getCurrentLocation();
-      }
+      if (replaceInfo) {
+        console.log('Attempting to replace photo:', replaceInfo);
+        await replaceImage(replaceInfo.sitId, replaceInfo.imageId, base64Image);
+        console.log('Photo replacement successful');
+        showNotification('Photo replaced successfully!', 'success');
+      } else {
+        // Handle new upload
+        let sitId = `sit_${Date.now()}`;
 
-      // Create initial sit with location and user info
-      const initialSit = {
-        id: sitId,
-        location: coordinates,
-        imageCollectionId: `${Date.now()}_${user.uid}`,
-        uploadedBy: user.uid,
-        createdAt: new Date(),
-      };
-
-      // Create marker immediately
-      if (map) {
-        const marker = createMarker(initialSit);
-        marker.addTo(map);
-
-        // Show uploading state in popup
-        const loadingPopup = new mapboxgl.Popup({ closeButton: false })
-          .setHTML('<div class="satlas-popup-loading"><p>Uploading photo...</p></div>');
-        marker.setPopup(loadingPopup);
-      }
-
-      // Perform actual upload
-      const completeSit = await uploadSit(base64Image, coordinates);
-
-      // Update marker with complete sit data (including photo)
-      if (map) {
-        const marker = markers.get(sitId);
-        if (marker && coordinates) {
-          const popupContent = `
-            <div class="satlas-popup">
-              <h3>${completeSit.name}</h3>
-              <p>Uploaded by: ${completeSit.uploadedBy}</p>
-              <p>Uploaded at: ${new Date(completeSit.createdAt).toLocaleString()}</p>
-            </div>
-          `;
-          marker.setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML(popupContent));
+        // Get location first
+        let coordinates = await getImageLocation(base64Image);
+        if (!coordinates) {
+          coordinates = await getCurrentLocation();
         }
-      }
 
-      showNotification('Sit uploaded successfully!', 'success');
+        // Create initial sit with location and user info
+        const initialSit = {
+          id: sitId,
+          location: coordinates,
+          imageCollectionId: `${Date.now()}_${user.uid}`,
+          uploadedBy: user.uid,
+          createdAt: new Date(),
+        };
+
+        // Create marker immediately
+        if (map) {
+          const marker = createMarker(initialSit);
+          marker.addTo(map);
+
+          // Show uploading state in popup
+          const loadingPopup = new mapboxgl.Popup({ closeButton: false })
+            .setHTML('<div class="satlas-popup-loading"><p>Uploading photo...</p></div>');
+          marker.setPopup(loadingPopup);
+        }
+
+        // Perform actual upload
+        const completeSit = await uploadSit(base64Image, coordinates);
+
+        // Update marker with complete sit data (including photo)
+        if (map) {
+          const marker = markers.get(sitId);
+          if (marker && coordinates) {
+            const popupContent = `
+              <div class="satlas-popup">
+                <h3>${completeSit.name}</h3>
+                <p>Uploaded by: ${completeSit.uploadedBy}</p>
+                <p>Uploaded at: ${new Date(completeSit.createdAt).toLocaleString()}</p>
+              </div>
+            `;
+            marker.setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML(popupContent));
+          }
+        }
+
+        showNotification('Sit uploaded successfully!', 'success');
+      }
     } catch (error) {
-      console.error('Error uploading sit:', error, {
-        authState: { isAuthenticated, userId: user?.uid }
-      });
-      // Remove marker on error
-      if (map) {
-        const marker = markers.get(sitId);
-        if (marker) {
-          marker.remove();
-        }
-      }
-      showNotification('Error uploading sit', 'error');
+      console.error('Error handling photo:', error);
+      showNotification('Error uploading photo', 'error');
     } finally {
       setIsUploading(false);
+      setReplaceInfo(null);
     }
   };
 
   const takePhoto = async () => {
     try {
-      closeModal(); // Close modal immediately after selection
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -199,6 +215,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       if (image.base64String) {
         await handlePhotoUpload(image.base64String);
+        closeModal();
       }
     } catch (error) {
       if (error instanceof Error && error.message !== 'User cancelled photos app') {
@@ -210,7 +227,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const chooseFromGallery = async () => {
     try {
-      closeModal(); // Close modal immediately after selection
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -220,6 +236,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       if (image.base64String) {
         await handlePhotoUpload(image.base64String);
+        closeModal();
       }
     } catch (error) {
       if (error instanceof Error && error.message !== 'User cancelled photos app') {
@@ -229,17 +246,21 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  // Add this log to see what value we're providing
+  const value = {
+    isModalOpen,
+    isUploading,
+    openModal,
+    closeModal,
+    takePhoto,
+    chooseFromGallery,
+  };
+
+  console.log('Creating PhotoUploadContext value:', value);
+
   return (
-    <PhotoUploadContext.Provider
-      value={{
-        isModalOpen,
-        isUploading,
-        openModal,
-        closeModal,
-        takePhoto,
-        chooseFromGallery,
-      }}
-    >
+    <PhotoUploadContext.Provider value={value}>
+      {console.log('PhotoUploadContext rendering with:', { isModalOpen, isUploading })}
       {children}
     </PhotoUploadContext.Provider>
   );

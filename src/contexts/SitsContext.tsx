@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Sit, Coordinates, Image } from '../types';
@@ -14,6 +14,8 @@ interface SitsContextType {
   getSit: (sitId: string) => Promise<Sit | null>;
   findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
+  deleteImage: (sitId: string, imageId: string) => Promise<void>;
+  replaceImage: (sitId: string, imageId: string, newImageBase64: string) => Promise<void>;
 }
 
 const SitsContext = createContext<SitsContextType>({
@@ -30,6 +32,8 @@ const SitsContext = createContext<SitsContextType>({
   getSit: async () => null,
   findNearbySit: async () => null,
   getImagesForSit: async () => [],
+  deleteImage: async () => {},
+  replaceImage: async () => {},
 });
 
 export const useSits = () => useContext(SitsContext);
@@ -199,6 +203,54 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } as Image));
   };
 
+  const deleteImage = async (sitId: string, imageId: string): Promise<void> => {
+    if (!user) throw new Error('Must be logged in to delete images');
+
+    try {
+      // Delete the image document
+      await deleteDoc(doc(db, 'images', imageId));
+
+      // Check if this was the last image
+      const remainingImages = await getImagesForSit(sitId);
+
+      if (remainingImages.length === 0) {
+        // If no images left, delete the entire sit
+        await deleteDoc(doc(db, 'sits', sitId));
+        // Remove from local state
+        const newSits = new Map(sits);
+        newSits.delete(sitId);
+        setSits(newSits);
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      throw error;
+    }
+  };
+
+  const replaceImage = async (sitId: string, imageId: string, newImageBase64: string): Promise<void> => {
+    if (!user) throw new Error('Must be logged in to replace images');
+
+    try {
+      // Upload new image
+      const filename = `sit_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `sits/${filename}`);
+      const base64WithoutPrefix = newImageBase64.replace(/^data:image\/\w+;base64,/, '');
+      await uploadString(storageRef, base64WithoutPrefix, 'base64');
+      const photoURL = await getDownloadURL(storageRef);
+
+      // Update the image document
+      await setDoc(doc(db, 'images', imageId), {
+        photoURL,
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous',
+        updatedAt: new Date()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error replacing image:', error);
+      throw error;
+    }
+  };
+
   const value = useMemo(() => ({
     sits,
     loadNearbySits,
@@ -207,7 +259,9 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getSit,
     findNearbySit,
     getImagesForSit,
-  }), [sits, loadNearbySits, uploadSit, addImageToSit, getSit, findNearbySit, getImagesForSit]);
+    deleteImage,
+    replaceImage,
+  }), [sits, loadNearbySits, uploadSit, addImageToSit, getSit, findNearbySit, getImagesForSit, deleteImage, replaceImage]);
 
   return (
     <SitsContext.Provider value={value}>

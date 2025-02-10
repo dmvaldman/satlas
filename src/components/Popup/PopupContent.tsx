@@ -1,6 +1,10 @@
 import { Carousel } from '../Carousel/Carousel';
 import { useMarks } from '../../contexts/MarksContext';
 import { Sit, Image, MarkType } from '../../types';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useSits } from '../../contexts/SitsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePhotoUpload } from '../../contexts/PhotoUploadContext';
 
 interface PopupContentProps {
   sit: Sit;
@@ -10,6 +14,13 @@ interface PopupContentProps {
 
 export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, currentLocation }) => {
   const { hasMark, getMarkCount, toggleMark } = useMarks();
+  const { deleteImage, replaceImage } = useSits();
+  const photoUploadContext = usePhotoUpload();
+
+  console.log('PhotoUpload context in PopupContent:', photoUploadContext);
+
+  const { openModal } = photoUploadContext;
+  const { user } = useAuth();
 
   const handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     console.log('Mark button clicked:', { type, sitId: sit.id });
@@ -22,14 +33,32 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
     }
   };
 
+  const handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
+    console.log('handleImageAction called:', { action, imageId, user });
+    if (!user) return;
+
+    try {
+      if (action === 'delete') {
+        if (window.confirm('Are you sure you want to delete this photo?')) {
+          await deleteImage(sit.id, imageId);
+        }
+      } else if (action === 'replace') {
+        console.log('Attempting to open modal for replacement:', { sitId: sit.id, imageId });
+        console.log('Using openModal function:', openModal);
+        openModal({ sitId: sit.id, imageId });
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing image:`, error);
+    }
+  };
+
   return (
     <div className="satlas-popup">
       <Carousel
         images={images}
         sitId={sit.id}
-        onImageAction={(action, imageId) => {
-          // Handle image actions
-        }}
+        onImageAction={handleImageAction}
+        showControls={images.some(img => img.userId === user?.uid)}
       />
       <div className="satlas-popup-info">
         {getMarkCount(sit.id, 'favorite') > 0 && (

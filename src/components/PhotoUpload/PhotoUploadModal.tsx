@@ -1,7 +1,15 @@
 import { usePhotoUpload } from '../../contexts/PhotoUploadContext';
 
 export const PhotoUploadModal: React.FC = () => {
-  const { isModalOpen, isUploading, closeModal, takePhoto, chooseFromGallery } = usePhotoUpload();
+  const {
+    isModalOpen,
+    isUploading,
+    closeModal,
+    takePhoto,
+    chooseFromGallery
+  } = usePhotoUpload();
+
+  console.log('PhotoUploadModal render:', { isModalOpen, isUploading });
 
   if (!isModalOpen) return null;
 
