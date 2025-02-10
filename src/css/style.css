@@ -36,6 +36,7 @@ header {
   width: 100%;
   min-height: 0; /* Important for flexbox */
   position: relative;
+  z-index: 1;
 }
 
 .mapboxgl-map {
@@ -93,18 +94,18 @@ header {
   transition: transform 0.2s;
 }
 
+.fab svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
 .fab:hover {
   transform: scale(1.1);
 }
 
 .fab:active {
   transform: scale(0.95);
-}
-
-.fab svg {
-  width: 24px;
-  height: 24px;
-  fill: white;
 }
 
 /* Add styles for the photo selection modal */
@@ -599,4 +600,22 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .mark-button.wantToGo.active svg {
   fill: #007AFF;
+}
+
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.map-loading p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
 }

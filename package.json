@@ -17,8 +17,14 @@
     "@capacitor/core": "^7.0.1",
     "@capacitor/geolocation": "^7.0.0",
     "@capacitor/splash-screen": "latest",
+    "@types/node": "^22.13.1",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
     "firebase": "^11.2.0",
-    "mapbox-gl": "^3.9.4"
+    "mapbox-gl": "^3.9.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.3"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",

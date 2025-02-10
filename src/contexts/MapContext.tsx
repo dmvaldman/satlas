@@ -11,6 +11,7 @@ interface MapContextType {
   currentLocation: Coordinates | null;
   getCurrentLocation: () => Promise<Coordinates>;
   isLoading: boolean;
+  getBounds: () => { north: number; south: number } | null;
 }
 
 const MapContext = createContext<MapContextType>({
@@ -18,6 +19,7 @@ const MapContext = createContext<MapContextType>({
   currentLocation: null,
   getCurrentLocation: async () => ({ latitude: 0, longitude: 0 }),
   isLoading: true,
+  getBounds: () => null,
 });
 
 export const useMap = () => useContext(MapContext);
@@ -123,6 +125,15 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  const getBounds = () => {
+    if (!mapRef.current) return null;
+    const bounds = mapRef.current.getBounds();
+    return {
+      north: bounds.getNorth(),
+      south: bounds.getSouth()
+    };
+  };
+
   return (
     <MapContext.Provider
       value={{
@@ -130,6 +141,7 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentLocation,
         getCurrentLocation,
         isLoading,
+        getBounds,
       }}
     >
       {children}
