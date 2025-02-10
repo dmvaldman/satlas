@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
@@ -11,12 +11,16 @@ interface MarkerContextType {
   markers: Map<string, mapboxgl.Marker>;
   createMarker: (sit: Sit) => mapboxgl.Marker;
   removeMarker: (sitId: string) => void;
+  createPendingMarker: (sit: Sit) => void;
+  updateMarker: (tempId: string, newSit: Sit) => void;
 }
 
 const MarkerContext = createContext<MarkerContextType>({
   markers: new Map(),
   createMarker: () => new mapboxgl.Marker(),
   removeMarker: () => {},
+  createPendingMarker: () => {},
+  updateMarker: () => {},
 });
 
 export const useMarkers = () => useContext(MarkerContext);
@@ -58,13 +62,55 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return marker;
   };
 
-  const removeMarker = (sitId: string) => {
-    const marker = markers.get(sitId);
+  const createPendingMarker = useCallback((sit: Sit) => {
+    if (!map) return;
+
+    const el = document.createElement('div');
+    el.className = 'satlas-marker pending';
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([sit.location.longitude, sit.location.latitude])
+      .addTo(map);
+
+    const popup = new mapboxgl.Popup({ closeButton: false })
+      .setHTML('<div class="satlas-popup-loading"><p>Uploading...</p></div>');
+
+    marker.setPopup(popup);
+    markers.set(sit.id, marker);
+  }, [map]);
+
+  const updateMarker = useCallback((tempId: string, newSit: Sit) => {
+    const marker = markers.get(tempId);
+    if (!marker) return;
+
+    marker.setLngLat([newSit.location.longitude, newSit.location.latitude]);
+
+    const el = marker.getElement();
+    el.className = getMarkerClasses(newSit);
+
+    if (map && currentLocation) {
+      marker.setPopup(createPopup(newSit, currentLocation));
+    }
+
+    markers.delete(tempId);
+    markers.set(newSit.id, marker);
+  }, [map, currentLocation, createPopup]);
+
+  const removeMarker = useCallback((markerId: string) => {
+    const marker = markers.get(markerId);
     if (marker) {
       marker.remove();
-      setMarkers(new Map(markers).set(sitId, marker));
+      markers.delete(markerId);
     }
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    markers,
+    createMarker,
+    removeMarker,
+    createPendingMarker,
+    updateMarker,
+  }), [markers, createMarker, removeMarker, createPendingMarker, updateMarker]);
 
   useEffect(() => {
     if (!map || !currentLocation) return;
@@ -131,11 +177,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   return (
     <MarkerContext.Provider
-      value={{
-        markers,
-        createMarker,
-        removeMarker,
-      }}
+      value={value}
     >
       {children}
     </MarkerContext.Provider>

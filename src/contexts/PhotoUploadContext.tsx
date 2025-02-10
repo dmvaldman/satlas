@@ -4,6 +4,8 @@ import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
 import { useAuth } from './AuthContext';
 import { Coordinates } from '../types';
+import { useMarkers } from '../contexts/MarkerContext';
+import * as mapboxgl from 'mapbox-gl';
 
 interface PhotoUploadContextType {
   isModalOpen: boolean;
@@ -31,6 +33,8 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const { getCurrentLocation } = useMap();
   const { uploadSit, findNearbySit } = useSits();
   const { isAuthenticated, user } = useAuth();
+  const { createPendingMarker, updateMarker, removeMarker, createMarker, markers } = useMarkers();
+  const { map } = useMap();
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
@@ -107,7 +111,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const handlePhotoUpload = async (base64Image: string) => {
-    // Add more detailed auth state logging
     console.log('Upload attempted. Auth state:', {
       isAuthenticated,
       user,
@@ -120,29 +123,65 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     setIsUploading(true);
-    try {
-      // Try to get location from image first
-      let coordinates = await getImageLocation(base64Image);
+    let sitId = `sit_${Date.now()}`;
 
-      // If no location in image, use current location
+    try {
+      // Get location first
+      let coordinates = await getImageLocation(base64Image);
       if (!coordinates) {
         coordinates = await getCurrentLocation();
       }
 
-      // Add logging before upload
-      console.log('Starting upload with:', {
-        coordinates,
-        userId: user.uid,
-        isAuthenticated
-      });
+      // Create initial sit with location and user info
+      const initialSit = {
+        id: sitId,
+        location: coordinates,
+        imageCollectionId: `${Date.now()}_${user.uid}`,
+        uploadedBy: user.uid,
+        createdAt: new Date(),
+      };
 
-      await uploadSit(base64Image, coordinates);
+      // Create marker immediately
+      if (map) {
+        const marker = createMarker(initialSit);
+        marker.addTo(map);
+
+        // Show uploading state in popup
+        const loadingPopup = new mapboxgl.Popup({ closeButton: false })
+          .setHTML('<div class="satlas-popup-loading"><p>Uploading photo...</p></div>');
+        marker.setPopup(loadingPopup);
+      }
+
+      // Perform actual upload
+      const completeSit = await uploadSit(base64Image, coordinates);
+
+      // Update marker with complete sit data (including photo)
+      if (map) {
+        const marker = markers.get(sitId);
+        if (marker && coordinates) {
+          const popupContent = `
+            <div class="satlas-popup">
+              <h3>${completeSit.name}</h3>
+              <p>Uploaded by: ${completeSit.uploadedBy}</p>
+              <p>Uploaded at: ${new Date(completeSit.createdAt).toLocaleString()}</p>
+            </div>
+          `;
+          marker.setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML(popupContent));
+        }
+      }
+
       showNotification('Sit uploaded successfully!', 'success');
-      closeModal();
     } catch (error) {
       console.error('Error uploading sit:', error, {
         authState: { isAuthenticated, userId: user?.uid }
       });
+      // Remove marker on error
+      if (map) {
+        const marker = markers.get(sitId);
+        if (marker) {
+          marker.remove();
+        }
+      }
       showNotification('Error uploading sit', 'error');
     } finally {
       setIsUploading(false);
