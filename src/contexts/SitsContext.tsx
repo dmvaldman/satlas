@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -38,6 +38,13 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sits, setSits] = useState<Map<string, Sit>>(new Map());
   const { user } = useAuth();
 
+  useEffect(() => {
+    console.log('SitsContext auth state updated:', {
+      userExists: !!user,
+      uid: user?.uid
+    });
+  }, [user]);
+
   const loadNearbySits = useCallback(async (bounds: { north: number; south: number }) => {
     const sitsRef = collection(db, 'sits');
     const q = query(
@@ -63,43 +70,57 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const uploadSit = async (base64Image: string, coordinates: Coordinates): Promise<Sit> => {
-    if (!user) throw new Error('Must be logged in to upload');
+  const uploadSit = useCallback(async (base64Image: string, coordinates: Coordinates): Promise<Sit> => {
+    // Add more detailed auth check
+    if (!user?.uid) {
+      console.error('Upload attempted without auth:', {
+        userExists: !!user,
+        uid: user?.uid
+      });
+      throw new Error('Must be logged in to upload');
+    }
 
-    // Upload image to storage
-    const filename = `sit_${Date.now()}.jpg`;
-    const storageRef = ref(storage, `sits/${filename}`);
-    const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    await uploadString(storageRef, base64WithoutPrefix, 'base64');
-    const photoURL = await getDownloadURL(storageRef);
+    try {
+      // Upload image to storage
+      const filename = `sit_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `sits/${filename}`);
+      const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      await uploadString(storageRef, base64WithoutPrefix, 'base64');
+      const photoURL = await getDownloadURL(storageRef);
 
-    // Create sit data
-    const imageCollectionId = `${Date.now()}_${user.uid}`;
-    const sitData = {
-      location: coordinates,
-      imageCollectionId,
-      uploadedBy: user.uid,
-      createdAt: serverTimestamp()
-    };
+      // Create sit data
+      const imageCollectionId = `${Date.now()}_${user.uid}`;
+      const sitData = {
+        location: coordinates,
+        imageCollectionId,
+        uploadedBy: user.uid,
+        createdAt: new Date() // Use local timestamp as we did with marks
+      };
 
-    // Add sit to Firestore
-    const docRef = await addDoc(collection(db, 'sits'), sitData);
-    const sit = { ...sitData, id: docRef.id } as Sit;
+      // Add sit to Firestore
+      const docRef = await addDoc(collection(db, 'sits'), sitData);
+      const sit = { ...sitData, id: docRef.id } as Sit;
 
-    // Add image to images collection
-    await addDoc(collection(db, 'images'), {
-      photoURL,
-      userId: user.uid,
-      userName: user.displayName || 'Anonymous',
-      collectionId: imageCollectionId,
-      createdAt: serverTimestamp()
-    });
+      // Add image to images collection
+      await addDoc(collection(db, 'images'), {
+        photoURL,
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous',
+        collectionId: imageCollectionId,
+        createdAt: new Date() // Use local timestamp
+      });
 
-    // Update local state
-    setSits(new Map(sits.set(sit.id, sit)));
+      // Update local state
+      setSits(new Map(sits.set(sit.id, sit)));
 
-    return sit;
-  };
+      return sit;
+    } catch (error) {
+      console.error('Error in uploadSit:', error, {
+        authState: { userExists: !!user, uid: user?.uid }
+      });
+      throw error;
+    }
+  }, [user]);
 
   const addImageToSit = async (sitId: string, base64Image: string) => {
     if (!user) throw new Error('Must be logged in to add images');
@@ -186,7 +207,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getSit,
     findNearbySit,
     getImagesForSit,
-  }), [sits, loadNearbySits]);
+  }), [sits, loadNearbySits, uploadSit, addImageToSit, getSit, findNearbySit, getImagesForSit]);
 
   return (
     <SitsContext.Provider value={value}>

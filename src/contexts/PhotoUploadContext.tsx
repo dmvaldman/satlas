@@ -43,6 +43,21 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTimeout(() => notification.remove(), 3000);
   };
 
+  // Add this helper function to convert DMS to decimal degrees
+  const convertDMSToDD = (dms: number[], direction: string): number => {
+    const degrees = dms[0];
+    const minutes = dms[1];
+    const seconds = dms[2];
+
+    let dd = degrees + (minutes / 60) + (seconds / 3600);
+
+    if (direction === 'S' || direction === 'W') {
+      dd *= -1;
+    }
+
+    return dd;
+  };
+
   const getImageLocation = async (base64Image: string): Promise<Coordinates | null> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -55,10 +70,30 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
             // @ts-ignore - EXIF is loaded globally
             const exifData = EXIF.getAllTags(this);
             if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
-              resolve({
-                latitude: exifData.GPSLatitude,
-                longitude: exifData.GPSLongitude
-              });
+              // Convert DMS to decimal degrees
+              const latitude = convertDMSToDD(
+                exifData.GPSLatitude,
+                exifData.GPSLatitudeRef
+              );
+              const longitude = convertDMSToDD(
+                exifData.GPSLongitude,
+                exifData.GPSLongitudeRef
+              );
+
+              // Validate the converted coordinates
+              if (
+                !isNaN(latitude) &&
+                !isNaN(longitude) &&
+                latitude >= -90 &&
+                latitude <= 90 &&
+                longitude >= -180 &&
+                longitude <= 180
+              ) {
+                resolve({ latitude, longitude });
+              } else {
+                console.warn('Invalid coordinates from EXIF:', { latitude, longitude });
+                resolve(null);
+              }
             } else {
               resolve(null);
             }
@@ -72,7 +107,14 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const handlePhotoUpload = async (base64Image: string) => {
-    if (!isAuthenticated) {
+    // Add more detailed auth state logging
+    console.log('Upload attempted. Auth state:', {
+      isAuthenticated,
+      user,
+      userId: user?.uid
+    });
+
+    if (!isAuthenticated || !user) {
       showNotification('Please sign in to add a sit', 'error');
       return;
     }
@@ -87,11 +129,20 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         coordinates = await getCurrentLocation();
       }
 
+      // Add logging before upload
+      console.log('Starting upload with:', {
+        coordinates,
+        userId: user.uid,
+        isAuthenticated
+      });
+
       await uploadSit(base64Image, coordinates);
       showNotification('Sit uploaded successfully!', 'success');
       closeModal();
     } catch (error) {
-      console.error('Error uploading sit:', error);
+      console.error('Error uploading sit:', error, {
+        authState: { isAuthenticated, userId: user?.uid }
+      });
       showNotification('Error uploading sit', 'error');
     } finally {
       setIsUploading(false);
@@ -100,6 +151,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const takePhoto = async () => {
     try {
+      closeModal(); // Close modal immediately after selection
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -114,12 +166,12 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.error('Error taking photo:', error);
         showNotification('Error taking photo', 'error');
       }
-      closeModal();
     }
   };
 
   const chooseFromGallery = async () => {
     try {
+      closeModal(); // Close modal immediately after selection
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -135,7 +187,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.error('Error choosing photo:', error);
         showNotification('Error choosing photo', 'error');
       }
-      closeModal();
     }
   };
 
