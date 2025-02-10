@@ -384,6 +384,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background-color: #ff3b30;  /* Red for favorites */
 }
 
+.favorite-count {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 8px;
+  text-align: center;
+}
+
 .favorite-button {
   display: flex;
   align-items: center;
