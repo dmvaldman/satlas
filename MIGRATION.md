@@ -1,44 +1,55 @@
-# React Migration Plan
+# Migration from Legacy to React
 
-## Current Issues
-- [x] Fix marker click handling
-- [x] Ensure popups work correctly
-- [ ] Handle map container sizing
-- [ ] Manage state between legacy and React apps
+## Progress
+
+### ✅ Completed
+- Map initialization and management (MapContext)
+- Marker creation and management (MarkerContext)
+- Popup system (PopupContext)
+- Authentication system (AuthContext)
+- Profile UI and management (ProfileContext)
+- Basic sits loading and display (SitsContext)
+
+### 🚧 In Progress
+- Marks/favorites system (MarksContext)
+  - Basic functionality working
+  - Need to remove legacy marks.ts
+- Photo upload system (PhotoUploadContext)
+  - Basic UI in place
+  - Need to complete functionality
+
+### 📋 Todo
+1. Complete Photo Upload
+   - Move functionality from map.ts to PhotoUploadContext
+   - Test upload flow
+   - Add error handling
+
+2. Complete Add New Sit Flow
+   - Move from map.ts to React components
+   - Integrate with photo upload
+   - Add location validation
+
+3. Clean Up Legacy Code
+   - Remove /ts folder:
+     - main.ts (after all features moved)
+     - map.ts (after photo upload complete)
+     - marks.ts (after marks system verified)
+     - profile.ts (after profile system verified)
+   - Clean up index.html
+   - Remove unused CSS
+
+4. Testing & Verification
+   - Test all marker interactions
+   - Verify marks/favorites system
+   - Test photo upload flow
+   - Verify authentication system
 
 ## Next Steps
-1. [x] Complete MarkerContext migration
-2. [x] Test marker and popup interaction
-3. [ ] Move on to PhotoUpload component
-4. [ ] Finally migrate Profile component
+1. Complete marks system migration
+2. Move photo upload functionality to React
+3. Remove legacy code as features are verified
 
-## Testing Checklist
-- [ ] Markers appear correctly
-- [ ] Markers are clickable
-- [ ] Popups show and hide correctly
-- [ ] Map resizes properly
-- [ ] State updates work in both apps
-
-## Components to Migrate
-- [x] Map Container
-- [x] Auth Container
-- [x] Popup Component
-- [x] Marker Component
-- [x] Photo Upload Modal
-- [ ] Profile Modal
-
-## Contexts to Migrate
-- [x] Map Context
-- [x] Auth Context
-- [x] Sits Context
-- [x] Popup Context
-- [x] Marker Context
-- [x] Photo Upload Context
-- [ ] Profile Context
-
-## Migration Steps
-1. [x] Set up React build pipeline
-2. [x] Create basic React app structure
-3. [ ] Migrate components one at a time
-4. [ ] Test each component thoroughly
-5. [ ] Remove legacy code when ready
+## Notes
+- Keep console.error for actual errors
+- Consider adding proper error boundaries
+- Need to verify all features work before removing legacy code

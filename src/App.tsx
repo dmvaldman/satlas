@@ -11,6 +11,7 @@ import { PhotoUploadModal } from './components/PhotoUpload/PhotoUploadModal';
 import { MarkerProvider } from './contexts/MarkerContext';
 import { PopupProvider } from './contexts/PopupContext';
 import { MarksProvider } from './contexts/MarksContext';
+import { AddSitButton } from './components/Map/AddSitButton';
 
 function App() {
   return (
@@ -27,11 +28,7 @@ function App() {
                         <AuthContainer />
                       </header>
                       <MapContainer />
-                      <button className="fab" id="add-satlas-btn" aria-label="Add new Satlas">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                        </svg>
-                      </button>
+                      <AddSitButton />
                       <ProfileModal />
                       <PhotoUploadModal />
                     </div>
