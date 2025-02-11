@@ -1,8 +1,6 @@
 import { usePhotoUpload } from '../../contexts/PhotoUploadContext';
 
 export const PhotoUploadModal: React.FC = () => {
-  console.log('PhotoUploadModal render');
-
   const {
     isModalOpen,
     isUploading,
@@ -16,9 +14,7 @@ export const PhotoUploadModal: React.FC = () => {
   return (
     <div
       className="modal-overlay active"
-      onClick={() => console.log('Modal overlay clicked')}
     >
-      {console.log('Modal DOM rendered - should see this when modal is open')}
       <div className="photo-options">
         <button
           className="photo-option-button"

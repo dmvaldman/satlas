@@ -28,8 +28,6 @@ const PhotoUploadContext = createContext<PhotoUploadContextType>({
 export const usePhotoUpload = () => useContext(PhotoUploadContext);
 
 export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log('PhotoUploadProvider render');  // Keep this
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [replaceInfo, setReplaceInfo] = useState<{ sitId: string; imageId: string } | null>(null);
@@ -40,7 +38,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const { map } = useMap();
 
   const openModal = useCallback((info?: { sitId: string; imageId: string }) => {
-    console.log('PhotoUploadContext openModal called with:', info);
     setReplaceInfo(info || null);
     setIsModalOpen(true);
   }, []);
@@ -121,13 +118,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const handlePhotoUpload = async (base64Image: string) => {
-    console.log('handlePhotoUpload called:', {
-      isAuthenticated,
-      hasUser: !!user,
-      hasReplaceInfo: !!replaceInfo,
-      replaceInfo
-    });
-
     if (!isAuthenticated || !user) {
       showNotification('Please sign in to add a sit', 'error');
       return;
@@ -137,9 +127,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     try {
       if (replaceInfo) {
-        console.log('Attempting to replace photo:', replaceInfo);
         await replaceImage(replaceInfo.sitId, replaceInfo.imageId, base64Image);
-        console.log('Photo replacement successful');
         showNotification('Photo replaced successfully!', 'success');
       } else {
         // Handle new upload
@@ -256,7 +244,6 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const value = useMemo(() => {
-    console.log('PhotoUploadContext value recreated');  // Keep this
     return {
       isModalOpen,
       isUploading,

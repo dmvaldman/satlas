@@ -10,14 +10,9 @@ import { PhotoUploadModal } from './components/PhotoUpload/PhotoUploadModal';
 import { MarkerProvider } from './contexts/MarkerContext';
 import { PopupProvider } from './contexts/PopupContext';
 import { MarksProvider } from './contexts/MarksContext';
-import { AddSitButton } from './components/Map/AddSitButton';
 import React from 'react';
 
 function App() {
-  console.log('App rendering, about to render PhotoUploadModal', {
-    isDevelopment: process.env.NODE_ENV === 'development',
-    isStrictMode: React.StrictMode !== undefined
-  });
   return (
     <AuthProvider>
       <ProfileProvider>
@@ -32,7 +27,6 @@ function App() {
                         <AuthContainer />
                       </header>
                       <MapContainer />
-                      <AddSitButton />
                       <ProfileModal />
                       <PhotoUploadModal />
                     </div>

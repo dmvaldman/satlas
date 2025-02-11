@@ -151,6 +151,8 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (!map || !sits) return;
 
+    console.log('MarkerContext useEffect - sits changed:', Array.from(sits.keys()));
+
     // Remove existing markers
     const existingMarkers = document.getElementsByClassName('marker');
     while (existingMarkers.length > 0) {
@@ -177,6 +179,38 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // ... rest of marker creation code ...
     });
   }, [map, sits, marks]);
+
+  useEffect(() => {
+    const handleSitDeleted = (event: Event) => {
+      const customEvent = event as CustomEvent<{ sitId: string }>;
+      const sitId = customEvent.detail.sitId;
+      console.log('Handling sitDeleted event:', { sitId });
+
+      // Remove the marker from the map
+      const marker = markers.get(sitId);
+      debugger;
+      if (marker) {
+        console.log('Found marker, removing from map:', marker);
+        marker.remove();  // This removes the marker from the map
+        markers.delete(sitId);  // This removes it from our markers Map
+        setMarkers(new Map(markers));  // This updates the state with a new Map
+        console.log('Marker removed and state updated');
+      }
+
+      // Close popup if it's open
+      if (map) {
+        const popups = document.getElementsByClassName('mapboxgl-popup');
+        for (let i = 0; i < popups.length; i++) {
+          popups[i].remove();
+        }
+      }
+    };
+
+    window.addEventListener('sitDeleted', handleSitDeleted);
+    return () => {
+      window.removeEventListener('sitDeleted', handleSitDeleted);
+    };
+  }, [markers, map]);
 
   return (
     <MarkerContext.Provider
