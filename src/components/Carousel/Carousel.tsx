@@ -15,6 +15,27 @@ export const Carousel: React.FC<CarouselProps> = ({ images, sitId, onImageAction
   const { user } = useAuth();
   const [activeIndexState, setActiveIndexState] = useState(activeIndex);
 
+  useEffect(() => {
+    setActiveIndexState(activeIndex);
+  }, [activeIndex]);
+
+  const handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
+    console.log('Carousel handleImageAction:', {
+      action,
+      imageId,
+      sitId,
+      userId: user?.uid,
+      imageUserId: images.find(img => img.id === imageId)?.userId
+    });
+
+    try {
+      await onImageAction(action, imageId);
+      console.log('Image action completed successfully');
+    } catch (error) {
+      console.error('Error in handleImageAction:', error);
+    }
+  };
+
   const currentImage = images[activeIndexState];
   const isUserImage = currentImage?.userId === user?.uid;
 
@@ -51,14 +72,7 @@ export const Carousel: React.FC<CarouselProps> = ({ images, sitId, onImageAction
               <div className="image-controls">
                 <button
                   className="replace-photo"
-                  onClick={() => {
-                    console.log('Replace button clicked:', {
-                      imageId: image.id,
-                      userId: image.userId,
-                      currentUserId: user?.uid
-                    });
-                    onImageAction('replace', image.id);
-                  }}
+                  onClick={() => handleImageAction('replace', image.id)}
                   title="Replace photo"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -67,7 +81,7 @@ export const Carousel: React.FC<CarouselProps> = ({ images, sitId, onImageAction
                 </button>
                 <button
                   className="delete-photo"
-                  onClick={() => onImageAction('delete', image.id)}
+                  onClick={() => handleImageAction('delete', image.id)}
                   title="Delete photo"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

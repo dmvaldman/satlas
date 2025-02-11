@@ -32,8 +32,10 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
 
     try {
       if (action === 'delete') {
+        console.log('Starting delete process for:', { sitId: sit.id, imageId });
         if (window.confirm('Are you sure you want to delete this photo?')) {
           await deleteImage(sit.id, imageId);
+          console.log('Delete completed');
         }
       } else if (action === 'replace') {
         window.dispatchEvent(new CustomEvent('openPhotoUploadModal', {

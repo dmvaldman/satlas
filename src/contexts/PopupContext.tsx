@@ -11,6 +11,7 @@ import { PopupContent } from '../components/Popup/PopupContent';
 import { MarksProvider } from './MarksContext';
 import { AuthProvider } from './AuthContext';
 import { PhotoUploadProvider } from './PhotoUploadContext';
+import { SitsProvider } from './SitsContext';
 
 interface PopupContextType {
   createPopup: (sit: Sit, currentLocation: { latitude: number; longitude: number }) => mapboxgl.Popup;
@@ -43,14 +44,18 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const renderContent = (images: Image[]) => {
       root.render(
         <AuthProvider>
-          <MarksProvider>
-            <PopupContent
-              key={`${sit.id}-${Date.now()}`}
-              sit={sit}
-              images={images}
-              currentLocation={currentLocation}
-            />
-          </MarksProvider>
+          <SitsProvider>
+            <MarksProvider>
+              <PhotoUploadProvider>
+                <PopupContent
+                  key={`${sit.id}-${Date.now()}`}
+                  sit={sit}
+                  images={images}
+                  currentLocation={currentLocation}
+                />
+              </PhotoUploadProvider>
+            </MarksProvider>
+          </SitsProvider>
         </AuthProvider>
       );
     };
@@ -73,36 +78,36 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return popup;
   }, [getImagesForSit]);
 
-  const updatePopupContent = (
+  const updatePopupContent = useCallback((
     popup: mapboxgl.Popup,
     sit: Sit,
     currentLocation: { latitude: number; longitude: number }
   ) => {
+    const content = document.createElement('div');
+    const root = createRoot(content);
+
     getImagesForSit(sit.imageCollectionId).then(images => {
-      const content = document.createElement('div');
-      const root = createRoot(content);
       root.render(
         <AuthProvider>
-          <MarksProvider>
-            <PopupContent
-              sit={sit}
-              images={images}
-              currentLocation={currentLocation}
-            />
-          </MarksProvider>
+          <SitsProvider>
+            <MarksProvider>
+              <PhotoUploadProvider>
+                <PopupContent
+                  sit={sit}
+                  images={images}
+                  currentLocation={currentLocation}
+                />
+              </PhotoUploadProvider>
+            </MarksProvider>
+          </SitsProvider>
         </AuthProvider>
       );
       popup.setDOMContent(content);
     });
-  };
+  }, []);
 
   return (
-    <PopupContext.Provider
-      value={{
-        createPopup,
-        updatePopupContent,
-      }}
-    >
+    <PopupContext.Provider value={{ createPopup, updatePopupContent }}>
       {children}
     </PopupContext.Provider>
   );

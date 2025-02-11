@@ -193,36 +193,74 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return [];
     }
 
+    console.log('Fetching images for collection:', imageCollectionId);
     const imagesRef = collection(db, 'images');
     const q = query(imagesRef, where('collectionId', '==', imageCollectionId));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map(doc => ({
+    const images = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Image));
+    console.log('Found images:', images);
+
+    return images;
   };
 
   const deleteImage = async (sitId: string, imageId: string): Promise<void> => {
     if (!user) throw new Error('Must be logged in to delete images');
 
     try {
+      console.log('Starting deleteImage:', { sitId, imageId });
+
+      // Get the sit first to get its imageCollectionId
+      let sitData = sits.get(sitId);
+      console.log('Found sit in local state:', sitData);
+
+      if (!sitData) {
+        console.log('Sit not found in local state, fetching from Firestore');
+        const sitDoc = await getDoc(doc(db, 'sits', sitId));
+        if (!sitDoc.exists()) {
+          throw new Error('Sit not found in Firestore');
+        }
+        sitData = { ...sitDoc.data(), id: sitDoc.id } as Sit;
+        console.log('Found sit in Firestore:', sitData);
+        setSits(new Map(sits.set(sitData.id, sitData)));
+      }
+
       // Delete the image document
-      await deleteDoc(doc(db, 'images', imageId));
+      console.log('Attempting to delete image document:', imageId);
+      const imageRef = doc(db, 'images', imageId);
+      const imageDoc = await getDoc(imageRef);
+      console.log('Image document exists?', imageDoc.exists());
+
+      await deleteDoc(imageRef);
+      console.log('Image document deleted');
 
       // Check if this was the last image
-      const remainingImages = await getImagesForSit(sitId);
+      console.log('Checking remaining images for collection:', sitData.imageCollectionId);
+      const remainingImages = await getImagesForSit(sitData.imageCollectionId);
+      console.log('Remaining images:', remainingImages, 'Length:', remainingImages.length);
 
       if (remainingImages.length === 0) {
-        // If no images left, delete the entire sit
-        await deleteDoc(doc(db, 'sits', sitId));
-        // Remove from local state
-        const newSits = new Map(sits);
-        newSits.delete(sitId);
-        setSits(newSits);
+        console.log('No images remain, deleting sit:', sitId);
+        try {
+          await deleteDoc(doc(db, 'sits', sitId));
+          console.log('Sit document deleted from Firestore');
+
+          const newSits = new Map(sits);
+          newSits.delete(sitId);
+          setSits(newSits);
+          console.log('Sit removed from local state');
+        } catch (error) {
+          console.error('Error deleting sit:', error);
+          throw error;
+        }
+      } else {
+        console.log(`${remainingImages.length} images remain, keeping sit`);
       }
     } catch (error) {
-      console.error('Error deleting image:', error);
+      console.error('Error in deleteImage:', error);
       throw error;
     }
   };
