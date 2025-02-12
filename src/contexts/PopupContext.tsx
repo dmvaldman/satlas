@@ -35,13 +35,19 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       closeButton: false,
       maxWidth: '300px',
       offset: 25,
-      anchor: 'bottom'
+      anchor: 'bottom',
+      className: 'satlas-popup-container'
     });
 
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    const renderContent = (images: Image[]) => {
+    root.render(<div className="satlas-popup-loading">Loading...</div>);
+    popup.setDOMContent(container);
+
+    getImagesForSit(sit.imageCollectionId).then(images => {
+      if (!popup.isOpen()) return;
+
       root.render(
         <AuthProvider>
           <SitsProvider>
@@ -58,21 +64,6 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           </SitsProvider>
         </AuthProvider>
       );
-    };
-
-    // Show loading state initially
-    root.render(<div className="satlas-popup-loading">Loading...</div>);
-    popup.setDOMContent(container);
-
-    // Load images and render full content
-    getImagesForSit(sit.imageCollectionId).then(images => {
-      renderContent(images);
-    });
-
-    // Listen for mark updates
-    popup.on('open', () => {
-      // Re-render content when popup opens
-      getImagesForSit(sit.imageCollectionId).then(renderContent);
     });
 
     return popup;
