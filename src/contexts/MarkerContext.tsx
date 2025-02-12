@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
@@ -35,6 +35,9 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Internal state - not exposed to consumers
   const [mapboxMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
+
+  // Instead of using state for activePopup, use a ref.
+  const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
   // Helper function to compute marker classes
   const getMarkerClasses = useCallback((sit: Sit): string[] => {
@@ -89,23 +92,31 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!marker) {
         console.log('Creating new marker:', id);
         const el = document.createElement('div');
-        el.className = state.classes.join(' ');  // Set classes before creating marker
+        el.className = state.classes.join(' ');
 
         marker = new mapboxgl.Marker(el)
           .setLngLat(state.position)
           .addTo(map);
 
-        // Add popup functionality
-        el.addEventListener('click', (e) => {  // Add click handler to element instead of marker
-          e.stopPropagation(); // Prevent the map from also handling this click
-          const popup = createPopup(state.sit, currentLocation);
-          popup.setLngLat(state.position);
-          popup.addTo(map);
+        // Add popup functionality with toggle behavior
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+
+          // Check the ref for the active popup
+          if (activePopupRef.current?.isOpen()) {
+            activePopupRef.current.remove();
+            activePopupRef.current = null;
+          } else {
+            const popup = createPopup(state.sit, currentLocation);
+            popup.setLngLat(state.position);
+            popup.addTo(map);
+            activePopupRef.current = popup;
+          }
         });
 
         mapboxMarkers.set(id, marker);
       } else {
-        // Update marker to match desired state
+        // Update existing marker
         marker.setLngLat(state.position);
         marker.getElement().className = state.classes.join(' ');
       }
