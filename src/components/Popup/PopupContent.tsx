@@ -25,6 +25,21 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images: initial
     getImagesForSit(sit.imageCollectionId).then(setImages);
   }, [getImagesForSit, imagesByCollection, sit.imageCollectionId]);
 
+  // Add effect to refresh on mark updates
+  useEffect(() => {
+    const handleMarkUpdate = (e: CustomEvent<{ sitId: string }>) => {
+      if (e.detail.sitId === sit.id) {
+        // Force re-render to update favorite count
+        setImages([...images]);
+      }
+    };
+
+    window.addEventListener('markUpdated', handleMarkUpdate as EventListener);
+    return () => {
+      window.removeEventListener('markUpdated', handleMarkUpdate as EventListener);
+    };
+  }, [sit.id, images]);
+
   const handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
     try {

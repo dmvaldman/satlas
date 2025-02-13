@@ -6,18 +6,22 @@ import { useAuth } from './AuthContext';
 
 interface MarksContextType {
   marks: Map<string, Set<MarkType>>;
+  favoriteCount: Map<string, number>;  // sitId -> count
   loadUserMarks: (userId: string | null) => Promise<void>;
   toggleMark: (sitId: string, type: MarkType) => Promise<void>;
   hasMark: (sitId: string, type: MarkType) => boolean;
   getMarks: (sitId: string) => Set<MarkType>;
+  getFavoriteCount: (sitId: string) => number;
 }
 
 const MarksContext = createContext<MarksContextType>({
   marks: new Map(),
+  favoriteCount: new Map(),
   loadUserMarks: async () => {},
   toggleMark: async () => {},
   hasMark: () => false,
   getMarks: () => new Set(),
+  getFavoriteCount: () => 0,
 });
 
 export const useMarks = () => {
@@ -30,6 +34,7 @@ export const useMarks = () => {
 
 export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [marks, setMarks] = useState<Map<string, Set<MarkType>>>(new Map());
+  const [favoriteCount, setFavoriteCount] = useState<Map<string, number>>(new Map());
   const { user } = useAuth();
 
   const loadUserMarks = useCallback(async (userId: string | null) => {
@@ -83,6 +88,26 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return newMarks;
       });
 
+      // Update favorite count if it's a favorite mark
+      if (type === 'favorite') {
+        setFavoriteCount(prev => {
+          const newCount = new Map(prev);
+          const currentCount = prev.get(sitId) || 0;
+          newCount.set(sitId, currentCount + (hasType ? -1 : 1));
+          return newCount;
+        });
+      }
+
+      // Emit event for marker styling
+      window.dispatchEvent(new CustomEvent('markUpdated', {
+        detail: {
+          sitId,
+          type,
+          isActive: !hasType,
+          userId: user.uid
+        }
+      }));
+
       // Update database
       if (hasType) {
         await deleteDoc(markRef);
@@ -115,6 +140,10 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return marks.get(sitId) || new Set();
   }, [marks]);
 
+  const getFavoriteCount = useCallback((sitId: string): number => {
+    return favoriteCount.get(sitId) || 0;
+  }, [favoriteCount]);
+
   // Load user's marks when auth state changes
   useEffect(() => {
     let unsubscribed = false;
@@ -138,10 +167,12 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <MarksContext.Provider
       value={{
         marks,
+        favoriteCount,
         loadUserMarks,
         toggleMark,
         hasMark,
         getMarks,
+        getFavoriteCount,
       }}
     >
       {children}

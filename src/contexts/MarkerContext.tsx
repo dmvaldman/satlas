@@ -128,12 +128,37 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
     window.addEventListener('sitDeleted', handleSitDeleted as EventListener);
 
+    // Listen for mark updates
+    const handleMarkUpdate = (e: CustomEvent<{
+      sitId: string;
+      type: MarkType;
+      isActive: boolean;
+      userId: string;
+    }>) => {
+      const marker = mapboxMarkers.get(e.detail.sitId);
+      if (!marker) return;
+
+      const el = marker.getElement();
+      const classes = el.className.split(' ').filter(c => c !== 'favorite');
+
+      if (e.detail.type === 'favorite' && e.detail.isActive) {
+        classes.push('favorite');
+      } else if (e.detail.userId === user?.uid) {
+        classes.push('own-sit');
+      }
+
+      el.className = classes.join(' ');
+    };
+
+    window.addEventListener('markUpdated', handleMarkUpdate as EventListener);
+
     return () => {
       window.removeEventListener('mapReady', handleMapReady);
       window.removeEventListener('sitCreated', handleNewSit as EventListener);
       window.removeEventListener('sitDeleted', handleSitDeleted as EventListener);
+      window.removeEventListener('markUpdated', handleMarkUpdate as EventListener);
     };
-  }, [map]);
+  }, [map, user?.uid]);
 
   return (
     <MarkerContext.Provider value={{
