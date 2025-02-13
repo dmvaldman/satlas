@@ -180,6 +180,31 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [map, user, hasMark]);
 
+  // When auth changes, update marker styling based on the current user's state
+  useEffect(() => {
+    if (!map || !marksLoaded) return;
+    // For each marker, update its classes without recreating the marker
+    mapboxMarkers.forEach((marker, sitId) => {
+      // Rebuild the marker's class list:
+      // Start with the base class.
+      const classes: string[] = ['satlas-marker'];
+      // Get the sit data from SitsContext.
+      const sit = sits.get(sitId);
+      if (sit) {
+        // If the current user created this sit, add "own-sit"
+        if (user && sit.uploadedBy === user.uid) {
+          classes.push('own-sit');
+        }
+        // If the marks indicate this sit is favorited, add "favorite"
+        if (hasMark(sitId, 'favorite')) {
+          classes.push('favorite');
+        }
+      }
+      // Use the updateMarkerStyle helper to update the element's className.
+      updateMarkerStyle(sitId, classes);
+    });
+  }, [user, sits, marksLoaded, hasMark, map, updateMarkerStyle]);
+
   return (
     <MarkerContext.Provider value={{
       createMarker,
