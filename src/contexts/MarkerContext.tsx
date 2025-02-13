@@ -4,6 +4,7 @@ import { useMap } from './MapContext';
 import { usePopups } from './PopupContext';
 import { useSits } from './SitsContext';
 import { Sit } from '../types';
+import { useAuth } from './AuthContext';
 
 interface MarkerContextType {
   createMarker: (sit: Sit) => void;
@@ -27,6 +28,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { map } = useMap();
   const { createPopup } = usePopups();
   const { sits } = useSits();
+  const { user } = useAuth();
   const [mapboxMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
@@ -57,7 +59,13 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createMarker = (sit: Sit) => {
     if (!map) return;
 
-    const classes = ['satlas-marker']; // Base classes, can be updated later
+    const classes = ['satlas-marker'];
+
+    // Add classes based on sit properties
+    if (sit.uploadedBy === user?.uid) {
+      classes.push('own-sit');
+    }
+
     const el = createMarkerElement(sit, classes);
 
     const marker = new mapboxgl.Marker(el)
