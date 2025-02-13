@@ -38,18 +38,18 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [marks, setMarks] = useState<Map<string, Set<MarkType>>>(new Map());
   const [favoriteCount, setFavoriteCount] = useState<Map<string, number>>(new Map());
   const [marksLoaded, setMarksLoaded] = useState(false);
-  const { user } = useAuth();
+  const { user, authIsReady } = useAuth();
 
   const loadUserMarks = useCallback(async (userId: string | null) => {
     if (!userId) {
       setMarks(new Map());
       setFavoriteCount(new Map());
+      debugger;
       setMarksLoaded(true);
       return;
     }
 
     const newMarks = new Map();
-    const newFavoriteCounts = new Map();
 
     // Load all types of marks
     const collections = ['favorites', 'visited', 'wantToGo'];
@@ -60,7 +60,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // For favorites, get the count for each sit
       if (collectionName === 'favorites') {
-        // Get all favorites to count them by sitId
+        // Get all favorites to count theMm by sitId
         const allFavoritesSnapshot = await getDocs(collection(db, 'favorites'));
         const counts = new Map();
 
@@ -83,10 +83,12 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           newMarks.set(mark.sitId, new Set());
         }
         newMarks.get(mark.sitId)!.add(types[index]);
+        console.log("Added type to mark", mark.sitId, types[index]);
       });
     }));
 
     setMarks(newMarks);
+    debugger
     setMarksLoaded(true);
   }, []);
 
@@ -172,6 +174,9 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     let unsubscribed = false;
 
+    // Only proceed once authentication is ready
+    if (!authIsReady) return;
+
     if (user) {
       loadUserMarks(user.uid).catch(error => {
         if (!unsubscribed) {
@@ -187,7 +192,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       unsubscribed = true;
     };
-  }, [user, loadUserMarks]);
+  }, [user, loadUserMarks, authIsReady]);
 
   return (
     <MarksContext.Provider

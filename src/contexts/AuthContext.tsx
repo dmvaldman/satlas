@@ -7,6 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  authIsReady: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -14,17 +15,20 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   signIn: async () => {},
   signOut: async () => {},
+  authIsReady: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [authIsReady, setAuthIsReady] = useState(false);
   const provider = new GoogleAuthProvider();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      setAuthIsReady(true);
     });
 
     return () => unsubscribe();
@@ -53,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: user !== null,
         signIn,
         signOut: handleSignOut,
+        authIsReady,
       }}
     >
       {children}

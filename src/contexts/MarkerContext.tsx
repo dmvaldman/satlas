@@ -59,6 +59,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createMarker = (sit: Sit) => {
+    debugger
     if (!map) return;
 
     const classes = ['satlas-marker'];
@@ -69,6 +70,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Add favorite class if it's favorited
+    console.log("Checking if sit is favorite", sit.id, hasMark(sit.id, 'favorite'));
     if (hasMark(sit.id, 'favorite')) {
       classes.push('favorite');
     }
