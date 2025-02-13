@@ -40,10 +40,12 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadUserMarks = useCallback(async (userId: string | null) => {
     if (!userId) {
       setMarks(new Map());
+      setFavoriteCount(new Map());
       return;
     }
 
     const newMarks = new Map();
+    const newFavoriteCounts = new Map();
 
     // Load all types of marks
     const collections = ['favorites', 'visited', 'wantToGo'];
@@ -51,6 +53,23 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     await Promise.all(collections.map(async (collectionName, index) => {
       const ref = collection(db, collectionName);
+
+      // For favorites, get the count for each sit
+      if (collectionName === 'favorites') {
+        // Get all favorites to count them by sitId
+        const allFavoritesSnapshot = await getDocs(collection(db, 'favorites'));
+        const counts = new Map();
+
+        allFavoritesSnapshot.forEach(doc => {
+          const mark = doc.data() as UserSitMark;
+          const currentCount = counts.get(mark.sitId) || 0;
+          counts.set(mark.sitId, currentCount + 1);
+        });
+
+        setFavoriteCount(counts);
+      }
+
+      // Get user's marks
       const q = query(ref, where('userId', '==', userId));
       const snapshot = await getDocs(q);
 
