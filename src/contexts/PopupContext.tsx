@@ -29,6 +29,7 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { user } = useAuth();
   const { getImagesForSit } = useSits();
   const { hasMark, getMarkCount, getMarks, toggleMark } = useMarks();
+  const [popupContentCache] = useState<Map<string, JSX.Element>>(new Map());
 
   const createPopup = useCallback((sit: Sit, currentLocation: { latitude: number; longitude: number }): mapboxgl.Popup => {
     const popup = new mapboxgl.Popup({
@@ -42,13 +43,32 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const container = document.createElement('div');
     const root = createRoot(container);
 
+    if (sit.id.startsWith('temp_')) {
+      root.render(
+        <div className="satlas-popup">
+          <div className="satlas-popup-loading">
+            <p>Uploading new sit...</p>
+          </div>
+        </div>
+      );
+      popup.setDOMContent(container);
+      return popup;
+    }
+
+    const cachedContent = popupContentCache.get(sit.id);
+    if (cachedContent) {
+      root.render(cachedContent);
+      popup.setDOMContent(container);
+      return popup;
+    }
+
     root.render(<div className="satlas-popup-loading">Loading...</div>);
     popup.setDOMContent(container);
 
     getImagesForSit(sit.imageCollectionId).then(images => {
       if (!popup.isOpen()) return;
 
-      root.render(
+      const content = (
         <AuthProvider>
           <SitsProvider>
             <MarksProvider>
@@ -64,10 +84,14 @@ export const PopupProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           </SitsProvider>
         </AuthProvider>
       );
+
+      popupContentCache.set(sit.id, content);
+
+      root.render(content);
     });
 
     return popup;
-  }, [getImagesForSit]);
+  }, [getImagesForSit, popupContentCache]);
 
   const updatePopupContent = useCallback((
     popup: mapboxgl.Popup,
