@@ -1,146 +1,134 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
-import { useSits } from './SitsContext';
 import { usePopups } from './PopupContext';
-import { useAuth } from './AuthContext';
-import { useMarks } from './MarksContext';
+import { useSits } from './SitsContext';
 import { Sit } from '../types';
 
-interface MarkerState {
-  id: string;
-  position: [number, number];
-  classes: string[];
-  sit: Sit;
-}
-
 interface MarkerContextType {
+  createMarker: (sit: Sit) => void;
+  deleteMarker: (sitId: string) => void;
+  loadMarkers: (sits: Sit[]) => void;
   getMarker: (id: string) => mapboxgl.Marker | undefined;
-  updateMarker: (id: string, updates: Partial<MarkerState>) => void;
+  updateMarkerStyle: (sitId: string, classes: string[]) => void;
 }
 
 const MarkerContext = createContext<MarkerContextType>({
+  createMarker: () => {},
+  deleteMarker: () => {},
+  loadMarkers: () => {},
   getMarker: () => undefined,
-  updateMarker: () => {},
+  updateMarkerStyle: () => {},
 });
 
 export const useMarkers = () => useContext(MarkerContext);
 
 export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { map, currentLocation } = useMap();
-  const { sits } = useSits();
+  const { map } = useMap();
   const { createPopup } = usePopups();
-  const { user } = useAuth();
-  const { hasMark } = useMarks();
-
-  // Internal state - not exposed to consumers
+  const { sits } = useSits();
   const [mapboxMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
-
-  // Instead of using state for activePopup, use a ref.
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
-  // Helper function to compute marker classes
-  const getMarkerClasses = useCallback((sit: Sit): string[] => {
-    const classes = ['satlas-marker'];
+  const createMarkerElement = (sit: Sit, classes: string[]) => {
+    const el = document.createElement('div');
+    el.className = classes.join(' ');
 
-    if (sit.uploadedBy === user?.uid) {
-      classes.push('own-sit');
-    }
-    if (hasMark(sit.id, 'favorite')) {
-      classes.push('favorite');
-    }
-
-    return classes;
-  }, [user, hasMark]);
-
-  // Compute desired marker states from sits
-  const getMarkerStates = useCallback((): Map<string, MarkerState> => {
-    const states = new Map();
-
-    sits.forEach((sit) => {
-      states.set(sit.id, {
-        id: sit.id,
-        position: [sit.location.longitude, sit.location.latitude],
-        classes: getMarkerClasses(sit),
-        sit,
-      });
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (activePopupRef.current?.isOpen()) {
+        activePopupRef.current.remove();
+        activePopupRef.current = null;
+      } else {
+        const markerLocation = {
+          latitude: sit.location.latitude,
+          longitude: sit.location.longitude
+        };
+        const popup = createPopup(sit, markerLocation);
+        popup.setLngLat([sit.location.longitude, sit.location.latitude]);
+        popup.addTo(map!);
+        activePopupRef.current = popup;
+      }
     });
 
-    return states;
-  }, [sits, getMarkerClasses]);
+    return el;
+  };
 
-  // Single effect to sync MapBox markers with desired state
+  const createMarker = (sit: Sit) => {
+    if (!map) return;
+
+    const classes = ['satlas-marker']; // Base classes, can be updated later
+    const el = createMarkerElement(sit, classes);
+
+    const marker = new mapboxgl.Marker(el)
+      .setLngLat([sit.location.longitude, sit.location.latitude])
+      .addTo(map);
+
+    mapboxMarkers.set(sit.id, marker);
+  };
+
+  const deleteMarker = (sitId: string) => {
+    const marker = mapboxMarkers.get(sitId);
+    if (marker) {
+      marker.remove();
+      mapboxMarkers.delete(sitId);
+    }
+  };
+
+  const loadMarkers = (sits: Sit[]) => {
+    if (!map) return;
+
+    // Clear existing markers
+    mapboxMarkers.forEach(marker => marker.remove());
+    mapboxMarkers.clear();
+
+    // Create new markers
+    sits.forEach(sit => createMarker(sit));
+  };
+
+  const getMarker = (id: string) => mapboxMarkers.get(id);
+
+  const updateMarkerStyle = (sitId: string, classes: string[]) => {
+    const marker = mapboxMarkers.get(sitId);
+    if (marker) {
+      marker.getElement().className = classes.join(' ');
+    }
+  };
+
   useEffect(() => {
-    // debugger;
-    if (!map || !currentLocation) return;
+    // Listen for map ready event
+    const handleMapReady = () => {
+      loadMarkers(Array.from(sits.values()));
+    };
+    window.addEventListener('mapReady', handleMapReady);
 
-    console.log('Syncing markers with state');
-    const desiredStates = getMarkerStates();
+    // Listen for new sit created
+    const handleNewSit = (e: CustomEvent<{ sit: Sit }>) => {
+      createMarker(e.detail.sit);
+    };
+    window.addEventListener('sitCreated', handleNewSit as EventListener);
 
-    // Remove markers that shouldn't exist
-    for (const [id, marker] of mapboxMarkers) {
-      if (!desiredStates.has(id)) {
-        console.log('Removing marker:', id);
-        marker.remove();
-        mapboxMarkers.delete(id);
-      }
-    }
+    // Listen for sit deleted
+    const handleSitDeleted = (e: CustomEvent<{ sitId: string }>) => {
+      deleteMarker(e.detail.sitId);
+    };
+    window.addEventListener('sitDeleted', handleSitDeleted as EventListener);
 
-    // Create or update markers based on desired state
-    for (const [id, state] of desiredStates) {
-      let marker = mapboxMarkers.get(id);
-
-      if (!marker) {
-        console.log('Creating new marker:', id);
-        const el = document.createElement('div');
-        el.className = state.classes.join(' ');
-
-        marker = new mapboxgl.Marker(el)
-          .setLngLat(state.position)
-          .addTo(map);
-
-        // Add popup functionality with toggle behavior
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-
-          // Check the ref for the active popup
-          if (activePopupRef.current?.isOpen()) {
-            activePopupRef.current.remove();
-            activePopupRef.current = null;
-          } else {
-            const popup = createPopup(state.sit, currentLocation);
-            popup.setLngLat(state.position);
-            popup.addTo(map);
-            activePopupRef.current = popup;
-          }
-        });
-
-        mapboxMarkers.set(id, marker);
-      } else {
-        // Update existing marker
-        marker.setLngLat(state.position);
-        marker.getElement().className = state.classes.join(' ');
-      }
-    }
-  }, [map, currentLocation, getMarkerStates, createPopup]);
-
-  // Public API
-  const getMarker = useCallback((id: string) => mapboxMarkers.get(id), []);
-
-  const updateMarker = useCallback((id: string, updates: Partial<MarkerState>) => {
-    const marker = mapboxMarkers.get(id);
-    if (!marker) return;
-
-    if (updates.position) {
-      marker.setLngLat(updates.position);
-    }
-    if (updates.classes) {
-      marker.getElement().className = updates.classes.join(' ');
-    }
-  }, []);
+    return () => {
+      window.removeEventListener('mapReady', handleMapReady);
+      window.removeEventListener('sitCreated', handleNewSit as EventListener);
+      window.removeEventListener('sitDeleted', handleSitDeleted as EventListener);
+    };
+  }, [map]);
 
   return (
-    <MarkerContext.Provider value={{ getMarker, updateMarker }}>
+    <MarkerContext.Provider value={{
+      createMarker,
+      deleteMarker,
+      loadMarkers,
+      getMarker,
+      updateMarkerStyle,
+    }}>
       {children}
     </MarkerContext.Provider>
   );

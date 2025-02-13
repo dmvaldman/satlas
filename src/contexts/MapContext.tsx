@@ -106,6 +106,8 @@ export const MapProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         map.on('load', () => {
           setIsLoading(false);
+          // Dispatch event for other contexts to know map is ready
+          window.dispatchEvent(new CustomEvent('mapReady'));
         });
 
         mapRef.current = map;

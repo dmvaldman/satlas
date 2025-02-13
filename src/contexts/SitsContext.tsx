@@ -228,11 +228,12 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!sitDoc.exists()) {
           throw new Error('Sit not found in Firestore');
         }
-        sitData = { ...sitDoc.data(), id: sitDoc.id } as Sit;
+        const newSitData = { ...sitDoc.data(), id: sitDoc.id } as Sit;
+        sitData = newSitData;
         setSits(prevSits => {
-           const newSits = new Map(prevSits);
-           newSits.set(sitData!.id, sitData);
-           return newSits;
+          const newSits = new Map(prevSits);
+          newSits.set(newSitData.id, newSitData);
+          return newSits;
         });
       }
 

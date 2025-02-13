@@ -135,7 +135,7 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         // Perform actual upload - let SitsContext handle the sit creation
         const completeSit = await uploadSit(base64Image, coordinates);
-
+        window.dispatchEvent(new CustomEvent('sitCreated', { detail: { sit: completeSit } }));
         showNotification('Sit uploaded successfully!', 'success');
       }
     } catch (error) {
