@@ -133,10 +133,32 @@ export const PhotoUploadProvider: React.FC<{ children: React.ReactNode }> = ({ c
           coordinates = await getCurrentLocation();
         }
 
-        // Perform actual upload - let SitsContext handle the sit creation
-        const completeSit = await uploadSit(base64Image, coordinates);
-        window.dispatchEvent(new CustomEvent('sitCreated', { detail: { sit: completeSit } }));
-        showNotification('Sit uploaded successfully!', 'success');
+        // Create optimistic sit
+        const optimisticSit: Sit = {
+          id: `temp_${Date.now()}`,
+          location: coordinates,
+          imageCollectionId: `temp_${Date.now()}_${user.uid}`,
+          uploadedBy: user.uid,
+          createdAt: new Date()
+        };
+
+        // Dispatch optimistic update
+        window.dispatchEvent(new CustomEvent('sitCreated', { detail: { sit: optimisticSit } }));
+
+        try {
+          // Perform actual upload
+          const completeSit = await uploadSit(base64Image, coordinates);
+
+          // Remove optimistic marker and add real one
+          window.dispatchEvent(new CustomEvent('sitDeleted', { detail: { sitId: optimisticSit.id } }));
+          window.dispatchEvent(new CustomEvent('sitCreated', { detail: { sit: completeSit } }));
+
+          showNotification('Sit uploaded successfully!', 'success');
+        } catch (error) {
+          // If upload fails, remove the optimistic marker
+          window.dispatchEvent(new CustomEvent('sitDeleted', { detail: { sitId: optimisticSit.id } }));
+          throw error;
+        }
       }
     } catch (error) {
       console.error('Error handling photo:', error);
