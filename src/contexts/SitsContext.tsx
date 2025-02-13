@@ -45,7 +45,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [imagesByCollection, setImagesByCollection] = useState<Map<string, Image[]>>(new Map());
   const { user } = useAuth();
 
-  const loadNearbySits = useCallback(async (bounds: { north: number; south: number }) => {
+  const loadNearbySits = useCallback(async (bounds: { north: number; south: number }): Promise<Sit[]> => {
     const sitsRef = collection(db, 'sits');
     const q = query(
       sitsRef,
@@ -68,6 +68,8 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (hasChanges) {
       setSits(newSits);
     }
+
+    return Array.from(newSits.values());
   }, []);
 
   const uploadSit = useCallback(async (base64Image: string, coordinates: Coordinates): Promise<Sit> => {

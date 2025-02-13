@@ -3,8 +3,9 @@ import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
 import { usePopups } from './PopupContext';
 import { useSits } from './SitsContext';
-import { Sit } from '../types';
+import { Sit, MarkType } from '../types';
 import { useAuth } from './AuthContext';
+import { useMarks } from './MarksContext';
 
 interface MarkerContextType {
   createMarker: (sit: Sit) => void;
@@ -27,8 +28,9 @@ export const useMarkers = () => useContext(MarkerContext);
 export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { map } = useMap();
   const { createPopup } = usePopups();
-  const { sits } = useSits();
+  const { sits, loadNearbySits } = useSits();
   const { user } = useAuth();
+  const { hasMark } = useMarks();
   const [mapboxMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
@@ -64,6 +66,11 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Add classes based on sit properties
     if (sit.uploadedBy === user?.uid) {
       classes.push('own-sit');
+    }
+
+    // Add favorite class if it's favorited
+    if (hasMark(sit.id, 'favorite')) {
+      classes.push('favorite');
     }
 
     const el = createMarkerElement(sit, classes);
@@ -111,8 +118,18 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     // Listen for map ready event
-    const handleMapReady = () => {
-      loadMarkers(Array.from(sits.values()));
+    const handleMapReady = async () => {
+      if (!map) return;
+      const bounds = map.getBounds();
+      try {
+        const loadedSits = await loadNearbySits({
+          north: bounds.getNorth(),
+          south: bounds.getSouth()
+        });
+        loadMarkers(loadedSits);
+      } catch (error) {
+        console.error('Error loading initial sits:', error);
+      }
     };
     window.addEventListener('mapReady', handleMapReady);
 
@@ -158,7 +175,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       window.removeEventListener('sitDeleted', handleSitDeleted as EventListener);
       window.removeEventListener('markUpdated', handleMarkUpdate as EventListener);
     };
-  }, [map, user?.uid]);
+  }, [map, loadNearbySits, user?.uid]);
 
   return (
     <MarkerContext.Provider value={{

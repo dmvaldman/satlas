@@ -23,13 +23,8 @@ export const MapContainer = () => {
       }
     };
 
-    // Load initial sits
-    handleMoveEnd();
-
-    // Add event listener
     map.on('moveend', handleMoveEnd);
 
-    // Cleanup
     return () => {
       map.off('moveend', handleMoveEnd);
     };
