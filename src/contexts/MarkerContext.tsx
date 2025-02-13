@@ -63,13 +63,10 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const classes = ['satlas-marker'];
 
-    // Add classes based on sit properties
-    if (sit.uploadedBy === user?.uid) {
+    if (user && sit.uploadedBy === user.uid) {
       classes.push('own-sit');
     }
 
-    // Add favorite class if it's favorited
-    console.log("Checking if sit is favorite", sit.id, hasMark(sit.id, 'favorite'));
     if (hasMark(sit.id, 'favorite')) {
       classes.push('favorite');
     }
@@ -86,12 +83,10 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteMarker = (sitId: string) => {
     const marker = mapboxMarkers.get(sitId);
     if (marker) {
-      // Close popup if it's open
       if (activePopupRef.current?.isOpen()) {
         activePopupRef.current.remove();
         activePopupRef.current = null;
       }
-
       marker.remove();
       mapboxMarkers.delete(sitId);
     }
@@ -99,12 +94,8 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const loadMarkers = (sits: Sit[]) => {
     if (!map) return;
-
-    // Clear existing markers
     mapboxMarkers.forEach(marker => marker.remove());
     mapboxMarkers.clear();
-
-    // Create new markers
     sits.forEach(sit => createMarker(sit));
   };
 
@@ -114,54 +105,66 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const marker = mapboxMarkers.get(sitId);
     if (marker) {
       const el = marker.getElement();
-      // Remove our custom classes only.
-      el.classList.remove("satlas-marker", "own-sit", "favorite");
-      // Add our custom classes if present in the passed classes.
+      // Remove our custom classes only
+      el.classList.remove('satlas-marker', 'own-sit', 'favorite');
+      // Add our custom classes if present in the passed classes
       classes.forEach(c => {
-        if (["satlas-marker", "own-sit", "favorite"].includes(c)) {
+        if (['satlas-marker', 'own-sit', 'favorite'].includes(c)) {
           el.classList.add(c);
         }
       });
-      // Note: Do NOT override el.className entirely, so that existing Mapbox classes remain.
     }
   };
 
+  // Combined effect: handles initial marker loading and subsequent updates
   useEffect(() => {
-    // Load markers once the map is available and marks are loaded,
-    // regardless of whether there is an authenticated user or not.
     if (!map || !marksLoaded) return;
-    const loadData = async () => {
-      const bounds = map.getBounds();
-      try {
-        const loadedSits = await loadNearbySits({
-          north: bounds.getNorth(),
-          south: bounds.getSouth()
-        });
-        loadMarkers(loadedSits);
-        // Animate markers to fade in by adding the "visible" class
-        mapboxMarkers.forEach(marker => {
-          const el = marker.getElement();
-          void el.offsetWidth; // Force reflow to trigger transition
-          el.classList.add('visible');
-        });
-      } catch (error) {
-        console.error('Error loading initial sits:', error);
+
+    const refreshMarkers = async () => {
+      let markerData;
+      // If no sits have been loaded yet, fetch them from the current map bounds
+      if (sits.size === 0) {
+        try {
+          const bounds = map.getBounds();
+          markerData = await loadNearbySits({
+            north: bounds.getNorth(),
+            south: bounds.getSouth()
+          });
+        } catch (error) {
+          console.error('Error loading initial sits:', error);
+          return;
+        }
+      } else {
+        markerData = Array.from(sits.values());
       }
-    };
-    loadData();
-  }, [map, marksLoaded, loadNearbySits]);
 
-  // Listen for new sit created, sit deleted, and mark updates as before
+      // Load (or reload) markers from the marker data
+      loadMarkers(markerData);
+
+      // Update marker styling based on current auth and favorites state
+      mapboxMarkers.forEach((marker, sitId) => {
+        const customClasses = ['satlas-marker'];
+        const sit = sits.get(sitId);
+        if (sit) {
+          if (user && sit.uploadedBy === user.uid) {
+            customClasses.push('own-sit');
+          }
+          if (hasMark(sitId, 'favorite')) {
+            customClasses.push('favorite');
+          }
+        }
+        updateMarkerStyle(sitId, customClasses);
+      });
+    };
+
+    refreshMarkers();
+  }, [map, marksLoaded, sits, user, loadNearbySits, hasMark]);
+
+  // Listen for sit deleted and mark updates
   useEffect(() => {
-    const handleNewSit = (e: CustomEvent<{ sit: Sit }>) => {
-      createMarker(e.detail.sit);
-    };
-    window.addEventListener('sitCreated', handleNewSit as EventListener);
-
     const handleSitDeleted = (e: CustomEvent<{ sitId: string }>) => {
       deleteMarker(e.detail.sitId);
     };
-    window.addEventListener('sitDeleted', handleSitDeleted as EventListener);
 
     const handleMarkUpdate = (e: CustomEvent<{
       sitId: string;
@@ -171,48 +174,28 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }>) => {
       const marker = mapboxMarkers.get(e.detail.sitId);
       if (!marker) return;
+
       const el = marker.getElement();
-      const classes = el.className.split(' ').filter(c => c !== 'favorite');
-      if (e.detail.type === 'favorite' && e.detail.isActive) {
-        classes.push('favorite');
-      } else if (e.detail.userId === user?.uid) {
+      const classes = ['satlas-marker'];
+
+      if (e.detail.userId === user?.uid) {
         classes.push('own-sit');
       }
-      el.className = classes.join(' ');
+      if (e.detail.type === 'favorite' && e.detail.isActive) {
+        classes.push('favorite');
+      }
+
+      updateMarkerStyle(e.detail.sitId, classes);
     };
+
+    window.addEventListener('sitDeleted', handleSitDeleted as EventListener);
     window.addEventListener('markUpdated', handleMarkUpdate as EventListener);
 
     return () => {
-      window.removeEventListener('sitCreated', handleNewSit as EventListener);
       window.removeEventListener('sitDeleted', handleSitDeleted as EventListener);
       window.removeEventListener('markUpdated', handleMarkUpdate as EventListener);
     };
-  }, [map, user, hasMark]);
-
-  // When auth changes, update marker styling based on the current user's state
-  useEffect(() => {
-    if (!map || !marksLoaded) return;
-    // For each marker, update its classes without recreating the marker
-    mapboxMarkers.forEach((marker, sitId) => {
-      // Rebuild the marker's class list:
-      // Start with the base class.
-      const classes: string[] = ['satlas-marker'];
-      // Get the sit data from SitsContext.
-      const sit = sits.get(sitId);
-      if (sit) {
-        // If the current user created this sit, add "own-sit"
-        if (user && sit.uploadedBy === user.uid) {
-          classes.push('own-sit');
-        }
-        // If the marks indicate this sit is favorited, add "favorite"
-        if (hasMark(sitId, 'favorite')) {
-          classes.push('favorite');
-        }
-      }
-      // Use the updateMarkerStyle helper to update the element's className.
-      updateMarkerStyle(sitId, classes);
-    });
-  }, [user, sits, marksLoaded, hasMark, map, updateMarkerStyle]);
+  }, [user]);
 
   return (
     <MarkerContext.Provider value={{
