@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 interface MarksContextType {
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;  // sitId -> count
+  marksLoaded: boolean;
   loadUserMarks: (userId: string | null) => Promise<void>;
   toggleMark: (sitId: string, type: MarkType) => Promise<void>;
   hasMark: (sitId: string, type: MarkType) => boolean;
@@ -17,6 +18,7 @@ interface MarksContextType {
 const MarksContext = createContext<MarksContextType>({
   marks: new Map(),
   favoriteCount: new Map(),
+  marksLoaded: false,
   loadUserMarks: async () => {},
   toggleMark: async () => {},
   hasMark: () => false,
@@ -35,12 +37,14 @@ export const useMarks = () => {
 export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [marks, setMarks] = useState<Map<string, Set<MarkType>>>(new Map());
   const [favoriteCount, setFavoriteCount] = useState<Map<string, number>>(new Map());
+  const [marksLoaded, setMarksLoaded] = useState(false);
   const { user } = useAuth();
 
   const loadUserMarks = useCallback(async (userId: string | null) => {
     if (!userId) {
       setMarks(new Map());
       setFavoriteCount(new Map());
+      setMarksLoaded(true);
       return;
     }
 
@@ -83,6 +87,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
 
     setMarks(newMarks);
+    setMarksLoaded(true);
   }, []);
 
   const toggleMark = useCallback(async (sitId: string, type: MarkType) => {
@@ -171,10 +176,12 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       loadUserMarks(user.uid).catch(error => {
         if (!unsubscribed) {
           console.error('Error loading marks:', error);
+          setMarksLoaded(true);
         }
       });
     } else {
       setMarks(new Map());
+      setMarksLoaded(true);
     }
 
     return () => {
@@ -187,6 +194,7 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         marks,
         favoriteCount,
+        marksLoaded,
         loadUserMarks,
         toggleMark,
         hasMark,

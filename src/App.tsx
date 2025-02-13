@@ -14,9 +14,9 @@ import React from 'react';
 
 function App() {
   return (
-    <AuthProvider>
-      <ProfileProvider>
-        <MapProvider>
+    <MapProvider>
+      <AuthProvider>
+        <ProfileProvider>
           <SitsProvider>
             <MarksProvider>
               <PopupProvider>
@@ -35,9 +35,9 @@ function App() {
               </PopupProvider>
             </MarksProvider>
           </SitsProvider>
-        </MapProvider>
-      </ProfileProvider>
-    </AuthProvider>
+        </ProfileProvider>
+      </AuthProvider>
+    </MapProvider>
   );
 }
 

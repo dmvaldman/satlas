@@ -30,7 +30,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { createPopup } = usePopups();
   const { sits, loadNearbySits } = useSits();
   const { user } = useAuth();
-  const { hasMark } = useMarks();
+  const { hasMark, marksLoaded } = useMarks();
   const [mapboxMarkers] = useState<Map<string, mapboxgl.Marker>>(new Map());
   const activePopupRef = useRef<mapboxgl.Popup | null>(null);
 
@@ -117,9 +117,9 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    // Listen for map ready event
-    const handleMapReady = async () => {
-      if (!map) return;
+    // Instead of listening for a standalone event, wait for map, user, and marksLoaded.
+    if (!map || !user || !marksLoaded) return;
+    const loadData = async () => {
       const bounds = map.getBounds();
       try {
         const loadedSits = await loadNearbySits({
@@ -127,25 +127,32 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           south: bounds.getSouth()
         });
         loadMarkers(loadedSits);
+        // Animate markers to fade in by adding the "visible" class
+        mapboxMarkers.forEach(marker => {
+          const el = marker.getElement();
+          // Triggering reflow optionally:
+          void el.offsetWidth;
+          el.classList.add('visible');
+        });
       } catch (error) {
         console.error('Error loading initial sits:', error);
       }
     };
-    window.addEventListener('mapReady', handleMapReady);
+    loadData();
+  }, [map, user, marksLoaded, loadNearbySits]);
 
-    // Listen for new sit created
+  // Listen for new sit created, sit deleted, and mark updates as before
+  useEffect(() => {
     const handleNewSit = (e: CustomEvent<{ sit: Sit }>) => {
       createMarker(e.detail.sit);
     };
     window.addEventListener('sitCreated', handleNewSit as EventListener);
 
-    // Listen for sit deleted
     const handleSitDeleted = (e: CustomEvent<{ sitId: string }>) => {
       deleteMarker(e.detail.sitId);
     };
     window.addEventListener('sitDeleted', handleSitDeleted as EventListener);
 
-    // Listen for mark updates
     const handleMarkUpdate = (e: CustomEvent<{
       sitId: string;
       type: MarkType;
@@ -154,28 +161,23 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }>) => {
       const marker = mapboxMarkers.get(e.detail.sitId);
       if (!marker) return;
-
       const el = marker.getElement();
       const classes = el.className.split(' ').filter(c => c !== 'favorite');
-
       if (e.detail.type === 'favorite' && e.detail.isActive) {
         classes.push('favorite');
       } else if (e.detail.userId === user?.uid) {
         classes.push('own-sit');
       }
-
       el.className = classes.join(' ');
     };
-
     window.addEventListener('markUpdated', handleMarkUpdate as EventListener);
 
     return () => {
-      window.removeEventListener('mapReady', handleMapReady);
       window.removeEventListener('sitCreated', handleNewSit as EventListener);
       window.removeEventListener('sitDeleted', handleSitDeleted as EventListener);
       window.removeEventListener('markUpdated', handleMarkUpdate as EventListener);
     };
-  }, [map, loadNearbySits, user?.uid]);
+  }, [map, user, hasMark]);
 
   return (
     <MarkerContext.Provider value={{
