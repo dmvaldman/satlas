@@ -44,7 +44,6 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!userId) {
       setMarks(new Map());
       setFavoriteCount(new Map());
-      debugger;
       setMarksLoaded(true);
       return;
     }
@@ -88,7 +87,6 @@ export const MarksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
 
     setMarks(newMarks);
-    debugger
     setMarksLoaded(true);
   }, []);
 

@@ -59,7 +59,6 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createMarker = (sit: Sit) => {
-    debugger
     if (!map) return;
 
     const classes = ['satlas-marker'];
@@ -119,8 +118,9 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    // Instead of listening for a standalone event, wait for map, user, and marksLoaded.
-    if (!map || !user || !marksLoaded) return;
+    // Load markers once the map is available and marks are loaded,
+    // regardless of whether there is an authenticated user or not.
+    if (!map || !marksLoaded) return;
     const loadData = async () => {
       const bounds = map.getBounds();
       try {
@@ -132,8 +132,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Animate markers to fade in by adding the "visible" class
         mapboxMarkers.forEach(marker => {
           const el = marker.getElement();
-          // Triggering reflow optionally:
-          void el.offsetWidth;
+          void el.offsetWidth; // Force reflow to trigger transition
           el.classList.add('visible');
         });
       } catch (error) {
@@ -141,7 +140,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     loadData();
-  }, [map, user, marksLoaded, loadNearbySits]);
+  }, [map, marksLoaded, loadNearbySits]);
 
   // Listen for new sit created, sit deleted, and mark updates as before
   useEffect(() => {
