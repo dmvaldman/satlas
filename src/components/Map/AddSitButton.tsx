@@ -5,7 +5,7 @@ import { useSits } from '../../contexts/SitsContext';
 
 export const AddSitButton = () => {
   const { openModal } = usePhotoUpload();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, signIn } = useAuth();
   const { getCurrentLocation } = useMap();
   const { findNearbySit } = useSits();
 
@@ -19,7 +19,7 @@ export const AddSitButton = () => {
 
   const handleClick = async () => {
     if (!isAuthenticated) {
-      showNotification('Please sign in to add a sit', 'error');
+      signIn();
       return;
     }
 

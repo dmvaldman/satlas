@@ -20,17 +20,8 @@ export const Carousel: React.FC<CarouselProps> = ({ images, sitId, onImageAction
   }, [activeIndex]);
 
   const handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
-    console.log('Carousel handleImageAction:', {
-      action,
-      imageId,
-      sitId,
-      userId: user?.uid,
-      imageUserId: images.find(img => img.id === imageId)?.userId
-    });
-
     try {
       await onImageAction(action, imageId);
-      console.log('Image action completed successfully');
     } catch (error) {
       console.error('Error in handleImageAction:', error);
     }

@@ -5,18 +5,25 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSits } from '../../contexts/SitsContext';
 import { usePhotoUpload } from '../../contexts/PhotoUploadContext';
 import { FavoriteCount } from './FavoriteCount';
+import { useEffect, useState } from 'react';
 
 interface PopupContentProps {
   sit: Sit;
-  images: Image[];
+  images: Image[]; // initial images passed when popup is created
   currentLocation: { latitude: number; longitude: number };
 }
 
-export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, currentLocation }) => {
+export const PopupContent: React.FC<PopupContentProps> = ({ sit, images: initialImages, currentLocation }) => {
   const { hasMark, toggleMark } = useMarks();
-  const { deleteImage } = useSits();
+  const { deleteImage, getImagesForSit, imagesByCollection } = useSits();
   const { openModal } = usePhotoUpload();
   const { user } = useAuth();
+  const [images, setImages] = useState<Image[]>(initialImages);
+
+  // Re-fetch images whenever the cached images change
+  useEffect(() => {
+    getImagesForSit(sit.imageCollectionId).then(setImages);
+  }, [getImagesForSit, imagesByCollection, sit.imageCollectionId]);
 
   const handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
@@ -29,13 +36,11 @@ export const PopupContent: React.FC<PopupContentProps> = ({ sit, images, current
 
   const handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
     if (!user) return;
-
     try {
       if (action === 'delete') {
-        console.log('Starting delete process for:', { sitId: sit.id, imageId });
         if (window.confirm('Are you sure you want to delete this photo?')) {
+          // Run deleteImage which will update the cached images immediately
           await deleteImage(sit.id, imageId);
-          console.log('Delete completed');
         }
       } else if (action === 'replace') {
         window.dispatchEvent(new CustomEvent('openPhotoUploadModal', {

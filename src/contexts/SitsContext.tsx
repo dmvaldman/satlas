@@ -8,6 +8,7 @@ import { getDistanceInFeet } from '../types';
 
 interface SitsContextType {
   sits: Map<string, Sit>;
+  imagesByCollection: Map<string, Image[]>;
   loadNearbySits: (bounds: { north: number; south: number }) => Promise<void>;
   uploadSit: (base64Image: string, coordinates: Coordinates) => Promise<Sit>;
   addImageToSit: (sitId: string, base64Image: string) => Promise<void>;
@@ -20,6 +21,7 @@ interface SitsContextType {
 
 const SitsContext = createContext<SitsContextType>({
   sits: new Map(),
+  imagesByCollection: new Map(),
   loadNearbySits: async () => {},
   uploadSit: async () => ({
     id: '',
@@ -40,6 +42,7 @@ export const useSits = () => useContext(SitsContext);
 
 export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sits, setSits] = useState<Map<string, Sit>>(new Map());
+  const [imagesByCollection, setImagesByCollection] = useState<Map<string, Image[]>>(new Map());
   const { user } = useAuth();
 
   const loadNearbySits = useCallback(async (bounds: { north: number; south: number }) => {
@@ -68,7 +71,6 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const uploadSit = useCallback(async (base64Image: string, coordinates: Coordinates): Promise<Sit> => {
-    // Add more detailed auth check
     if (!user?.uid) {
       console.error('Upload attempted without auth:', {
         userExists: !!user,
@@ -78,37 +80,45 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Upload image to storage
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
       const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
 
-      // Create sit data
       const imageCollectionId = `${Date.now()}_${user.uid}`;
       const sitData = {
         location: coordinates,
         imageCollectionId,
         uploadedBy: user.uid,
-        createdAt: new Date() // Use local timestamp as we did with marks
+        createdAt: new Date()
       };
 
-      // Add sit to Firestore
       const docRef = await addDoc(collection(db, 'sits'), sitData);
       const sit = { ...sitData, id: docRef.id } as Sit;
 
-      // Add image to images collection
       await addDoc(collection(db, 'images'), {
         photoURL,
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
         collectionId: imageCollectionId,
-        createdAt: new Date() // Use local timestamp
+        createdAt: new Date()
       });
 
-      // Update local state
       setSits(new Map(sits.set(sit.id, sit)));
+
+      setImagesByCollection(prev =>
+        new Map(prev).set(imageCollectionId, [
+          {
+            id: 'initialId',
+            photoURL,
+            userId: user.uid,
+            userName: user.displayName || 'Anonymous',
+            collectionId: imageCollectionId,
+            createdAt: new Date()
+          }
+        ])
+      );
 
       return sit;
     } catch (error) {
@@ -117,7 +127,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       throw error;
     }
-  }, [user]);
+  }, [user, sits]);
 
   const addImageToSit = async (sitId: string, base64Image: string) => {
     if (!user) throw new Error('Must be logged in to add images');
@@ -125,14 +135,12 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sit = sits.get(sitId);
     if (!sit) throw new Error('Sit not found');
 
-    // Upload image
     const filename = `sit_${Date.now()}.jpg`;
     const storageRef = ref(storage, `sits/${filename}`);
     const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
     await uploadString(storageRef, base64WithoutPrefix, 'base64');
     const photoURL = await getDownloadURL(storageRef);
 
-    // Add to images collection
     await addDoc(collection(db, 'images'), {
       photoURL,
       userId: user.uid,
@@ -140,14 +148,29 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       collectionId: sit.imageCollectionId,
       createdAt: serverTimestamp()
     });
+
+    setImagesByCollection(prev => {
+      const newMap = new Map(prev);
+      const images = newMap.get(sit.imageCollectionId) || [];
+      newMap.set(sit.imageCollectionId, [
+        ...images,
+        {
+          id: 'newlyAddedId',
+          photoURL,
+          userId: user.uid,
+          userName: user.displayName || 'Anonymous',
+          collectionId: sit.imageCollectionId,
+          createdAt: new Date()
+        }
+      ]);
+      return newMap;
+    });
   };
 
   const getSit = async (sitId: string): Promise<Sit | null> => {
-    // Check cache first
     const cachedSit = sits.get(sitId);
     if (cachedSit) return cachedSit;
 
-    // If not in cache, fetch from Firestore
     const sitDoc = await getDoc(doc(db, 'sits', sitId));
     if (sitDoc.exists()) {
       const sit = { ...sitDoc.data(), id: sitDoc.id } as Sit;
@@ -158,14 +181,12 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
-    // Check cache first
     for (const sit of sits.values()) {
       if (getDistanceInFeet(coordinates, sit.location) < 100) {
         return sit;
       }
     }
 
-    // If not found in cache, query Firestore
     const sitsRef = collection(db, 'sits');
     const querySnapshot = await getDocs(sitsRef);
 
@@ -180,84 +201,84 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
-  const getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
-    if (!imageCollectionId) {
-      console.warn('No imageCollectionId provided to getImagesForSit');
-      return [];
+  const getImagesForSit = useCallback(async (imageCollectionId: string): Promise<Image[]> => {
+    if (imagesByCollection.has(imageCollectionId)) {
+      return imagesByCollection.get(imageCollectionId)!;
     }
 
     const imagesRef = collection(db, 'images');
     const q = query(imagesRef, where('collectionId', '==', imageCollectionId));
     const snapshot = await getDocs(q);
-
     const images = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Image));
 
+    setImagesByCollection(prev => new Map(prev).set(imageCollectionId, images));
     return images;
-  };
+  }, [imagesByCollection]);
 
-  const deleteImage = async (sitId: string, imageId: string): Promise<void> => {
+  const deleteImage = useCallback(async (sitId: string, imageId: string): Promise<void> => {
     if (!user) throw new Error('Must be logged in to delete images');
 
     try {
       let sitData = sits.get(sitId);
-
       if (!sitData) {
         const sitDoc = await getDoc(doc(db, 'sits', sitId));
         if (!sitDoc.exists()) {
           throw new Error('Sit not found in Firestore');
         }
         sitData = { ...sitDoc.data(), id: sitDoc.id } as Sit;
-        setSits(new Map(sits.set(sitData.id, sitData)));
+        setSits(prevSits => {
+           const newSits = new Map(prevSits);
+           newSits.set(sitData!.id, sitData);
+           return newSits;
+        });
       }
 
-      // Delete the image document
-      const imageRef = doc(db, 'images', imageId);
-      const imageDoc = await getDoc(imageRef);
+      console.log("Before deletion, images for sit", sitData.imageCollectionId, ":", imagesByCollection.get(sitData.imageCollectionId));
 
-      await deleteDoc(imageRef);
+      setImagesByCollection(prevImages => {
+        const newMap = new Map(prevImages);
+        const currentImages = newMap.get(sitData!.imageCollectionId) || [];
+        console.log("Current images count for sit", sitId, ":", currentImages.length);
 
-      // Check if this was the last image
-      const remainingImages = await getImagesForSit(sitData.imageCollectionId);
+        const updatedImages = currentImages.filter(img => img.id !== imageId);
+        console.log("After removal, images count for sit", sitId, ":", updatedImages.length);
+        newMap.set(sitData!.imageCollectionId, updatedImages);
 
-      if (remainingImages.length === 0) {
-        try {
-          await deleteDoc(doc(db, 'sits', sitId));
-
-          // Update local state
-          const newSits = new Map(sits);
-          newSits.delete(sitId);
-          setSits(newSits);
-
-          // Dispatch event for UI updates
-          window.dispatchEvent(new CustomEvent('sitDeleted', {
-            detail: { sitId }
-          }));
-        } catch (error) {
-          console.error('Error deleting sit:', error);
-          throw error;
+        if (updatedImages.length === 0) {
+          console.log("No images remain for sit", sitId, "- removing sit optimistically.");
+          setSits(prevSits => {
+            const newSits = new Map(prevSits);
+            newSits.delete(sitId);
+            return newSits;
+          });
+          window.dispatchEvent(new CustomEvent('sitDeleted', { detail: { sitId } }));
+          deleteDoc(doc(db, 'sits', sitId)).catch(err => {
+            console.error("Error deleting sit in Firestore:", err);
+          });
         }
-      }
+        return newMap;
+      });
+
+      await deleteDoc(doc(db, 'images', imageId));
     } catch (error) {
       console.error('Error in deleteImage:', error);
       throw error;
     }
-  };
+  }, [user, sits]);
 
-  const replaceImage = async (sitId: string, imageId: string, newImageBase64: string): Promise<void> => {
+  const replaceImage = useCallback(async (sitId: string, imageId: string, newImageBase64: string): Promise<void> => {
     if (!user) throw new Error('Must be logged in to replace images');
 
     try {
-      // Upload new image
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
       const base64WithoutPrefix = newImageBase64.replace(/^data:image\/\w+;base64,/, '');
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
 
-      // Update the image document
       await setDoc(doc(db, 'images', imageId), {
         photoURL,
         userId: user.uid,
@@ -268,10 +289,11 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error replacing image:', error);
       throw error;
     }
-  };
+  }, [user]);
 
   const value = useMemo(() => ({
     sits,
+    imagesByCollection,
     loadNearbySits,
     uploadSit,
     addImageToSit,
@@ -280,7 +302,7 @@ export const SitsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getImagesForSit,
     deleteImage,
     replaceImage,
-  }), [sits, loadNearbySits, uploadSit, addImageToSit, getSit, findNearbySit, getImagesForSit, deleteImage, replaceImage]);
+  }), [sits, imagesByCollection, loadNearbySits, uploadSit, addImageToSit, getSit, findNearbySit, getImagesForSit, deleteImage, replaceImage]);
 
   return (
     <SitsContext.Provider value={value}>
