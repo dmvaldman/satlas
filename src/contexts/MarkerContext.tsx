@@ -113,7 +113,16 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateMarkerStyle = (sitId: string, classes: string[]) => {
     const marker = mapboxMarkers.get(sitId);
     if (marker) {
-      marker.getElement().className = classes.join(' ');
+      const el = marker.getElement();
+      // Remove our custom classes only.
+      el.classList.remove("satlas-marker", "own-sit", "favorite");
+      // Add our custom classes if present in the passed classes.
+      classes.forEach(c => {
+        if (["satlas-marker", "own-sit", "favorite"].includes(c)) {
+          el.classList.add(c);
+        }
+      });
+      // Note: Do NOT override el.className entirely, so that existing Mapbox classes remain.
     }
   };
 
