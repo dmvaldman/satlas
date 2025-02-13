@@ -70,6 +70,12 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteMarker = (sitId: string) => {
     const marker = mapboxMarkers.get(sitId);
     if (marker) {
+      // Close popup if it's open
+      if (activePopupRef.current?.isOpen()) {
+        activePopupRef.current.remove();
+        activePopupRef.current = null;
+      }
+
       marker.remove();
       mapboxMarkers.delete(sitId);
     }
