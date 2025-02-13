@@ -71,6 +71,7 @@ export const MarkerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Single effect to sync MapBox markers with desired state
   useEffect(() => {
+    // debugger;
     if (!map || !currentLocation) return;
 
     console.log('Syncing markers with state');
