@@ -14,6 +14,7 @@ import {
   deleteObject
 } from 'firebase/storage';
 import { storage } from './firebase';
+import PhotoUploadComponent from './Photo/PhotoUpload';
 
 interface AppState {
   // Auth state
@@ -34,6 +35,18 @@ interface AppState {
   sits: Map<string, Sit>;
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;
+
+  // Modal state
+  modals: {
+    photo: {
+      isOpen: boolean;
+      data?: { sitId?: string; imageId?: string };
+    };
+    profile: {
+      isOpen: boolean;
+      data?: any;
+    };
+  };
 }
 
 interface Sit {
@@ -68,7 +81,13 @@ class App extends React.Component<{}, AppState> {
       // Data state
       sits: new Map(),
       marks: new Map(),
-      favoriteCount: new Map()
+      favoriteCount: new Map(),
+
+      // Modal state
+      modals: {
+        photo: { isOpen: false },
+        profile: { isOpen: false }
+      }
     };
 
     this.provider = new GoogleAuthProvider();
@@ -408,6 +427,24 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
+  private handleModalOpen = (type: 'photo' | 'profile', data?: any) => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        [type]: { isOpen: true, data }
+      }
+    }));
+  };
+
+  private handleModalClose = (type: 'photo' | 'profile') => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        [type]: { isOpen: false }
+      }
+    }));
+  };
+
   render() {
     const {
       user,
@@ -418,7 +455,8 @@ class App extends React.Component<{}, AppState> {
       sits,
       marks,
       favoriteCount,
-      currentLocation
+      currentLocation,
+      modals
     } = this.state;
 
     return (
@@ -449,6 +487,14 @@ class App extends React.Component<{}, AppState> {
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
           getImagesForSit={this.getImagesForSit}
+          onModalOpen={this.handleModalOpen}
+        />
+
+        <PhotoUploadComponent
+          isOpen={modals.photo.isOpen}
+          replaceInfo={modals.photo.data}
+          onClose={() => this.handleModalClose('photo')}
+          onPhotoCapture={this.handlePhotoUploadComplete}
         />
 
         {/* Other components will be added as we migrate them */}

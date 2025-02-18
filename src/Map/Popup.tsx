@@ -12,6 +12,7 @@ interface PopupProps {
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
+  onClose?: () => void;
 }
 
 interface PopupState {
@@ -29,6 +30,29 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       error: null
     };
   }
+
+  componentDidMount() {
+    document.addEventListener('keydown', this.handleKeyPress);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this.handleKeyPress);
+  }
+
+  private handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this.props.onClose) {
+      this.props.onClose();
+    }
+  };
+
+  private handleCarouselNav = (direction: 'prev' | 'next') => {
+    const { images } = this.props;
+    this.setState(prev => ({
+      activeImageIndex: direction === 'prev'
+        ? (prev.activeImageIndex === 0 ? images.length - 1 : prev.activeImageIndex - 1)
+        : (prev.activeImageIndex === images.length - 1 ? 0 : prev.activeImageIndex + 1)
+    }));
+  };
 
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
@@ -84,21 +108,13 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         {images.length > 1 && (
           <div className="carousel-controls">
             <button
-              onClick={() => this.setState(prev => ({
-                activeImageIndex: prev.activeImageIndex === 0
-                  ? images.length - 1
-                  : prev.activeImageIndex - 1
-              }))}
+              onClick={() => this.handleCarouselNav('prev')}
               className="carousel-button prev"
             >
               ←
             </button>
             <button
-              onClick={() => this.setState(prev => ({
-                activeImageIndex: prev.activeImageIndex === images.length - 1
-                  ? 0
-                  : prev.activeImageIndex + 1
-              }))}
+              onClick={() => this.handleCarouselNav('next')}
               className="carousel-button next"
             >
               →

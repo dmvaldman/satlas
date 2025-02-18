@@ -1,6 +1,7 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Sit, MarkType, User, Image } from '../types';
+import MarkerComponent from './Marker';
 import { createRoot } from 'react-dom/client';
 import PopupComponent from './Popup';
 
@@ -21,10 +22,10 @@ interface MapProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
+  onModalOpen?: (type: 'photo' | 'profile', data?: any) => void;
 }
 
 interface MapState {
-  mapboxMarkers: Map<string, mapboxgl.Marker>;
   activePopup: mapboxgl.Popup | null;
 }
 
@@ -32,7 +33,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
   constructor(props: MapProps) {
     super(props);
     this.state = {
-      mapboxMarkers: new Map(),
       activePopup: null
     };
   }
@@ -41,19 +41,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { map } = this.props;
     if (map) {
       this.setupMapListeners(map);
-      this.loadMarkers();
-    }
-  }
-
-  componentDidUpdate(prevProps: MapProps) {
-    // Update markers when sits change
-    if (prevProps.sits !== this.props.sits) {
-      this.loadMarkers();
-    }
-
-    // Update marker styles when marks change
-    if (prevProps.marks !== this.props.marks) {
-      this.updateAllMarkerStyles();
     }
   }
 
@@ -62,7 +49,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
     if (map) {
       map.off('moveend', this.handleMapMove);
     }
-    this.clearMarkers();
+    if (this.state.activePopup) {
+      this.state.activePopup.remove();
+    }
   }
 
   private setupMapListeners(map: mapboxgl.Map) {
@@ -80,68 +69,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     });
   };
 
-  private loadMarkers() {
-    this.clearMarkers();
-    const { sits } = this.props;
-    sits.forEach(sit => this.createMarker(sit));
-  }
-
-  private clearMarkers() {
-    const { mapboxMarkers } = this.state;
-    mapboxMarkers.forEach(marker => marker.remove());
-    this.setState({ mapboxMarkers: new Map() });
-  }
-
-  private createMarker(sit: Sit) {
-    const { map, userId } = this.props;
-    if (!map) return;
-
-    const el = document.createElement('div');
-    el.className = 'satlas-marker';
-    this.updateMarkerClasses(el, sit);
-
-    const marker = new mapboxgl.Marker(el)
-      .setLngLat([sit.longitude, sit.latitude])
-      .addTo(map);
-
-    marker.getElement().addEventListener('click', () => {
-      this.handleMarkerClick(sit);
-    });
-
-    this.setState(prevState => ({
-      mapboxMarkers: new Map(prevState.mapboxMarkers).set(sit.id, marker)
-    }));
-  }
-
-  private updateMarkerClasses(el: HTMLElement, sit: Sit) {
-    const { marks, userId } = this.props;
-    const classes = ['satlas-marker'];
-
-    if (sit.uploadedBy === userId) {
-      classes.push('own-sit');
-    }
-
-    const sitMarks = marks.get(sit.id);
-    if (sitMarks?.has('favorite')) {
-      classes.push('favorite');
-    }
-
-    el.className = classes.join(' ');
-  }
-
-  private updateAllMarkerStyles() {
-    const { sits } = this.props;
-    const { mapboxMarkers } = this.state;
-
-    sits.forEach(sit => {
-      const marker = mapboxMarkers.get(sit.id);
-      if (marker) {
-        this.updateMarkerClasses(marker.getElement(), sit);
-      }
-    });
-  }
-
-  private async handleMarkerClick(sit: Sit) {
+  private handleMarkerClick = async (sit: Sit) => {
     const { map, currentLocation, marks, favoriteCount, user } = this.props;
     if (!map || !currentLocation) return;
 
@@ -174,7 +102,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
           favoriteCount={favoriteCount.get(sit.id) || 0}
           onToggleMark={this.props.onToggleMark}
           onDeleteImage={this.props.onDeleteImage}
-          onReplaceImage={this.props.onReplaceImage}
+          onReplaceImage={this.handleReplaceImage}
         />
       );
 
@@ -186,7 +114,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
       this.setState({ activePopup: popup });
     } catch (error) {
       console.error('Error loading popup content:', error);
-      // Render error state in popup
       root.render(
         <div className="satlas-popup-error">
           Failed to load content
@@ -197,10 +124,16 @@ class MapComponent extends React.Component<MapProps, MapState> {
         .setLngLat([sit.longitude, sit.latitude])
         .addTo(map);
     }
-  }
+  };
+
+  private handleReplaceImage = (sitId: string, imageId: string) => {
+    if (this.props.onModalOpen) {
+      this.props.onModalOpen('photo', { sitId, imageId });
+    }
+  };
 
   render() {
-    const { isLoading } = this.props;
+    const { map, sits, userId, marks, isLoading } = this.props;
 
     return (
       <div id="map-container">
@@ -209,6 +142,17 @@ class MapComponent extends React.Component<MapProps, MapState> {
             <p>Loading map...</p>
           </div>
         )}
+        {map && Array.from(sits.values()).map(sit => (
+          <MarkerComponent
+            key={sit.id}
+            sit={sit}
+            map={map}
+            userId={userId}
+            marks={marks.get(sit.id) || new Set()}
+            onMarkerClick={this.handleMarkerClick}
+            onMarkUpdate={this.props.onToggleMark}
+          />
+        ))}
       </div>
     );
   }
