@@ -1,58 +1,86 @@
-# Migration from Legacy to React
+# React Simplification Migration Plan
 
-## Progress
+## Current Issues
+1. Excessive state management complexity through multiple contexts
+2. Over-reliance on hooks and effects
+3. Scattered state management across multiple files
+4. Unnecessary indirection through provider/context patterns
+5. Too many small files creating cognitive overhead
 
-### ✅ Completed
-- **Map System:**
-  - Map initialization and management (MapContext)
-  - Marker creation and management (MarkerContext)
-  - Popup system (PopupContext)
-- **Auth & Profile:**
-  - Authentication system (AuthContext)
-  - Profile UI and management (ProfileContext)
-- **Sits:**
-  - Basic sits loading and display (SitsContext)
-- **Marks System:**
-  - Migration complete in MarksContext with support for "favorite", "visited" and new "wantToGo" types
-  - Uses locally computed timestamps (via `new Date()`) instead of `serverTimestamp()`
-- **Photo Upload UI:**
-  - Basic UI integrated into PhotoUploadContext
+## Target Architecture
 
-### 🚧 In Progress
-- **Photo Upload System Functionality:**
-  - Final integration, error handling, and testing pending (PhotoUploadContext)
-- **Legacy Code Clean-Up:**
-  - Marks logic has been migrated; legacy file `/ts/marks.ts` is ready for removal
-  - Other legacy files (such as `/ts/map.ts`, `/ts/main.ts`, and `/ts/profile.ts`) will be removed after full feature verification
-- **Add New Sit Flow:**
-  - Refinement and migration from legacy code is underway
+### Core Components
+- `App.tsx` - Main application container
+- `Map/`
+  - `MapComponent.tsx` - Core map functionality
+  - `Marker.tsx` - Marker rendering
+  - `Popup.tsx` - Popup functionality
+- `Auth/`
+  - `AuthComponent.tsx` - Authentication handling
+  - `ProfileComponent.tsx` - User profile management
+- `Photo/`
+  - `PhotoUpload.tsx` - Photo upload functionality
+  - `PhotoCarousel.tsx` - Image display
+- `types.ts` - Shared type definitions
 
-### 📋 Todo
-1. **Finalize Photo Upload Flow**
-   - Complete integration in PhotoUploadContext
-   - Enhance error handling and perform thorough testing
-2. **Complete Add New Sit Flow**
-   - Migrate remaining functionalities from legacy code
-   - Integrate with photo upload and add location validation
-3. **Remove Legacy Code**
-   - Delete legacy files in the `/ts` folder:
-     - `/ts/marks.ts` (marks system verified)
-     - `/ts/map.ts`
-     - `/ts/main.ts`
-     - `/ts/profile.ts` (if applicable)
-   - Clean up `index.html` and remove unused CSS/JS assets
-4. **Comprehensive Testing & Verification**
-   - Test all marker interactions and popup updates (for all mark types)
-   - Verify full authentication and profile flows
-   - Ensure robust error handling in photo upload and new sit addition
+### State Management
+- Move to class-based components with explicit state/props
+- Centralize state management in App.tsx
+- Use prop drilling for state updates (simpler than context)
+- Minimize use of effects to essential cases only (map initialization, auth)
 
-## Next Steps
-1. Thoroughly test the new Marks system (favorite, visited, wantToGo) through the UI.
-2. Finalize and verify Photo Upload and New Sit flows.
-3. Remove all legacy code once feature migration is verified.
-4. Update documentation and polish any remaining refactoring.
+### Migration Steps
 
-## Notes
-- Maintain verbose logging for error tracking.
-- Consider adding error boundaries where appropriate.
-- Verify that no references to the legacy `/ts` files remain after removal.
+1. **Phase 1: State Centralization**
+   - Create new App.tsx with consolidated state
+   - Define core state interfaces
+   - Implement main state update methods
+
+2. **Phase 2: Map Component Migration**
+   - Consolidate MapContext, MarkerContext, PopupContext into single MapComponent
+   - Convert to class component with clear lifecycle methods
+   - Move marker/popup logic into subcomponents
+
+3. **Phase 3: Auth Simplification**
+   - Merge AuthContext and ProfileContext into AuthComponent
+   - Implement as class component
+   - Move profile UI into subcomponent
+
+4. **Phase 4: Photo Management**
+   - Combine PhotoUploadContext and related components
+   - Create unified PhotoComponent
+   - Simplify carousel implementation
+
+5. **Phase 5: Cleanup**
+   - Remove context files
+   - Clean up unused hooks
+   - Consolidate types
+   - Remove redundant components
+
+### Implementation Order
+1. Start with App.tsx refactor to establish new patterns
+2. Tackle Map components (most complex)
+3. Migrate Auth functionality
+4. Update Photo components
+5. Final cleanup
+
+### Testing Strategy
+- Maintain working application throughout migration
+- Test each component after conversion
+- Focus on core user flows:
+  - Map navigation
+  - Marker interaction
+  - Photo upload
+  - Authentication
+  - Profile management
+
+### Code Style Guidelines
+1. Prefer class components for stateful logic
+2. Use pure functional components for presentation
+3. Explicit props over context
+4. Minimize hooks usage
+5. Clear component hierarchy
+6. Descriptive method names
+7. Strong typing
+
+Would you like to proceed with Phase 1 and start with the new App.tsx implementation?
