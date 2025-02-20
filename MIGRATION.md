@@ -6,50 +6,42 @@
 1. **Initial State Centralization (Phase 1)**
    - Created new App.tsx with consolidated state
    - Implemented core state interfaces
-   - Added main state update methods for auth and photo handling
+   - Added main state update methods
+   - Added modal state management
 
-2. **Auth Component (Phase 3 - Partial)**
-   - Created class-based AuthComponent
-   - Implemented basic auth flow
-   - Moved profile management into component
-
-3. **Map Component (Phase 2 - Partial)**
+2. **Map Components (Phase 2)**
    - Created class-based MapComponent
-   - Implemented marker management
-   - Added popup handling
+   - Implemented MarkerComponent
+   - Added PopupComponent
+   - Standardized event handling between components
+   - Implemented proper lifecycle management
 
-4. **Photo Upload (Phase 4 - Partial)**
+3. **Photo Upload (Phase 4)**
    - Created PhotoUpload component
    - Implemented camera and gallery integration
    - Added image upload handling
+   - Maintained legacy event support
+   - Standardized modal control via props
 
 ### 🚧 In Progress
 
-1. **Map Component (Remaining)**
-   - Need to implement Marker.tsx as separate component
-   - Need to finalize map initialization logic
-   - Consider splitting popup logic into separate component
-
-2. **Auth Component (Remaining)**
+1. **Auth Component (Phase 3)**
    - Need to complete ProfileComponent implementation
    - Need to add user preferences management
+   - Need to standardize event handling
 
-3. **Photo Management (Remaining)**
+2. **Photo Management (Remaining)**
    - Need to implement PhotoCarousel component
    - Need to add image collection management
 
 ### 📋 Next Steps
 
-1. **Complete Map Components**
-   - Create Marker.tsx
-   - Finalize map initialization
-   - Consider map event handling optimization
-
-2. **Finish Auth Flow**
-   - Complete ProfileComponent
+1. **Complete Auth Flow**
+   - Create ProfileComponent
    - Add user settings persistence
+   - Standardize event handling with other components
 
-3. **Complete Photo Management**
+2. **Complete Photo Management**
    - Implement PhotoCarousel
    - Add image collection handling
 
@@ -57,18 +49,21 @@
 
 1. **Component Organization**
    - Feature-based directory structure working well (Auth/, Map/, Photo/)
-   - Consider renaming Component.tsx to index.tsx in each directory
-   - May need additional utility files for complex features
+   - Each feature has clear component hierarchy
+   - Shared interfaces in types.ts
 
 2. **State Management**
    - Centralized state in App.tsx proving effective
-   - Props drilling simpler than expected
-   - Consider adding TypeScript interfaces file for shared types
+   - Modal state now properly managed at App level
+   - Props drilling simpler than context for most cases
 
-3. **Event Handling**
-   - Keep global events for backward compatibility
-   - Consider adding event type definitions
-   - Document event flow in comments
+3. **Event Handling (Updated)**
+   - Standardized approach:
+     - Props for parent-child communication
+     - DOM events only for unrelated component communication
+     - Legacy support maintained where needed
+   - Clear separation between internal and cross-component events
+   - Modal state managed centrally
 
 ### Code Style Guidelines (Updated)
 
@@ -84,7 +79,8 @@
      │   └── Popup.tsx
      ├── Photo/
      │   ├── index.tsx (main component)
-     │   └── Carousel.tsx
+     │   ├── PhotoUpload.tsx
+     │   └── Carousel.tsx (pending)
      ├── types.ts
      └── App.tsx
    ```
@@ -94,11 +90,20 @@
    - Keep render methods focused and split into sub-methods
    - Use explicit prop types and interfaces
    - Document complex state interactions
+   - Prefer prop callbacks over DOM events for related components
 
-3. **Testing Priorities**
+3. **Event Handling Guidelines**
+   - Use props for parent-child communication
+   - Use DOM events only for unrelated component communication
+   - Maintain legacy event support with environment flags
+   - Document deprecated event patterns
+   - Centralize modal state in App.tsx
+
+4. **Testing Priorities**
    - Focus on user interaction flows
    - Test state updates and prop changes
    - Verify event handling
    - Check backward compatibility
+   - Test modal state management
 
 Would you like to proceed with implementing any of the remaining components?
