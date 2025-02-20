@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
-import { Sit, Coordinates, Image } from '../types';
+import { db, storage } from '../../firebase';
+import { Sit, Coordinates, Image } from '../../types';
 import { useAuth } from './AuthContext';
-import { getDistanceInFeet } from '../types';
+import { getDistanceInFeet } from '../../types';
 
 interface SitsContextType {
   sits: Map<string, Sit>;

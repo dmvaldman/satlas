@@ -1,6 +1,6 @@
 import { createContext, useContext, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Coordinates } from '../types';
+import { Coordinates } from '../../types';
 import { Geolocation } from '@capacitor/geolocation';
 
 // Replace with your Mapbox access token

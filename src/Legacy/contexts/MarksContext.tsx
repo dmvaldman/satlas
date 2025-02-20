@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { UserSitMark, MarkType } from '../types';
+import { db } from '../../firebase';
+import { UserSitMark, MarkType } from '../../types';
 import { useAuth } from './AuthContext';
 
 interface MarksContextType {

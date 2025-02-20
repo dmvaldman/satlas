@@ -3,7 +3,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useMap } from './MapContext';
 import { useSits } from './SitsContext';
 import { useAuth } from './AuthContext';
-import { Coordinates } from '../types';
+import { Coordinates } from '../../types';
 import * as mapboxgl from 'mapbox-gl';
 
 interface PhotoUploadContextType {
