@@ -105,8 +105,8 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
-    // Only set up auth listener first
     this.setupAuthListener();
+    this.initializeMap();
   }
 
   private setupAuthListener = () => {
@@ -115,9 +115,6 @@ class App extends React.Component<{}, AppState> {
         user,
         isAuthenticated: !!user,
         authIsReady: true
-      }, () => {
-        // Initialize map after auth is ready and container is rendered
-        this.initializeMap();
       });
 
       if (user) {
@@ -131,12 +128,12 @@ class App extends React.Component<{}, AppState> {
 
   private initializeMap = async () => {
     try {
-      console.log('Initializing map with container:', this.mapContainer.current);
       if (!this.mapContainer.current) {
         throw new Error('Map container not found');
       }
 
       const coordinates = await this.getCurrentLocation();
+
       const map = new mapboxgl.Map({
         container: this.mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
@@ -144,8 +141,20 @@ class App extends React.Component<{}, AppState> {
         zoom: 13
       });
 
+      // Add geolocate control
+      const geolocate = new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: true
+        },
+        trackUserLocation: true,
+        showUserHeading: true
+      });
+
+      map.addControl(geolocate);
+
       map.on('load', () => {
-        console.log('Map loaded');
+        // Trigger geolocation on map load
+        geolocate.trigger();
         this.setState({ isMapLoading: false });
         window.dispatchEvent(new CustomEvent('mapReady'));
       });
@@ -154,26 +163,24 @@ class App extends React.Component<{}, AppState> {
 
     } catch (error) {
       console.error('Error initializing map:', error);
-      this.initializeWithDefaultLocation();
+      // If we can't get location, center on San Francisco as default
+      const defaultLocation = { latitude: 37.7749, longitude: -122.4194 };
+
+      if (this.mapContainer.current) {
+        const map = new mapboxgl.Map({
+          container: this.mapContainer.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [defaultLocation.longitude, defaultLocation.latitude],
+          zoom: 13
+        });
+
+        this.setState({
+          map,
+          currentLocation: defaultLocation,
+          isMapLoading: false
+        });
+      }
     }
-  };
-
-  private initializeWithDefaultLocation = () => {
-    if (!this.mapContainer.current) return;
-
-    const defaultLocation = { latitude: 0, longitude: 0 };
-    const map = new mapboxgl.Map({
-      container: this.mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [defaultLocation.longitude, defaultLocation.latitude],
-      zoom: 13
-    });
-
-    this.setState({
-      map,
-      currentLocation: defaultLocation,
-      isMapLoading: false
-    });
   };
 
   private getCurrentLocation = (): Promise<{ latitude: number; longitude: number }> => {
