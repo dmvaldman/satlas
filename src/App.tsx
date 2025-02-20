@@ -15,6 +15,8 @@ import {
 } from 'firebase/storage';
 import { storage } from './firebase';
 import PhotoUploadComponent from './Photo/PhotoUpload';
+import ProfileModal from './Auth/ProfileModal';
+import { UserPreferences } from './types';
 
 interface AppState {
   // Auth state
@@ -47,6 +49,8 @@ interface AppState {
       data?: any;
     };
   };
+
+  userPreferences: UserPreferences;
 }
 
 interface Sit {
@@ -59,6 +63,7 @@ type MarkType = 'favorite' | 'visited' | 'wantToGo';
 
 class App extends React.Component<{}, AppState> {
   private provider: GoogleAuthProvider;
+  private mapContainer: React.RefObject<HTMLDivElement>;
 
   constructor(props: {}) {
     super(props);
@@ -87,67 +92,89 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false },
         profile: { isOpen: false }
+      },
+
+      userPreferences: {
+        nickname: '',
+        pushNotificationsEnabled: false
       }
     };
 
     this.provider = new GoogleAuthProvider();
+    this.mapContainer = React.createRef();
   }
 
   componentDidMount() {
-    // Handle auth state changes
+    // Only set up auth listener first
     this.setupAuthListener();
-    // Initialize map
-    this.initializeMap();
   }
 
   private setupAuthListener = () => {
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
       this.setState({
         user,
         isAuthenticated: !!user,
         authIsReady: true
+      }, () => {
+        // Initialize map after auth is ready and container is rendered
+        this.initializeMap();
       });
 
       if (user) {
-        this.loadUserData(user.uid);
+        await Promise.all([
+          this.loadUserData(user.uid),
+          this.loadUserPreferences(user.uid)
+        ]);
       }
     });
   };
 
-  private async initializeMap() {
+  private initializeMap = async () => {
     try {
+      console.log('Initializing map with container:', this.mapContainer.current);
+      if (!this.mapContainer.current) {
+        throw new Error('Map container not found');
+      }
+
       const coordinates = await this.getCurrentLocation();
       const map = new mapboxgl.Map({
-        container: 'map-container',
+        container: this.mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [coordinates.longitude, coordinates.latitude],
         zoom: 13
       });
 
       map.on('load', () => {
+        console.log('Map loaded');
         this.setState({ isMapLoading: false });
         window.dispatchEvent(new CustomEvent('mapReady'));
       });
 
       this.setState({ map, currentLocation: coordinates });
+
     } catch (error) {
       console.error('Error initializing map:', error);
-      // Initialize with default location
-      const defaultLocation = { latitude: 0, longitude: 0 };
-      const map = new mapboxgl.Map({
-        container: 'map-container',
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [defaultLocation.longitude, defaultLocation.latitude],
-        zoom: 13
-      });
-
-      this.setState({
-        map,
-        currentLocation: defaultLocation,
-        isMapLoading: false
-      });
+      this.initializeWithDefaultLocation();
     }
-  }
+  };
+
+  private initializeWithDefaultLocation = () => {
+    if (!this.mapContainer.current) return;
+
+    const defaultLocation = { latitude: 0, longitude: 0 };
+    const map = new mapboxgl.Map({
+      container: this.mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [defaultLocation.longitude, defaultLocation.latitude],
+      zoom: 13
+    });
+
+    this.setState({
+      map,
+      currentLocation: defaultLocation,
+      isMapLoading: false
+    });
+  };
 
   private getCurrentLocation = (): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve, reject) => {
@@ -174,6 +201,22 @@ class App extends React.Component<{}, AppState> {
     // Load user's sits, marks, etc.
     // This will be implemented as we migrate other components
   }
+
+  private loadUserPreferences = async (userId: string) => {
+    try {
+      const prefsDoc = await getDoc(doc(db, 'userPreferences', userId));
+      if (prefsDoc.exists()) {
+        this.setState({
+          userPreferences: {
+            nickname: prefsDoc.data().nickname || '',
+            pushNotificationsEnabled: prefsDoc.data().pushNotificationsEnabled || false
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+    }
+  };
 
   // Auth methods
   private handleSignIn = async () => {
@@ -210,13 +253,18 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleSavePreferences = async (prefs: UserPreferences) => {
-    if (!this.state.user) return;
+    const { user } = this.state;
+    if (!user) return;
 
     try {
-      await setDoc(doc(db, 'users', this.state.user.uid), {
-        ...prefs,
-        lastVisit: new Date().getTime()
-      }, { merge: true });
+      await setDoc(doc(db, 'userPreferences', user.uid), {
+        nickname: prefs.nickname,
+        pushNotificationsEnabled: prefs.pushNotificationsEnabled,
+        updatedAt: new Date()
+      });
+
+      this.setState({ userPreferences: prefs });
+      this.handleModalClose('profile');
     } catch (error) {
       console.error('Error saving preferences:', error);
       throw error;
@@ -449,15 +497,30 @@ class App extends React.Component<{}, AppState> {
     const {
       user,
       isAuthenticated,
-      isProfileOpen,
-      isMapLoading,
+      authIsReady,
       map,
       sits,
       marks,
       favoriteCount,
       currentLocation,
-      modals
+      modals,
+      userPreferences,
+      isMapLoading
     } = this.state;
+
+    // Still show loading, but include the map container
+    if (!authIsReady) {
+      return (
+        <div className="app">
+          <div className="loading">Loading...</div>
+          <div
+            id="map-container"
+            ref={this.mapContainer}
+            style={{ width: '100%', height: 'calc(100vh - 60px)' }}
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="app">
@@ -467,28 +530,35 @@ class App extends React.Component<{}, AppState> {
             isAuthenticated={isAuthenticated}
             onSignIn={this.handleSignIn}
             onSignOut={this.handleSignOut}
-            isProfileOpen={isProfileOpen}
-            onToggleProfile={this.toggleProfile}
+            isProfileOpen={modals.profile.isOpen}
+            onToggleProfile={() => this.handleModalOpen('profile')}
             onSavePreferences={this.handleSavePreferences}
           />
         </header>
 
-        <MapComponent
-          map={map}
-          sits={sits}
-          marks={marks}
-          favoriteCount={favoriteCount}
-          currentLocation={currentLocation}
-          isLoading={isMapLoading}
-          userId={user?.uid || null}
-          onSitClick={this.handleSitClick}
-          onLoadNearbySits={this.handleLoadNearbySits}
-          onToggleMark={this.handleToggleMark}
-          onDeleteImage={this.handleDeleteImage}
-          onReplaceImage={this.handleReplaceImage}
-          getImagesForSit={this.getImagesForSit}
-          onModalOpen={this.handleModalOpen}
+        <div
+          id="map-container"
+          ref={this.mapContainer}
+          style={{ width: '100%', height: 'calc(100vh - 60px)' }}
         />
+
+        {!isMapLoading && map && (
+          <MapComponent
+            map={map}
+            sits={sits}
+            marks={marks}
+            favoriteCount={favoriteCount}
+            currentLocation={currentLocation}
+            userId={user?.uid || null}
+            onSitClick={this.handleSitClick}
+            onLoadNearbySits={this.handleLoadNearbySits}
+            onToggleMark={this.handleToggleMark}
+            onDeleteImage={this.handleDeleteImage}
+            onReplaceImage={this.handleReplaceImage}
+            getImagesForSit={this.getImagesForSit}
+            onModalOpen={this.handleModalOpen}
+          />
+        )}
 
         <PhotoUploadComponent
           isOpen={modals.photo.isOpen}
@@ -497,7 +567,14 @@ class App extends React.Component<{}, AppState> {
           onPhotoCapture={this.handlePhotoUploadComplete}
         />
 
-        {/* Other components will be added as we migrate them */}
+        <ProfileModal
+          isOpen={modals.profile.isOpen}
+          user={user}
+          preferences={userPreferences}
+          onClose={() => this.handleModalClose('profile')}
+          onSignOut={this.handleSignOut}
+          onSave={this.handleSavePreferences}
+        />
       </div>
     );
   }

@@ -2,6 +2,9 @@ import React from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Coordinates } from '../types';
 
+// Replace process.env with import.meta.env for Vite
+const LEGACY_SUPPORT = import.meta.env.VITE_LEGACY_SUPPORT === 'true';
+
 interface PhotoUploadProps {
   isOpen: boolean;
   isUploading: boolean;
@@ -24,14 +27,14 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
   componentDidMount() {
     // Only keep if absolutely necessary for legacy code
-    if (process.env.REACT_APP_LEGACY_SUPPORT) {
-      window.addEventListener('openPhotoUploadModal', this.handleGlobalOpen);
+    if (LEGACY_SUPPORT) {
+      window.addEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
     }
   }
 
   componentWillUnmount() {
-    if (process.env.REACT_APP_LEGACY_SUPPORT) {
-      window.removeEventListener('openPhotoUploadModal', this.handleGlobalOpen);
+    if (LEGACY_SUPPORT) {
+      window.removeEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
     }
   }
 

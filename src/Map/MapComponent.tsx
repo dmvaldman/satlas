@@ -135,13 +135,16 @@ class MapComponent extends React.Component<MapProps, MapState> {
   render() {
     const { map, sits, userId, marks, isLoading } = this.props;
 
+    if (isLoading) {
+      return (
+        <div className="loading">
+          <p>Loading map...</p>
+        </div>
+      );
+    }
+
     return (
-      <div id="map-container">
-        {isLoading && (
-          <div className="map-loading">
-            <p>Loading map...</p>
-          </div>
-        )}
+      <>
         {map && Array.from(sits.values()).map(sit => (
           <MarkerComponent
             key={sit.id}
@@ -153,7 +156,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
             onMarkUpdate={this.props.onToggleMark}
           />
         ))}
-      </div>
+      </>
     );
   }
 }
