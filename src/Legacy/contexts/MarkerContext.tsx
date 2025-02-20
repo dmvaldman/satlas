@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import { useMap } from './MapContext';
 import { usePopups } from './PopupContext';
 import { useSits } from './SitsContext';
-import { Sit, MarkType } from '../types';
+import { Sit, MarkType } from '../../types';
 import { useAuth } from './AuthContext';
 import { useMarks } from './MarksContext';
 

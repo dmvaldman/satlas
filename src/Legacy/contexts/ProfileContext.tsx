@@ -1,9 +1,9 @@
 import { createContext, useContext, useState } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
-import { db, auth } from '../firebase';
+import { db, auth } from '../../firebase';
 import { useAuth } from './AuthContext';
-import { UserPreferences } from '../types';
+import { UserPreferences } from '../../types';
 
 interface ProfileContextType {
   isProfileOpen: boolean;

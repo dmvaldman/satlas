@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Sit, Image, MarkType } from '../types';
+import { Sit, Image, MarkType } from '../../types';
 import { useAuth } from './AuthContext';
 import { useSits } from './SitsContext';
-import { getDistanceInFeet } from '../types';
+import { getDistanceInFeet } from '../../types';
 import { createRoot } from 'react-dom/client';
 import { Carousel } from '../components/Carousel/Carousel';
 import { useMarks } from './MarksContext';
