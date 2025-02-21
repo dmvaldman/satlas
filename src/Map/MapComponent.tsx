@@ -63,10 +63,12 @@ class MapComponent extends React.Component<MapProps, MapState> {
     if (!map) return;
 
     const bounds = map.getBounds();
-    await onLoadNearbySits({
-      north: bounds.getNorth(),
-      south: bounds.getSouth()
-    });
+    if (bounds) {
+      await onLoadNearbySits({
+        north: bounds.getNorth(),
+        south: bounds.getSouth()
+      });
+    }
   };
 
   private handleMarkerClick = async (sit: Sit) => {
@@ -108,7 +110,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
       popup
         .setDOMContent(container)
-        .setLngLat([sit.longitude, sit.latitude])
+        .setLngLat([sit.location.longitude, sit.location.latitude])
         .addTo(map);
 
       this.setState({ activePopup: popup });
@@ -121,7 +123,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
       );
       popup
         .setDOMContent(container)
-        .setLngLat([sit.longitude, sit.latitude])
+        .setLngLat([sit.location.longitude, sit.location.latitude])
         .addTo(map);
     }
   };
@@ -133,7 +135,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   render() {
-    const { map, sits, userId, marks, isLoading } = this.props;
+    const { map, sits, isLoading } = this.props;
 
     if (isLoading) {
       return (
@@ -150,8 +152,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
             key={sit.id}
             sit={sit}
             map={map}
-            userId={userId}
-            marks={marks.get(sit.id) || new Set()}
+            userId={this.props.userId}
+            marks={this.props.marks.get(sit.id) || new Set()}
             onMarkerClick={this.handleMarkerClick}
             onMarkUpdate={this.props.onToggleMark}
           />

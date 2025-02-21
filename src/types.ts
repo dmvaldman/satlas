@@ -43,7 +43,7 @@ export interface Coordinates {
 export interface UserPreferences {
   nickname: string;
   pushNotificationsEnabled: boolean;
-  lastVisit: number;  // Unix timestamp
+  lastVisit?: number;  // Making lastVisit optional since it's not used in the profile modal
 }
 
 export type MarkType = 'favorite' | 'wantToGo' | 'visited';
