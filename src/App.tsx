@@ -6,7 +6,8 @@ import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import AuthComponent from './Auth/AuthComponent';
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import MapComponent from './Map/MapComponent';
-import { Image } from './types';
+import { Image, Sit, Coordinates } from './types';
+import { getDistanceInFeet } from './utils/geo';
 import {
   ref,
   uploadString,
@@ -18,6 +19,7 @@ import PhotoUploadComponent from './Photo/PhotoUpload';
 import ProfileModal from './Auth/ProfileModal';
 import { UserPreferences } from './types';
 import { SitManager } from './Map/SitManager';
+import AddSitButton from './Map/AddSitButton';
 
 interface AppState {
   // Auth state
@@ -52,12 +54,6 @@ interface AppState {
   };
 
   userPreferences: UserPreferences;
-}
-
-interface Sit {
-  id: string;
-  imageCollectionId: string;
-  // ... other sit properties
 }
 
 type MarkType = 'favorite' | 'visited' | 'wantToGo';
@@ -154,6 +150,7 @@ class App extends React.Component<{}, AppState> {
       map.addControl(geolocate);
 
       map.on('load', () => {
+        console.log('Map loaded');
         // Trigger geolocation on map load
         geolocate.trigger();
         this.setState({ isMapLoading: false });
@@ -484,6 +481,41 @@ class App extends React.Component<{}, AppState> {
     }));
   };
 
+  private findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
+    const { sits } = this.state;
+
+    // Check existing sits first
+    for (const sit of sits.values()) {
+      if (getDistanceInFeet(coordinates, sit.location) < 100) {
+        return sit;
+      }
+    }
+
+    // If not found in current sits, check database
+    const sitsRef = collection(db, 'sits');
+    const querySnapshot = await getDocs(sitsRef);
+
+    for (const doc of querySnapshot.docs) {
+      const sitData = doc.data();
+      const sitLocation = {
+        latitude: sitData.location.latitude,
+        longitude: sitData.location.longitude
+      };
+
+      if (getDistanceInFeet(coordinates, sitLocation) < 100) {
+        return {
+          id: doc.id,
+          location: sitLocation,
+          imageCollectionId: sitData.imageCollectionId,
+          createdAt: sitData.createdAt,
+          uploadedBy: sitData.uploadedBy
+        };
+      }
+    }
+
+    return null;
+  };
+
   render() {
     const {
       user,
@@ -565,6 +597,15 @@ class App extends React.Component<{}, AppState> {
           onClose={() => this.handleModalClose('profile')}
           onSignOut={this.handleSignOut}
           onSave={this.handleSavePreferences}
+        />
+
+        <AddSitButton
+          isAuthenticated={isAuthenticated}
+          userId={user?.uid || null}
+          onSignIn={this.handleSignIn}
+          getCurrentLocation={this.getCurrentLocation}
+          findNearbySit={this.findNearbySit}
+          onPhotoUploadOpen={() => this.handleModalOpen('photo')}
         />
       </div>
     );

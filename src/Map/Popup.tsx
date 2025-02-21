@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { Sit, Image, MarkType } from '../types';
+import Carousel from './Carousel';
 
 interface PopupProps {
   sit: Sit;
@@ -45,15 +46,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     }
   };
 
-  private handleCarouselNav = (direction: 'prev' | 'next') => {
-    const { images } = this.props;
-    this.setState(prev => ({
-      activeImageIndex: direction === 'prev'
-        ? (prev.activeImageIndex === 0 ? images.length - 1 : prev.activeImageIndex - 1)
-        : (prev.activeImageIndex === images.length - 1 ? 0 : prev.activeImageIndex + 1)
-    }));
-  };
-
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
     const { sit, onToggleMark } = this.props;
@@ -88,83 +80,37 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private renderCarousel() {
     const { images, user, sit } = this.props;
-    const { activeImageIndex } = this.state;
-
-    if (images.length === 0) {
-      return <div className="no-images">No images available</div>;
-    }
-
-    const currentImage = images[activeImageIndex];
     const showControls = user?.uid === sit.uploadedBy;
 
     return (
-      <div className="carousel">
-        <img
-          src={currentImage.photoURL}
-          alt={`Sit ${activeImageIndex + 1}`}
-          className="carousel-image"
-        />
-
-        {images.length > 1 && (
-          <div className="carousel-controls">
-            <button
-              onClick={() => this.handleCarouselNav('prev')}
-              className="carousel-button prev"
-            >
-              ←
-            </button>
-            <button
-              onClick={() => this.handleCarouselNav('next')}
-              className="carousel-button next"
-            >
-              →
-            </button>
-          </div>
-        )}
-
-        {showControls && (
-          <div className="image-controls">
-            <button
-              onClick={() => this.handleImageAction('replace', currentImage.id)}
-              disabled={this.state.isDeleting}
-            >
-              Replace
-            </button>
-            <button
-              onClick={() => this.handleImageAction('delete', currentImage.id)}
-              disabled={this.state.isDeleting}
-            >
-              {this.state.isDeleting ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
-        )}
-      </div>
+      <Carousel
+        images={images}
+        showControls={showControls}
+        onImageAction={this.handleImageAction}
+        isDeleting={this.state.isDeleting}
+      />
     );
   }
 
   private renderMarkButtons() {
     const { marks } = this.props;
+    const markTypes: { type: MarkType; icon: string; label: string }[] = [
+      { type: 'favorite', icon: '★', label: 'Favorite' },
+      { type: 'visited', icon: '✓', label: 'Visited' },
+      { type: 'wantToGo', icon: '→', label: 'Want to Go' }
+    ];
 
     return (
       <div className="mark-buttons">
-        <button
-          className={`mark-button favorite ${marks.has('favorite') ? 'active' : ''}`}
-          onClick={(e) => this.handleMarkClick(e, 'favorite')}
-        >
-          ★ Favorite
-        </button>
-        <button
-          className={`mark-button visited ${marks.has('visited') ? 'active' : ''}`}
-          onClick={(e) => this.handleMarkClick(e, 'visited')}
-        >
-          ✓ Visited
-        </button>
-        <button
-          className={`mark-button want-to-go ${marks.has('wantToGo') ? 'active' : ''}`}
-          onClick={(e) => this.handleMarkClick(e, 'wantToGo')}
-        >
-          → Want to Go
-        </button>
+        {markTypes.map(({ type, icon, label }) => (
+          <button
+            key={type}
+            className={`mark-button ${type}${marks.has(type) ? ' active' : ''}`}
+            onClick={(e) => this.handleMarkClick(e, type)}
+          >
+            {icon} {label}
+          </button>
+        ))}
       </div>
     );
   }
@@ -181,7 +127,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   }
 
   render() {
-    const { sit, user } = this.props;
+    const { user } = this.props;
     const { error } = this.state;
 
     return (
@@ -197,11 +143,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         {user && this.renderMarkButtons()}
 
         {this.renderFavoriteCount()}
-
-        <div className="sit-info">
-          <p className="sit-description">{sit.description}</p>
-          <p className="sit-author">Added by {sit.userName}</p>
-        </div>
       </div>
     );
   }
