@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import AuthComponent from './Auth/AuthComponent';
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import MapComponent from './Map/MapComponent';
 import { Image, Sit, Coordinates } from './types';
 import { getDistanceInFeet } from './utils/geo';
@@ -45,7 +45,7 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      data?: { sitId?: string; imageId?: string };
+      data?: { sitId: string; imageId: string; } | null;
     };
     profile: {
       isOpen: boolean;
@@ -54,6 +54,13 @@ interface AppState {
   };
 
   userPreferences: UserPreferences;
+
+  // Remove these as they're handled by modals state
+  isProfileOpen: boolean;
+  isPhotoUploadOpen: boolean;
+
+  // Remove this as it's handled by modals.photo.data
+  photoUploadReplaceInfo: { sitId: string; imageId: string } | null;
 }
 
 type MarkType = 'favorite' | 'visited' | 'wantToGo';
@@ -94,7 +101,14 @@ class App extends React.Component<{}, AppState> {
       userPreferences: {
         nickname: '',
         pushNotificationsEnabled: false
-      }
+      },
+
+      // Remove these as they're handled by modals state
+      isProfileOpen: false,
+      isPhotoUploadOpen: false,
+
+      // Remove this as it's handled by modals.photo.data
+      photoUploadReplaceInfo: null
     };
 
     this.provider = new GoogleAuthProvider();
@@ -410,55 +424,58 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Add this new method to handle photo upload completion
-  private handlePhotoUploadComplete = async (
-    imageBase64: string,
-    sitId?: string,
-    replaceImageId?: string
-  ) => {
-    const { user } = this.state;
-    if (!user) throw new Error('Must be logged in to upload images');
+  private handlePhotoUploadComplete = async (base64Image: string) => {
+    const { user, currentLocation } = this.state;
+    if (!user || !currentLocation) return;
+
+    let initialSit: Sit | null = null;  // Declare outside try block
 
     try {
+      initialSit = SitManager.createInitialSit(currentLocation, user.uid);
+
+      // Add to local state
+      this.setState(prevState => ({
+        sits: new Map(prevState.sits).set(initialSit.id, initialSit)
+      }));
+
+      // Upload photo and create actual sit
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
+      const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-      // Remove data URL prefix
-      const base64WithoutPrefix = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-
-      // Upload to storage
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
 
-      if (replaceImageId) {
-        // Handle image replacement
-        await setDoc(doc(db, 'images', replaceImageId), {
-          photoURL,
-          updatedAt: new Date()
-        }, { merge: true });
-      } else if (sitId) {
-        // Handle adding new image to existing sit
-        const sit = this.state.sits.get(sitId);
-        if (!sit) throw new Error('Sit not found');
+      // Create image collection
+      const imageCollectionId = `${Date.now()}_${user.uid}`;
+      await addDoc(collection(db, 'images'), {
+        photoURL,
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous',
+        collectionId: imageCollectionId,
+        createdAt: new Date(),
+        deleted: false
+      });
 
-        const newImageRef = doc(collection(db, 'images'));
-        await setDoc(newImageRef, {
-          photoURL,
-          userId: user.uid,
-          userName: user.displayName || 'Anonymous',
-          collectionId: sit.imageCollectionId,
-          createdAt: new Date(),
-          deleted: false
-        });
-      }
+      // Create actual sit
+      const sit = await SitManager.createSit(currentLocation, imageCollectionId, user.uid);
 
-      // Close upload modal
-      this.setState({
-        isPhotoUploadOpen: false,
-        photoUploadReplaceInfo: null
+      // Replace initial sit with complete sit
+      this.setState(prevState => {
+        const newSits = new Map(prevState.sits);
+        newSits.delete(initialSit.id);
+        newSits.set(sit.id, sit);
+        return { sits: newSits };
       });
 
     } catch (error) {
-      console.error('Error uploading photo:', error);
+      if (initialSit) {  // Only try to remove if it was created
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.delete(initialSit!.id);
+          return { sits: newSits };
+        });
+      }
       throw error;
     }
   };
@@ -572,7 +589,8 @@ class App extends React.Component<{}, AppState> {
             marks={marks}
             favoriteCount={favoriteCount}
             currentLocation={currentLocation}
-            userId={user?.uid || null}
+            user={user}
+            isLoading={isMapLoading}
             onSitClick={this.handleSitClick}
             onLoadNearbySits={this.handleLoadNearbySits}
             onToggleMark={this.handleToggleMark}
@@ -601,7 +619,7 @@ class App extends React.Component<{}, AppState> {
 
         <AddSitButton
           isAuthenticated={isAuthenticated}
-          userId={user?.uid || null}
+          user={user}
           onSignIn={this.handleSignIn}
           getCurrentLocation={this.getCurrentLocation}
           findNearbySit={this.findNearbySit}

@@ -15,7 +15,6 @@ interface MapProps {
   favoriteCount: Map<string, number>;
   currentLocation: { latitude: number; longitude: number } | null;
   isLoading: boolean;
-  userId: string | null;
   user: User | null;
   onSitClick: (sit: Sit) => void;
   onLoadNearbySits: (bounds: { north: number; south: number }) => Promise<void>;
@@ -106,8 +105,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const root = createRoot(container);
 
     try {
-      debugger;
-      const images = await this.props.getImagesForSit(sit.imageCollectionId);
+      const images = sit.imageCollectionId
+        ? await this.props.getImagesForSit(sit.imageCollectionId)
+        : [];
 
       root.render(
         <PopupComponent
@@ -167,7 +167,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
             key={sit.id}
             sit={sit}
             map={map}
-            userId={this.props.userId}
+            user={this.props.user}
             marks={this.props.marks.get(sit.id) || new Set()}
             onMarkerClick={this.handleMarkerClick}
             onMarkUpdate={this.props.onToggleMark}

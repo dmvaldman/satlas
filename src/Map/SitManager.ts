@@ -1,6 +1,6 @@
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Sit, Image } from '../types';
+import { Sit, Image, Coordinates } from '../types';
 
 export class SitManager {
   // Load sits within map bounds
@@ -41,8 +41,9 @@ export class SitManager {
 
   // Get a single sit by ID
   static async getSit(sitId: string): Promise<Sit | null> {
-    const sitDoc = await doc(db, 'sits', sitId);
-    const sitData = (await sitDoc.get()).data();
+    const sitRef = doc(db, 'sits', sitId);
+    const sitDoc = await getDoc(sitRef);
+    const sitData = sitDoc.data();
 
     if (!sitData) return null;
 
@@ -83,5 +84,30 @@ export class SitManager {
       collectionId: doc.data().collectionId,
       createdAt: doc.data().createdAt
     }));
+  }
+
+  static createInitialSit(coordinates: Coordinates, userId: string): Sit {
+    return {
+      id: `new_${Date.now()}`,
+      location: coordinates,
+      uploadedBy: userId
+    };
+  }
+
+  static async createSit(coordinates: Coordinates, imageCollectionId: string, userId: string): Promise<Sit> {
+    const sitRef = doc(collection(db, 'sits'));
+    const sitData = {
+      location: coordinates,
+      imageCollectionId,
+      createdAt: new Date(),
+      uploadedBy: userId
+    };
+
+    await setDoc(sitRef, sitData);
+
+    return {
+      id: sitRef.id,
+      ...sitData
+    };
   }
 }
