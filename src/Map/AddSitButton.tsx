@@ -6,7 +6,7 @@ interface AddSitButtonProps {
   isAuthenticated: boolean;
   user: User | null;
   onSignIn: () => Promise<void>;
-  getCurrentLocation: () => Promise<Coordinates>;
+  currentLocation: Coordinates | null;
   findNearbySit: (coordinates: Coordinates) => Promise<any>;
   onPhotoUploadOpen: () => void;
 }
@@ -37,17 +37,23 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
   }
 
   private handleClick = async () => {
-    const { isAuthenticated, onSignIn, getCurrentLocation, findNearbySit, user, onPhotoUploadOpen } = this.props;
+    console.log('AddSitButton clicked');
+    const { isAuthenticated, onSignIn, currentLocation, findNearbySit, user, onPhotoUploadOpen } = this.props;
 
     if (!isAuthenticated) {
+      console.log('Not authenticated, triggering sign in');
       await onSignIn();
       return;
     }
 
+    if (!currentLocation) {
+      this.showNotification('Location not available', 'error');
+      return;
+    }
+
     try {
-      // Check location before opening modal
-      const coordinates = await getCurrentLocation();
-      const nearbySit = await findNearbySit(coordinates);
+      const nearbySit = await findNearbySit(currentLocation);
+      console.log('Nearby sit check result:', nearbySit);
 
       if (nearbySit) {
         if (nearbySit.uploadedBy === user?.uid) {
@@ -58,10 +64,10 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
         return;
       }
 
-      // If we get here, location is valid
+      console.log('Opening photo upload modal');
       onPhotoUploadOpen();
     } catch (error) {
-      console.error('Error checking location:', error);
+      console.error('Error in handleClick:', error);
       this.showNotification('Error checking location', 'error');
     }
   };

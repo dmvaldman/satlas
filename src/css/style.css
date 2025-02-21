@@ -773,13 +773,14 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .satlas-marker.new {
   opacity: 0.7;
-  animation: pulse 1.5s infinite;
+  /* Remove scale animation as it breaks positioning */
+  animation: fade 1.5s infinite;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+@keyframes fade {
+  0% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.7; }
 }
 
 .pending-upload {
