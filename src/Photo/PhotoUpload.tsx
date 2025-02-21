@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 
 // For Vite env types
 declare global {
@@ -13,13 +13,21 @@ declare global {
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
-  onPhotoCapture: (base64Image: string) => Promise<void>;
+  onPhotoCapture: (result: PhotoResult) => Promise<void>;
   replaceInfo: { sitId: string; imageId: string; } | null;
   isUploading?: boolean;
 }
 
 interface PhotoUploadState {
   error: string | null;
+}
+
+interface PhotoResult {
+  base64Data: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUploadState> {
@@ -58,17 +66,39 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     setTimeout(() => notification.remove(), 3000);
   }
 
+  private async extractExifLocation(photo: Photo): Promise<Coordinates | null> {
+    if (photo.exif) {
+      const { GPSLatitude, GPSLongitude } = photo.exif;
+      if (GPSLatitude && GPSLongitude) {
+        return {
+          latitude: GPSLatitude,
+          longitude: GPSLongitude
+        };
+      }
+    }
+    return null;
+  }
+
   private handleTakePhoto = async () => {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
-        resultType: CameraResultType.Base64
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        saveToGallery: true,
+        correctOrientation: true,
+        // Request EXIF data
+        exifData: true
       });
 
       if (image.base64String) {
+        const location = await this.extractExifLocation(image);
         this.props.onClose();
-        await this.props.onPhotoCapture(image.base64String);
+        await this.props.onPhotoCapture({
+          base64Data: image.base64String,
+          location
+        });
       }
     } catch (error) {
       if (error instanceof Error && error.message !== 'User cancelled photos app') {
@@ -105,7 +135,12 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     const { isOpen, isUploading, onClose } = this.props;
     const { error } = this.state;
 
-    if (!isOpen) return null;
+    console.log('PhotoUpload render:', { isOpen, isUploading, error });
+
+    if (!isOpen) {
+      console.log('PhotoUpload not open, returning null');
+      return null;
+    }
 
     return (
       <div className="modal-overlay active">

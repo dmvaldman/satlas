@@ -94,8 +94,8 @@ class App extends React.Component<{}, AppState> {
 
       // Modal state
       modals: {
-        photo: { isOpen: false },
-        profile: { isOpen: false }
+        photo: { isOpen: false, data: null },
+        profile: { isOpen: false, data: null }
       },
 
       userPreferences: {
@@ -424,14 +424,20 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Add this new method to handle photo upload completion
-  private handlePhotoUploadComplete = async (base64Image: string) => {
+  private handlePhotoUploadComplete = async (photoResult: PhotoResult) => {
     const { user, currentLocation } = this.state;
-    if (!user || !currentLocation) return;
+    if (!user) return;
 
-    let initialSit: Sit | null = null;  // Declare outside try block
+    // Use photo location if available, otherwise fall back to current location
+    const location = photoResult.location || currentLocation;
+    if (!location) {
+      throw new Error('No location available');
+    }
+
+    let initialSit: Sit | null = null;
 
     try {
-      initialSit = SitManager.createInitialSit(currentLocation, user.uid);
+      initialSit = SitManager.createInitialSit(location, user.uid);
 
       // Add to local state
       this.setState(prevState => ({
@@ -441,7 +447,7 @@ class App extends React.Component<{}, AppState> {
       // Upload photo and create actual sit
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
-      const base64WithoutPrefix = base64Image.replace(/^data:image\/\w+;base64,/, '');
+      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
       const photoURL = await getDownloadURL(storageRef);
@@ -458,7 +464,7 @@ class App extends React.Component<{}, AppState> {
       });
 
       // Create actual sit
-      const sit = await SitManager.createSit(currentLocation, imageCollectionId, user.uid);
+      const sit = await SitManager.createSit(location, imageCollectionId, user.uid);
 
       // Replace initial sit with complete sit
       this.setState(prevState => {
@@ -481,12 +487,16 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleModalOpen = (type: 'photo' | 'profile', data?: any) => {
+    console.log('Opening modal:', type, data);
+    debugger;
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,
         [type]: { isOpen: true, data }
       }
-    }));
+    }), () => {
+      console.log('New modal state:', this.state.modals);
+    });
   };
 
   private handleModalClose = (type: 'photo' | 'profile') => {
@@ -603,7 +613,7 @@ class App extends React.Component<{}, AppState> {
 
         <PhotoUploadComponent
           isOpen={modals.photo.isOpen}
-          replaceInfo={modals.photo.data}
+          replaceInfo={modals.photo.data || null}
           onClose={() => this.handleModalClose('photo')}
           onPhotoCapture={this.handlePhotoUploadComplete}
         />
@@ -621,7 +631,7 @@ class App extends React.Component<{}, AppState> {
           isAuthenticated={isAuthenticated}
           user={user}
           onSignIn={this.handleSignIn}
-          getCurrentLocation={this.getCurrentLocation}
+          currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
           onPhotoUploadOpen={() => this.handleModalOpen('photo')}
         />
