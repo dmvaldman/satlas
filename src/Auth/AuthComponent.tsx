@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { UserPreferences } from '../types';
+import ProfileModal from './ProfileModal';
 
 interface AuthProps {
   user: User | null;
@@ -81,7 +82,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
   }
 
   render() {
-    const { isAuthenticated } = this.props;
+    const { isAuthenticated, isProfileOpen, onSignOut, onToggleProfile, onSavePreferences, user } = this.props;
     const { error } = this.state;
 
     return (
@@ -92,6 +93,14 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
           </div>
         )}
         {isAuthenticated ? this.renderProfileButton() : this.renderLoginButton()}
+
+        <ProfileModal
+          isOpen={isProfileOpen}
+          user={user}
+          onClose={onToggleProfile}
+          onSignOut={onSignOut}
+          onSave={onSavePreferences}
+        />
       </div>
     );
   }
