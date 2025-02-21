@@ -1,9 +1,23 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
-import EXIF from 'exif-js';
 import { Coordinates } from '../types';
 
 /// <reference types="vite/client" />
+
+// Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
+function convertDMSToDD(dms: number[], direction: string): number {
+  const degrees = dms[0];
+  const minutes = dms[1];
+  const seconds = dms[2];
+
+  let dd = degrees + (minutes / 60) + (seconds / 3600);
+
+  if (direction === 'S' || direction === 'W') {
+    dd *= -1;
+  }
+
+  return dd;
+}
 
 interface PhotoUploadProps {
   isOpen: boolean;
@@ -34,7 +48,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   }
 
   componentDidMount() {
-    // Only keep if absolutely necessary for legacy code
     if (import.meta.env.VITE_LEGACY_SUPPORT === 'true') {
       window.addEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
     }
@@ -49,7 +62,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   /** @deprecated Use props for modal control instead */
   private handleGlobalOpen = (event: Event) => {
     const customEvent = event as CustomEvent<{ sitId: string; imageId: string }>;
-    this.props.onClose(); // Reset current state
+    this.props.onClose();
     this.props.onPhotoCapture({
       base64Data: '',
       location: undefined
@@ -64,47 +77,38 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     setTimeout(() => notification.remove(), 3000);
   }
 
-  private convertDMSToDD = (dms: number[], direction: string): number => {
-    const degrees = dms[0];
-    const minutes = dms[1];
-    const seconds = dms[2];
-
-    let dd = degrees + (minutes / 60) + (seconds / 3600);
-
-    if (direction === 'S' || direction === 'W') {
-      dd *= -1;
-    }
-
-    return dd;
-  };
-
-  private async getImageLocation(base64Image: string): Promise<Coordinates | null> {
+  // ---------------------------------------------------
+  // New method that extracts GPS coordinates from a base64 image
+  private async getImageLocationFromBase64(base64Image: string): Promise<Coordinates | null> {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = `data:image/jpeg;base64,${base64Image}`;
-
       img.onload = () => {
         try {
-          // @ts-ignore - EXIF is loaded globally
+          // @ts-ignore - EXIF is loaded globally (via a script tag in index.html)
           EXIF.getData(img, function() {
-            // @ts-ignore - EXIF is loaded globally
+            // @ts-ignore
             const exifData = EXIF.getAllTags(this);
             console.log('Raw EXIF data:', exifData);
-
             if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
-              const latitude = this.convertDMSToDD(
+              const latitude = convertDMSToDD(
                 exifData.GPSLatitude,
                 exifData.GPSLatitudeRef
               );
-              const longitude = this.convertDMSToDD(
+              const longitude = convertDMSToDD(
                 exifData.GPSLongitude,
                 exifData.GPSLongitudeRef
               );
-
-              if (!isNaN(latitude) && !isNaN(longitude) &&
-                  latitude >= -90 && latitude <= 90 &&
-                  longitude >= -180 && longitude <= 180) {
+              if (
+                !isNaN(latitude) &&
+                !isNaN(longitude) &&
+                latitude >= -90 &&
+                latitude <= 90 &&
+                longitude >= -180 &&
+                longitude <= 180
+              ) {
                 resolve({ latitude, longitude });
+                return;
               } else {
                 console.warn('Invalid coordinates:', { latitude, longitude });
                 resolve(null);
@@ -113,7 +117,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
               console.log('No GPS data in EXIF');
               resolve(null);
             }
-          }.bind(this));
+          });
         } catch (error) {
           console.error('Error reading EXIF:', error);
           resolve(null);
@@ -121,6 +125,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       };
     });
   }
+  // ---------------------------------------------------
 
   private handleChooseFromGallery = async () => {
     try {
@@ -132,7 +137,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) return;
 
-        // Convert file to base64
+        // Convert the file to a base64 string
         const base64Data = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -142,8 +147,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           reader.readAsDataURL(file);
         });
 
-        // Get location from EXIF
-        const location = await this.getImageLocation(base64Data);
+        // Get the location from the base64 image using the legacy EXIF method
+        const location = await this.getImageLocationFromBase64(base64Data);
 
         this.props.onClose();
         this.props.onPhotoCapture({
@@ -171,7 +176,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) return;
 
-        // Convert file to base64
+        // Convert file to base64 string
         const base64Data = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -181,8 +186,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           reader.readAsDataURL(file);
         });
 
-        // Get location from EXIF
-        const location = await this.getImageLocation(base64Data);
+        // Get location from the base64 image
+        const location = await this.getImageLocationFromBase64(base64Data);
 
         this.props.onClose();
         this.props.onPhotoCapture({
