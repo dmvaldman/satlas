@@ -52,17 +52,17 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
     }
 
     try {
-      const nearbySit = await findNearbySit(currentLocation);
-      console.log('Nearby sit check result:', nearbySit);
+      // const nearbySit = await findNearbySit(currentLocation);
+      // console.log('Nearby sit check result:', nearbySit);
 
-      if (nearbySit) {
-        if (nearbySit.uploadedBy === user?.uid) {
-          this.showNotification("You've already added a sit here", 'error');
-        } else {
-          this.showNotification('There is already a sit nearby', 'error');
-        }
-        return;
-      }
+      // if (nearbySit) {
+      //   if (nearbySit.uploadedBy === user?.uid) {
+      //     this.showNotification("You've already added a sit here", 'error');
+      //   } else {
+      //     this.showNotification('There is already a sit nearby', 'error');
+      //   }
+      //   return;
+      // }
 
       console.log('Opening photo upload modal');
       onPhotoUploadOpen();
