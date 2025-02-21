@@ -101,6 +101,7 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
   }
 
   private handleMarkerClick = (e: MouseEvent) => {
+    debugger;
     e.stopPropagation();
     this.props.onMarkerClick(this.props.sit);
   };

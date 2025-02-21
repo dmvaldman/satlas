@@ -13,6 +13,11 @@ export class SitManager {
     );
 
     const querySnapshot = await getDocs(q);
+    console.log('Found sits:', querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })));
+
     const sits = new Map<string, Sit>();
 
     querySnapshot.docs.forEach(doc => {
@@ -55,6 +60,8 @@ export class SitManager {
 
   // Get images for a sit
   static async getImages(imageCollectionId: string): Promise<Image[]> {
+    console.log('Fetching images for collection:', imageCollectionId);
+
     const imagesRef = collection(db, 'images');
     const q = query(
       imagesRef,
@@ -63,6 +70,11 @@ export class SitManager {
     );
 
     const snapshot = await getDocs(q);
+    console.log('Found images:', snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })));
+
     return snapshot.docs.map(doc => ({
       id: doc.id,
       photoURL: doc.data().photoURL,

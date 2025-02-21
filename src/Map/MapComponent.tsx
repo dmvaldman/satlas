@@ -4,6 +4,7 @@ import { Sit, MarkType, User, Image } from '../types';
 import MarkerComponent from './Marker';
 import { createRoot } from 'react-dom/client';
 import PopupComponent from './Popup';
+import { debounce } from '../utils/debounce';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
 
@@ -30,14 +31,25 @@ interface MapState {
 }
 
 class MapComponent extends React.Component<MapProps, MapState> {
+  private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
+
   constructor(props: MapProps) {
     super(props);
     this.state = {
       activePopup: null
     };
+
+    // Create debounced version of handleMapMove
+    this.debouncedHandleMapMove = debounce(
+      (bounds: { north: number; south: number }) => {
+        this.props.onLoadNearbySits(bounds);
+      },
+      500 // Wait 500ms after the last move event before loading sits
+    );
   }
 
   componentDidMount() {
+    console.log('MapComponent mounted');
     const { map } = this.props;
     if (map) {
       this.setupMapListeners(map);
@@ -55,16 +67,18 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   private setupMapListeners(map: mapboxgl.Map) {
+    console.log('Setting up map listeners');
     map.on('moveend', this.handleMapMove);
   }
 
   private handleMapMove = async () => {
-    const { map, onLoadNearbySits } = this.props;
+    console.log('Map moved');
+    const { map } = this.props;
     if (!map) return;
 
     const bounds = map.getBounds();
     if (bounds) {
-      await onLoadNearbySits({
+      this.debouncedHandleMapMove({
         north: bounds.getNorth(),
         south: bounds.getSouth()
       });
@@ -92,6 +106,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const root = createRoot(container);
 
     try {
+      debugger;
       const images = await this.props.getImagesForSit(sit.imageCollectionId);
 
       root.render(
