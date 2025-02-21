@@ -1,9 +1,10 @@
 import React from 'react';
 import { Coordinates } from '../types';
+import { User } from '../types';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;
-  userId: string | null;
+  user: User | null;
   onSignIn: () => Promise<void>;
   getCurrentLocation: () => Promise<Coordinates>;
   findNearbySit: (coordinates: Coordinates) => Promise<any>;
@@ -36,7 +37,7 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
   }
 
   private handleClick = async () => {
-    const { isAuthenticated, onSignIn, getCurrentLocation, findNearbySit, userId, onPhotoUploadOpen } = this.props;
+    const { isAuthenticated, onSignIn, getCurrentLocation, findNearbySit, user, onPhotoUploadOpen } = this.props;
 
     if (!isAuthenticated) {
       await onSignIn();
@@ -49,7 +50,7 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
       const nearbySit = await findNearbySit(coordinates);
 
       if (nearbySit) {
-        if (nearbySit.uploadedBy === userId) {
+        if (nearbySit.uploadedBy === user?.uid) {
           this.showNotification("You've already added a sit here", 'error');
         } else {
           this.showNotification('There is already a sit nearby', 'error');

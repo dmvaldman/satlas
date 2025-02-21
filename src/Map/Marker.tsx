@@ -1,11 +1,11 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Sit, MarkType } from '../types';
+import { Sit, MarkType, User } from '../types';
 
 interface MarkerProps {
   sit: Sit;
   map: mapboxgl.Map;
-  userId: string | null;
+  user: User | null;
   marks: Set<MarkType>;
   onMarkerClick: (sit: Sit) => void;
   onMarkUpdate: (sitId: string, type: MarkType, isActive: boolean) => Promise<void>;
@@ -29,7 +29,7 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
 
   componentDidUpdate(prevProps: MarkerProps) {
     // Update marker styling if marks or userId changes
-    if (prevProps.marks !== this.props.marks || prevProps.userId !== this.props.userId) {
+    if (prevProps.marks !== this.props.marks || prevProps.user !== this.props.user) {
       this.updateMarkerStyle();
     }
 
@@ -49,15 +49,19 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
   }
 
   private getMarkerClasses(): string[] {
-    const { sit, userId, marks } = this.props;
+    const { sit, user, marks } = this.props;
     const classes = ['satlas-marker'];
 
-    if (userId && sit.uploadedBy === userId) {
+    if (user && sit.uploadedBy && sit.uploadedBy === user.uid) {
       classes.push('own-sit');
     }
 
     if (marks.has('favorite')) {
       classes.push('favorite');
+    }
+
+    if (!sit.imageCollectionId) {
+      classes.push('new');
     }
 
     return classes;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { User } from 'firebase/auth';
+import { UserPreferences } from '../types';
 
 interface ProfileModalProps {
   isOpen: boolean;

@@ -199,7 +199,7 @@ header {
 
 .satlas-marker.pending {
   background-color: rgba(49, 213, 61, 0.5); /* Lighter shade of the original color */
-  animation: pulse 1.5s infinite;
+  /* animation: pulse 1.5s infinite; */
 }
 
 .satlas-popup-loading {
@@ -210,21 +210,6 @@ header {
 .satlas-popup-loading p {
   margin: 0;
   color: #666;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
 }
 
 /* Update auth styles */
@@ -523,7 +508,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .satlas-marker.uploading {
   opacity: 0.7;
-  animation: pulse 1.5s infinite;
+  /* animation: pulse 1.5s infinite; */
 }
 
 @keyframes pulse {
@@ -784,4 +769,27 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .image-control-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.satlas-marker.new {
+  opacity: 0.7;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.pending-upload {
+  padding: 1rem;
+  text-align: center;
+  color: #666;
+}
+
+.sit-status {
+  font-style: italic;
+  color: #666;
+  text-align: center;
 }

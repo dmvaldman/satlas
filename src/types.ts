@@ -17,9 +17,9 @@ export interface Sit {
     latitude: number;
     longitude: number;
   };
-  imageCollectionId: string;  // Reference to ImageCollection
-  createdAt: FieldValue | Date;
-  uploadedBy: string;
+  imageCollectionId?: string;
+  createdAt?: FieldValue | Date;
+  uploadedBy?: string;
 }
 
 export interface ImageCollection {

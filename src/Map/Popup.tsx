@@ -127,7 +127,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   }
 
   render() {
-    const { user } = this.props;
+    const { sit, user, images } = this.props;
     const { error } = this.state;
 
     return (
@@ -138,11 +138,31 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
           </div>
         )}
 
-        {this.renderCarousel()}
+        {sit.imageCollectionId ? (
+          this.renderCarousel()
+        ) : (
+          <div className="pending-upload">
+            <p>Uploading new sit...</p>
+          </div>
+        )}
 
-        {user && this.renderMarkButtons()}
+        {/* Only show mark buttons if the sit is fully created */}
+        {sit.imageCollectionId && user && this.renderMarkButtons()}
 
-        {this.renderFavoriteCount()}
+        {/* Only show favorite count for established sits */}
+        {sit.imageCollectionId && this.renderFavoriteCount()}
+
+        {/* Show appropriate status message */}
+        <div className="sit-info">
+          {sit.uploadedBy && (
+            <p className="sit-author">
+              Added by {sit.uploadedBy === user?.uid ? 'you' : 'another user'}
+            </p>
+          )}
+          {!sit.imageCollectionId && (
+            <p className="sit-status">Processing upload...</p>
+          )}
+        </div>
       </div>
     );
   }
