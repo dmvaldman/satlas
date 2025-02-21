@@ -52,8 +52,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (!isOpen) return null;
 
     return (
-      <div className="modal-overlay">
-        <div className="profile-modal">
+      <div
+        className="modal-overlay active"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="profile-content">
           <h2>Profile Settings</h2>
 
           {error && (
@@ -62,18 +67,20 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </div>
           )}
 
-          <div className="form-group">
+          <div className="profile-section">
             <label htmlFor="nickname">Nickname</label>
             <input
               type="text"
               id="nickname"
               value={nickname}
               onChange={(e) => this.setState({ nickname: e.target.value })}
+              placeholder="Enter nickname"
             />
           </div>
 
-          <div className="form-group">
-            <label>
+          <div className="profile-section">
+            <label className="toggle-label">
+              <span>Enable Push Notifications</span>
               <input
                 type="checkbox"
                 checked={pushNotifications}
@@ -81,30 +88,44 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   pushNotifications: e.target.checked
                 })}
               />
-              Enable Push Notifications
+              <span className="toggle-slider"></span>
             </label>
           </div>
 
-          <div className="button-group">
+          <div className="profile-section">
             <button
+              className="profile-button"
+              onClick={() => {/* TODO: Implement favorites view */}}
+            >
+              View Favorite Sits
+            </button>
+          </div>
+
+          <div className="profile-actions">
+            <button
+              className="profile-button primary"
               onClick={this.handleSave}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
-
             <button
-              onClick={onSignOut}
-              className="sign-out-button"
-            >
-              Sign Out
-            </button>
-
-            <button
+              className="profile-button"
               onClick={onClose}
-              className="cancel-button"
             >
-              Cancel
+              Close
+            </button>
+          </div>
+
+          <div className="profile-section logout-section">
+            <button
+              className="profile-button danger"
+              onClick={async () => {
+                await onSignOut();
+                onClose();
+              }}
+            >
+              Log Out
             </button>
           </div>
         </div>
