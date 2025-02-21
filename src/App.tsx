@@ -54,13 +54,6 @@ interface AppState {
   };
 
   userPreferences: UserPreferences;
-
-  // Remove these as they're handled by modals state
-  isProfileOpen: boolean;
-  isPhotoUploadOpen: boolean;
-
-  // Remove this as it's handled by modals.photo.data
-  photoUploadReplaceInfo: { sitId: string; imageId: string } | null;
 }
 
 type MarkType = 'favorite' | 'visited' | 'wantToGo';
@@ -488,7 +481,6 @@ class App extends React.Component<{}, AppState> {
 
   private handleModalOpen = (type: 'photo' | 'profile', data?: any) => {
     console.log('Opening modal:', type, data);
-    debugger;
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,

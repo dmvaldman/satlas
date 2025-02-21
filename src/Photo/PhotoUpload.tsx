@@ -1,12 +1,7 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
-
-// For Vite env types
-declare global {
-  interface ImportMetaEnv {
-    VITE_LEGACY_SUPPORT: string;
-  }
-}
+import EXIF from 'exif-js';
+import { Coordinates } from '../types';
 
 /// <reference types="vite/client" />
 
@@ -55,7 +50,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   private handleGlobalOpen = (event: Event) => {
     const customEvent = event as CustomEvent<{ sitId: string; imageId: string }>;
     this.props.onClose(); // Reset current state
-    this.props.onPhotoCapture(customEvent.detail.sitId);
+    this.props.onPhotoCapture({
+      base64Data: '',
+      location: undefined
+    });
   };
 
   private showNotification(message: string, type: 'success' | 'error') {
@@ -66,68 +64,138 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     setTimeout(() => notification.remove(), 3000);
   }
 
-  private async extractExifLocation(photo: Photo): Promise<Coordinates | null> {
-    if (photo.exif) {
-      const { GPSLatitude, GPSLongitude } = photo.exif;
-      if (GPSLatitude && GPSLongitude) {
-        return {
-          latitude: GPSLatitude,
-          longitude: GPSLongitude
-        };
-      }
-    }
-    return null;
-  }
+  private convertDMSToDD = (dms: number[], direction: string): number => {
+    const degrees = dms[0];
+    const minutes = dms[1];
+    const seconds = dms[2];
 
-  private handleTakePhoto = async () => {
-    try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera,
-        saveToGallery: true,
-        correctOrientation: true,
-        // Request EXIF data
-        exifData: true
-      });
+    let dd = degrees + (minutes / 60) + (seconds / 3600);
 
-      if (image.base64String) {
-        const location = await this.extractExifLocation(image);
-        this.props.onClose();
-        await this.props.onPhotoCapture({
-          base64Data: image.base64String,
-          location
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message !== 'User cancelled photos app') {
-        console.error('Error taking photo:', error);
-        this.setState({ error: 'Error taking photo' });
-        this.showNotification('Error taking photo', 'error');
-      }
+    if (direction === 'S' || direction === 'W') {
+      dd *= -1;
     }
+
+    return dd;
   };
+
+  private async getImageLocation(base64Image: string): Promise<Coordinates | null> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = `data:image/jpeg;base64,${base64Image}`;
+
+      img.onload = () => {
+        try {
+          // @ts-ignore - EXIF is loaded globally
+          EXIF.getData(img, function() {
+            // @ts-ignore - EXIF is loaded globally
+            const exifData = EXIF.getAllTags(this);
+            console.log('Raw EXIF data:', exifData);
+
+            if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
+              const latitude = this.convertDMSToDD(
+                exifData.GPSLatitude,
+                exifData.GPSLatitudeRef
+              );
+              const longitude = this.convertDMSToDD(
+                exifData.GPSLongitude,
+                exifData.GPSLongitudeRef
+              );
+
+              if (!isNaN(latitude) && !isNaN(longitude) &&
+                  latitude >= -90 && latitude <= 90 &&
+                  longitude >= -180 && longitude <= 180) {
+                resolve({ latitude, longitude });
+              } else {
+                console.warn('Invalid coordinates:', { latitude, longitude });
+                resolve(null);
+              }
+            } else {
+              console.log('No GPS data in EXIF');
+              resolve(null);
+            }
+          }.bind(this));
+        } catch (error) {
+          console.error('Error reading EXIF:', error);
+          resolve(null);
+        }
+      };
+    });
+  }
 
   private handleChooseFromGallery = async () => {
     try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Photos
-      });
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
 
-      if (image.base64String) {
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        // Convert file to base64
+        const base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = (e.target?.result as string).split(',')[1];
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+
+        // Get location from EXIF
+        const location = await this.getImageLocation(base64Data);
+
         this.props.onClose();
-        await this.props.onPhotoCapture(image.base64String);
-      }
+        this.props.onPhotoCapture({
+          base64Data,
+          location: location || undefined
+        });
+      };
+
+      input.click();
     } catch (error) {
-      if (error instanceof Error && error.message !== 'User cancelled photos app') {
-        console.error('Error choosing photo:', error);
-        this.setState({ error: 'Error choosing photo' });
-        this.showNotification('Error choosing photo', 'error');
-      }
+      console.error('Error choosing photo:', error);
+      this.setState({ error: 'Error choosing photo' });
+      this.showNotification('Error choosing photo', 'error');
+    }
+  };
+
+  private handleTakePhoto = async () => {
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        // Convert file to base64
+        const base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = (e.target?.result as string).split(',')[1];
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+
+        // Get location from EXIF
+        const location = await this.getImageLocation(base64Data);
+
+        this.props.onClose();
+        this.props.onPhotoCapture({
+          base64Data,
+          location: location || undefined
+        });
+      };
+
+      input.click();
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      this.setState({ error: 'Error taking photo' });
+      this.showNotification('Error taking photo', 'error');
     }
   };
 
