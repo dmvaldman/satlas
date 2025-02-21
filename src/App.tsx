@@ -17,6 +17,7 @@ import { storage } from './firebase';
 import PhotoUploadComponent from './Photo/PhotoUpload';
 import ProfileModal from './Auth/ProfileModal';
 import { UserPreferences } from './types';
+import { SitManager } from './Map/SitManager';
 
 interface AppState {
   // Auth state
@@ -284,11 +285,22 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleLoadNearbySits = async (bounds: { north: number; south: number }) => {
-    // Implementation of loading nearby sits from Firebase
-    // This will be expanded when we implement the sits functionality
     try {
-      // Fetch sits within bounds
-      // Update this.state.sits
+      const newSits = await SitManager.loadNearbySits(bounds);
+
+      // Only update state if there are actual changes
+      let hasChanges = false;
+      const currentSits = this.state.sits;
+
+      newSits.forEach((sit, id) => {
+        if (!currentSits.has(id) || JSON.stringify(currentSits.get(id)) !== JSON.stringify(sit)) {
+          hasChanges = true;
+        }
+      });
+
+      if (hasChanges) {
+        this.setState({ sits: newSits });
+      }
     } catch (error) {
       console.error('Error loading nearby sits:', error);
     }
@@ -393,35 +405,7 @@ class App extends React.Component<{}, AppState> {
 
   private getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
     try {
-      const imagesQuery = query(
-        collection(db, 'images'),
-        where('collectionId', '==', imageCollectionId),
-        where('deleted', '==', false)
-      );
-
-      const snapshot = await getDocs(imagesQuery);
-      const images = snapshot.docs.map(doc => ({
-        id: doc.id,
-        photoURL: doc.data().photoURL,
-        userId: doc.data().userId,
-        userName: doc.data().userName,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date()
-      }));
-
-      // Sort by creation date
-      images.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-      // Update local state cache
-      this.setState(prevState => ({
-        imagesByCollection: new Map(prevState.imagesByCollection).set(
-          imageCollectionId,
-          images
-        )
-      }));
-
-      return images;
-
+      return await SitManager.getImages(imageCollectionId);
     } catch (error) {
       console.error('Error fetching images:', error);
       throw error;

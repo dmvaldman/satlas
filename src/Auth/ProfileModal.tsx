@@ -6,7 +6,7 @@ interface ProfileModalProps {
   user: User | null;
   onClose: () => void;
   onSignOut: () => Promise<void>;
-  onSave: (preferences: { nickname: string; pushNotifications: boolean }) => Promise<void>;
+  onSave: (preferences: UserPreferences) => Promise<void>;
 }
 
 interface ProfileModalState {
@@ -34,7 +34,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     this.setState({ isSubmitting: true, error: null });
 
     try {
-      await onSave({ nickname, pushNotifications });
+      await onSave({
+        nickname,
+        pushNotificationsEnabled: pushNotifications,
+        lastVisit: Date.now()
+      });
       onClose();
     } catch (error) {
       this.setState({
