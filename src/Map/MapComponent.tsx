@@ -22,7 +22,8 @@ interface MapProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
-  onModalOpen?: (type: 'photo' | 'profile', data?: any) => void;
+  onOpenPhotoModal: () => void;
+  onOpenProfileModal: () => void;
 }
 
 interface MapState {
@@ -119,6 +120,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
           onToggleMark={this.props.onToggleMark}
           onDeleteImage={this.props.onDeleteImage}
           onReplaceImage={this.handleReplaceImage}
+          onOpenPhotoModal={this.props.onOpenPhotoModal}
+          onOpenProfileModal={this.props.onOpenProfileModal}
         />
       );
 
@@ -161,6 +164,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
             onToggleMark={this.props.onToggleMark}
             onDeleteImage={this.props.onDeleteImage}
             onReplaceImage={this.handleReplaceImage}
+            onOpenPhotoModal={this.props.onOpenPhotoModal}
+            onOpenProfileModal={this.props.onOpenProfileModal}
           />
         );
       }

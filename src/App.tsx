@@ -287,7 +287,7 @@ class App extends React.Component<{}, AppState> {
       });
 
       this.setState({ userPreferences: prefs });
-      this.handleModalClose('profile');
+      this.toggleProfile();
     } catch (error) {
       console.error('Error saving preferences:', error);
       throw error;
@@ -473,27 +473,6 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleModalOpen = (type: 'photo' | 'profile', data?: any) => {
-    console.log('Opening modal:', type, data);
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        [type]: { isOpen: true, data }
-      }
-    }), () => {
-      console.log('New modal state:', this.state.modals);
-    });
-  };
-
-  private handleModalClose = (type: 'photo' | 'profile') => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        [type]: { isOpen: false }
-      }
-    }));
-  };
-
   private findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
     const { sits } = this.state;
 
@@ -567,7 +546,7 @@ class App extends React.Component<{}, AppState> {
             onSignIn={this.handleSignIn}
             onSignOut={this.handleSignOut}
             isProfileOpen={modals.profile.isOpen}
-            onToggleProfile={() => this.handleModalOpen('profile')}
+            onToggleProfile={this.toggleProfile}
             onSavePreferences={this.handleSavePreferences}
           />
         </header>
@@ -593,25 +572,30 @@ class App extends React.Component<{}, AppState> {
             onDeleteImage={this.handleDeleteImage}
             onReplaceImage={this.handleReplaceImage}
             getImagesForSit={this.getImagesForSit}
-            onModalOpen={this.handleModalOpen}
+            onOpenPhotoModal={this.togglePhotoUpload}
+            onOpenProfileModal={this.toggleProfile}
           />
         )}
 
-        <PhotoUploadComponent
-          isOpen={modals.photo.isOpen}
-          replaceInfo={modals.photo.data || null}
-          onClose={() => this.handleModalClose('photo')}
-          onPhotoCapture={this.handlePhotoUploadComplete}
-        />
+        {modals.photo.isOpen && (
+          <PhotoUploadComponent
+            isOpen={modals.photo.isOpen}
+            onClose={this.togglePhotoUpload}
+            onPhotoCapture={this.handlePhotoUploadComplete}
+            replaceInfo={modals.photo.data}
+          />
+        )}
 
-        <ProfileModal
-          isOpen={modals.profile.isOpen}
-          user={user}
-          preferences={userPreferences}
-          onClose={() => this.handleModalClose('profile')}
-          onSignOut={this.handleSignOut}
-          onSave={this.handleSavePreferences}
-        />
+        {modals.profile.isOpen && (
+          <ProfileModal
+            isOpen={modals.profile.isOpen}
+            user={user}
+            preferences={userPreferences}
+            onClose={this.toggleProfile}
+            onSignOut={this.handleSignOut}
+            onSave={this.handleSavePreferences}
+          />
+        )}
 
         <AddSitButton
           isAuthenticated={isAuthenticated}
@@ -619,7 +603,7 @@ class App extends React.Component<{}, AppState> {
           onSignIn={this.handleSignIn}
           currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
-          onPhotoUploadOpen={() => this.handleModalOpen('photo')}
+          onPhotoUploadOpen={this.togglePhotoUpload}
         />
       </div>
     );
