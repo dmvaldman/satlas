@@ -20,6 +20,7 @@ import ProfileModal from './Auth/ProfileModal';
 import { UserPreferences } from './types';
 import { SitManager } from './Map/SitManager';
 import AddSitButton from './Map/AddSitButton';
+import { MarksManager } from './Map/MarksManager';
 
 interface AppState {
   // Auth state
@@ -201,26 +202,12 @@ class App extends React.Component<{}, AppState> {
 
   private async loadUserData(userId: string) {
     try {
-      // Query the 'marks' collection for documents that have userId equal to the current user.
-      const marksQuery = query(
-        collection(db, 'marks'),
-        where('userId', '==', userId)
-      );
-      const querySnapshot = await getDocs(marksQuery);
-
-      // Build a Map with key: sitId, value: Set<MarkType>
-      const marksMap = new Map<string, Set<MarkType>>();
-      querySnapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        // Ensure the document has the expected properties
-        if (data && data.sitId && data.types && Array.isArray(data.types)) {
-          // data.types is assumed to be an array of mark types, such as ['favorite']
-          marksMap.set(data.sitId, new Set<MarkType>(data.types));
-        }
+      const marksMap = await MarksManager.loadUserMarks(userId);
+      const favoriteCounts = await MarksManager.loadFavoriteCounts();
+      this.setState({
+        marks: marksMap,
+        favoriteCount: favoriteCounts
       });
-
-      // Update the state with the loaded marks
-      this.setState({ marks: marksMap });
     } catch (error) {
       console.error('Error loading user marks:', error);
     }
@@ -339,42 +326,18 @@ class App extends React.Component<{}, AppState> {
     if (!user) return;
 
     try {
-      const sitMarks = marks.get(sitId) || new Set();
-      const newMarks = new Set(sitMarks);
-
-      if (newMarks.has(type)) {
-        newMarks.delete(type);
-      } else {
-        newMarks.add(type);
-      }
+      const currentMarks = marks.get(sitId) || new Set();
+      const result = await MarksManager.toggleMark(user.uid, sitId, type, currentMarks);
 
       // Update local state immediately for responsiveness
       this.setState(prevState => ({
-        marks: new Map(prevState.marks).set(sitId, newMarks)
-      }), () => {
-        console.log('Updated marks:', this.state.marks);
-      });
-
-      // Update Firestore
-      await setDoc(doc(db, 'marks', `${user.uid}_${sitId}`), {
-        userId: user.uid,
-        sitId,
-        types: Array.from(newMarks),
-        updatedAt: new Date()
-      });
-
-      // Update favorite count if necessary
-      if (type === 'favorite') {
-        const currentCount = this.state.favoriteCount.get(sitId) || 0;
-        const newCount = newMarks.has('favorite') ? currentCount + 1 : currentCount - 1;
-
-        this.setState(prevState => ({
-          favoriteCount: new Map(prevState.favoriteCount).set(sitId, newCount)
-        }));
-      }
-
+        marks: new Map(prevState.marks).set(sitId, result.marks),
+        // If we got a new favorite count, update it
+        ...(result.favoriteCount !== undefined && {
+          favoriteCount: new Map(prevState.favoriteCount).set(sitId, result.favoriteCount)
+        })
+      }));
     } catch (error) {
-      // Revert local state on error
       console.error('Error toggling mark:', error);
       this.setState(prevState => ({
         marks: new Map(prevState.marks)
