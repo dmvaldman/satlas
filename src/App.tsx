@@ -200,8 +200,30 @@ class App extends React.Component<{}, AppState> {
   };
 
   private async loadUserData(userId: string) {
-    // Load user's sits, marks, etc.
-    // This will be implemented as we migrate other components
+    try {
+      // Query the 'marks' collection for documents that have userId equal to the current user.
+      const marksQuery = query(
+        collection(db, 'marks'),
+        where('userId', '==', userId)
+      );
+      const querySnapshot = await getDocs(marksQuery);
+
+      // Build a Map with key: sitId, value: Set<MarkType>
+      const marksMap = new Map<string, Set<MarkType>>();
+      querySnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        // Ensure the document has the expected properties
+        if (data && data.sitId && data.types && Array.isArray(data.types)) {
+          // data.types is assumed to be an array of mark types, such as ['favorite']
+          marksMap.set(data.sitId, new Set<MarkType>(data.types));
+        }
+      });
+
+      // Update the state with the loaded marks
+      this.setState({ marks: marksMap });
+    } catch (error) {
+      console.error('Error loading user marks:', error);
+    }
   }
 
   private loadUserPreferences = async (userId: string) => {
