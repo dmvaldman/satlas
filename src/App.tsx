@@ -32,10 +32,6 @@ interface AppState {
   currentLocation: { latitude: number; longitude: number } | null;
   isMapLoading: boolean;
 
-  // UI state
-  isProfileOpen: boolean;
-  isPhotoUploadOpen: boolean;
-
   // Data state
   sits: Map<string, Sit>;
   marks: Map<string, Set<MarkType>>;
@@ -76,10 +72,6 @@ class App extends React.Component<{}, AppState> {
       currentLocation: null,
       isMapLoading: true,
 
-      // UI state
-      isProfileOpen: false,
-      isPhotoUploadOpen: false,
-
       // Data state
       sits: new Map(),
       marks: new Map(),
@@ -95,13 +87,6 @@ class App extends React.Component<{}, AppState> {
         nickname: '',
         pushNotificationsEnabled: false
       },
-
-      // Remove these as they're handled by modals state
-      isProfileOpen: false,
-      isPhotoUploadOpen: false,
-
-      // Remove this as it's handled by modals.photo.data
-      photoUploadReplaceInfo: null
     };
 
     this.provider = new GoogleAuthProvider();
@@ -151,7 +136,7 @@ class App extends React.Component<{}, AppState> {
           enableHighAccuracy: true
         },
         trackUserLocation: true,
-        showUserHeading: true
+        showUserHeading: false
       });
 
       map.addControl(geolocate);
@@ -204,6 +189,11 @@ class App extends React.Component<{}, AppState> {
         },
         (error) => {
           reject(error);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 10000
         }
       );
     });
@@ -254,13 +244,25 @@ class App extends React.Component<{}, AppState> {
   // UI methods
   private toggleProfile = () => {
     this.setState(prevState => ({
-      isProfileOpen: !prevState.isProfileOpen
+      modals: {
+        ...prevState.modals,
+        profile: {
+          isOpen: !prevState.modals.profile.isOpen,
+          data: prevState.modals.profile.data
+        }
+      }
     }));
   };
 
   private togglePhotoUpload = () => {
     this.setState(prevState => ({
-      isPhotoUploadOpen: !prevState.isPhotoUploadOpen
+      modals: {
+        ...prevState.modals,
+        photo: {
+          isOpen: !prevState.modals.photo.isOpen,
+          data: prevState.modals.photo.data
+        }
+      }
     }));
   };
 
@@ -328,7 +330,6 @@ class App extends React.Component<{}, AppState> {
       this.setState(prevState => ({
         marks: new Map(prevState.marks).set(sitId, newMarks)
       }), () => {
-        debugger
         console.log('Updated marks:', this.state.marks);
       });
 
@@ -405,8 +406,13 @@ class App extends React.Component<{}, AppState> {
   private handleReplaceImage = (sitId: string, imageId: string) => {
     // Open photo upload modal with replace info
     this.setState({
-      isPhotoUploadOpen: true,
-      photoUploadReplaceInfo: { sitId, imageId }
+      modals: {
+        ...this.state.modals,
+        photo: {
+          isOpen: true,
+          data: { sitId, imageId }
+        }
+      }
     });
   };
 
