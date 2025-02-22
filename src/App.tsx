@@ -42,11 +42,11 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      data?: { sitId: string; imageId: string; } | null;
+      data: { sitId: string; imageId: string; } | null;
     };
     profile: {
       isOpen: boolean;
-      data?: any;
+      data: any | null;
     };
   };
 
@@ -339,7 +339,8 @@ class App extends React.Component<{}, AppState> {
 
       // Update local state immediately for responsiveness
       this.setState(prevState => {
-        const updates: Partial<AppState> = {
+        const updates = {
+          ...prevState,
           marks: new Map(prevState.marks).set(sitId, result.marks)
         };
         if (result.favoriteCount !== undefined) {
@@ -390,7 +391,9 @@ class App extends React.Component<{}, AppState> {
       }, { merge: true });
 
       // Update local state
-      await this.getImagesForSit(sit.imageCollectionId);
+      if (sit.imageCollectionId) {
+        await this.getImagesForSit(sit.imageCollectionId);
+      }
 
     } catch (error) {
       console.error('Error deleting image:', error);
@@ -438,7 +441,7 @@ class App extends React.Component<{}, AppState> {
 
       // Add to local state
       this.setState(prevState => ({
-        sits: new Map(prevState.sits).set(initialSit.id, initialSit!)
+        sits: new Map(prevState.sits).set(initialSit.id, initialSit)
       }));
 
       // Upload photo and create actual sit

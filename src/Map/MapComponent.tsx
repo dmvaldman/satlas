@@ -90,8 +90,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private handleMarkerClick = async (sit: Sit) => {
-    const { map, currentLocation, marks, favoriteCount, user } = this.props;
-    if (!map || !currentLocation) return;
+    const { map, marks, favoriteCount, user } = this.props;
+    if (!map) return;
 
     if (this.state.activePopup) {
       this.state.activePopup.remove();
@@ -113,7 +113,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
         <PopupComponent
           sit={sit}
           images={images}
-          currentLocation={currentLocation}
           user={user}
           marks={marks.get(sit.id) || new Set()}
           favoriteCount={favoriteCount.get(sit.id) || 0}
@@ -157,7 +156,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
           <PopupComponent
             sit={sit}
             images={this.currentPopupImages}
-            currentLocation={this.props.currentLocation}
             user={this.props.user}
             marks={this.props.marks.get(sitId) || new Set()}
             favoriteCount={this.props.favoriteCount.get(sitId) || 0}
@@ -173,9 +171,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
-    if (this.props.onModalOpen) {
-      this.props.onModalOpen('photo', { sitId, imageId });
-    }
+    this.props.onOpenPhotoModal();
   };
 
   render() {

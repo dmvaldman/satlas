@@ -5,6 +5,7 @@ import { UserPreferences } from '../types';
 interface ProfileModalProps {
   isOpen: boolean;
   user: User | null;
+  preferences: UserPreferences;
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
