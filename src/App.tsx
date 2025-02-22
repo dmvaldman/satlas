@@ -55,6 +55,14 @@ interface AppState {
 
 type MarkType = 'favorite' | 'visited' | 'wantToGo';
 
+interface PhotoResult {
+  base64Data: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
 class App extends React.Component<{}, AppState> {
   private provider: GoogleAuthProvider;
   private mapContainer: React.RefObject<HTMLDivElement>;
@@ -330,13 +338,15 @@ class App extends React.Component<{}, AppState> {
       const result = await MarksManager.toggleMark(user.uid, sitId, type, currentMarks);
 
       // Update local state immediately for responsiveness
-      this.setState(prevState => ({
-        marks: new Map(prevState.marks).set(sitId, result.marks),
-        // If we got a new favorite count, update it
-        ...(result.favoriteCount !== undefined && {
-          favoriteCount: new Map(prevState.favoriteCount).set(sitId, result.favoriteCount)
-        })
-      }));
+      this.setState(prevState => {
+        const updates: Partial<AppState> = {
+          marks: new Map(prevState.marks).set(sitId, result.marks)
+        };
+        if (result.favoriteCount !== undefined) {
+          updates.favoriteCount = new Map(prevState.favoriteCount).set(sitId, result.favoriteCount);
+        }
+        return updates;
+      });
     } catch (error) {
       console.error('Error toggling mark:', error);
       this.setState(prevState => ({
@@ -428,7 +438,7 @@ class App extends React.Component<{}, AppState> {
 
       // Add to local state
       this.setState(prevState => ({
-        sits: new Map(prevState.sits).set(initialSit.id, initialSit)
+        sits: new Map(prevState.sits).set(initialSit.id, initialSit!)
       }));
 
       // Upload photo and create actual sit
