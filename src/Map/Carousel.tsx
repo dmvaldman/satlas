@@ -49,31 +49,35 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     return (
       <div className="carousel">
         <div className="carousel-content">
-          <img
-            src={currentImage.photoURL}
-            alt={`Image ${activeIndex + 1}`}
-            className="carousel-image"
-          />
-
-          {images.length > 1 && (
-            <>
-              <button
-                className="carousel-nav prev"
-                onClick={this.prev}
-                aria-label="Previous image"
-              >
-                ←
-              </button>
-              <button
-                className="carousel-nav next"
-                onClick={this.next}
-                aria-label="Next image"
-              >
-                →
-              </button>
-            </>
-          )}
-
+          <div className="carousel-img-container">
+            <img
+              src={currentImage.photoURL}
+              alt={`Image ${activeIndex + 1}`}
+              className="carousel-image"
+            />
+            {showControls && onImageAction && (
+              <div className="image-controls">
+                <button
+                  className="image-control-button"
+                  onClick={() => onImageAction('replace', currentImage.id)}
+                  disabled={isDeleting}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                  </svg>
+                </button>
+                <button
+                  className="image-control-button delete"
+                  onClick={() => onImageAction('delete', currentImage.id)}
+                  disabled={isDeleting}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
           <div className="carousel-dots">
             {images.map((_, index) => (
               <button
@@ -84,25 +88,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               />
             ))}
           </div>
-
-          {showControls && onImageAction && (
-            <div className="image-controls">
-              <button
-                onClick={() => onImageAction('replace', currentImage.id)}
-                disabled={isDeleting}
-                className="image-control-button"
-              >
-                Replace
-              </button>
-              <button
-                onClick={() => onImageAction('delete', currentImage.id)}
-                disabled={isDeleting}
-                className="image-control-button danger"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );

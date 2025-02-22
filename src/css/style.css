@@ -58,7 +58,6 @@ header {
 }
 
 .satlas-popup img {
-  width: 200px;
   height: 150px;
   object-fit: cover;
   border-radius: 4px;
@@ -413,6 +412,12 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
 }
 
+.carousel {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
 .carousel-container {
   overflow: hidden;
   position: relative;
@@ -465,7 +470,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   top: 8px;
   right: 8px;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   background: rgba(0, 0, 0, 0.5);
   padding: 4px;
   border-radius: 4px;
@@ -636,22 +641,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 1;
 }
 
-/* Keep existing marker and popup styles unchanged since they're working */
-.satlas-marker {
-  /* ... existing styles ... */
-  /* pointer-events: none; */
-}
-
 .satlas-popup-container {
   z-index: 1000;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-.satlas-popup {
-  padding: 10px;
-  min-width: 200px;
 }
 
 .satlas-popup-loading,
@@ -665,110 +659,84 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #ff3b30;
 }
 
-/* Make sure popups are above markers */
-.mapboxgl-popup {
-  z-index: 2;  /* Keep this to ensure popups are above markers */
-}
-
-.mapboxgl-popup-content {
-  padding: 0;
-  overflow: hidden;
-}
-
-.carousel {
+.carousel-img-container {
   position: relative;
   width: 100%;
-  margin-bottom: 1rem;
-}
-
-.carousel-content {
-  position: relative;
 }
 
 .carousel-image {
   width: 100%;
-  height: auto;
   display: block;
-}
-
-.carousel-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  border: none;
-  padding: 1rem;
-  cursor: pointer;
-  font-size: 1.5rem;
-  transition: background-color 0.2s;
-}
-
-.carousel-nav:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.carousel-nav.prev {
-  left: 0;
-  border-radius: 0 3px 3px 0;
-}
-
-.carousel-nav.next {
-  right: 0;
-  border-radius: 3px 0 0 3px;
-}
-
-.carousel-dots {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-}
-
-.carousel-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.carousel-dot.active {
-  background: white;
+  max-width: 100%;  /* Ensure image doesn't overflow container */
+  height: auto;     /* Maintain aspect ratio */
 }
 
 .image-controls {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.5);
+  top: 8px;
+  right: 8px;
   display: flex;
-  gap: 0.5rem;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+/* Dots are now separate from the image container */
+.carousel-dots {
+  display: flex;
   justify-content: center;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.carousel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ccc;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  /* box-sizing: border-box; */
+}
+
+.carousel-dot.active {
+  background: #31d53d;
 }
 
 .image-control-button {
-  padding: 0.25rem 0.5rem;
-  border: none;
-  border-radius: 4px;
-  background: white;
+  padding: 4px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
-.image-control-button.danger {
-  background: #ff4444;
-  color: white;
+.image-control-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
 .image-control-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.image-control-button svg {
+  width: 20px;
+  height: 20px;
+  fill: white;
+}
+
+.image-control-button:hover svg {
+  fill: #31d53d;
+}
+
+.image-control-button.delete:hover svg {
+  fill: #ff3b30;
 }
 
 .satlas-marker.new {
@@ -793,4 +761,30 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   font-style: italic;
   color: #666;
   text-align: center;
+}
+
+/* New wrapper for the carousel image and its overlay controls */
+.carousel-img-wrapper {
+  position: relative;
+  height: 300px;  /* Set the desired height for the image+controls container */
+}
+
+.carousel-content {
+  position: relative;
+}
+
+.carousel-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  margin: 0 auto;   /* Center the image horizontally */
+  object-fit: cover; /* Ensure the image covers the container without distortion */
+}
+
+.image-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
 }
