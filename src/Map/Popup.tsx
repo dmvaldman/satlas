@@ -50,8 +50,10 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     e.stopPropagation();
     const { sit, onToggleMark } = this.props;
 
+    console.log('Before toggle:', this.props.marks);
     try {
       await onToggleMark(sit.id, type);
+      console.log('After toggle:', this.props.marks);
     } catch (error) {
       this.setState({ error: 'Failed to update mark' });
     }
@@ -94,21 +96,41 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private renderMarkButtons() {
     const { marks } = this.props;
-    const markTypes: { type: MarkType; icon: string; label: string }[] = [
-      { type: 'favorite', icon: '★', label: 'Favorite' },
-      { type: 'visited', icon: '✓', label: 'Visited' },
-      { type: 'wantToGo', icon: '→', label: 'Want to Go' }
+    const markTypes: { type: MarkType; label: string }[] = [
+      {
+        type: 'favorite',
+        label: 'Favorite'
+      },
+      {
+        type: 'visited',
+        label: 'Visited'
+      },
+      {
+        type: 'wantToGo',
+        label: 'Want to Go'
+      }
     ];
 
     return (
       <div className="mark-buttons">
-        {markTypes.map(({ type, icon, label }) => (
+        {markTypes.map(({ type, label }) => (
           <button
             key={type}
             className={`mark-button ${type}${marks.has(type) ? ' active' : ''}`}
             onClick={(e) => this.handleMarkClick(e, type)}
           >
-            {icon} {label}
+            <svg className="mark-icon" viewBox="0 0 24 24">
+              {type === 'favorite' && (
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              )}
+              {type === 'visited' && (
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              )}
+              {type === 'wantToGo' && (
+                <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
+              )}
+            </svg>
+            {label}
           </button>
         ))}
       </div>

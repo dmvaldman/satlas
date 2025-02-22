@@ -327,7 +327,10 @@ class App extends React.Component<{}, AppState> {
       // Update local state immediately for responsiveness
       this.setState(prevState => ({
         marks: new Map(prevState.marks).set(sitId, newMarks)
-      }));
+      }), () => {
+        debugger
+        console.log('Updated marks:', this.state.marks);
+      });
 
       // Update Firestore
       await setDoc(doc(db, 'marks', `${user.uid}_${sitId}`), {

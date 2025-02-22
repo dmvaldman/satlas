@@ -559,10 +559,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #666;
 }
 
-.mark-button svg {
+.mark-button .mark-icon {
   width: 16px;
   height: 16px;
-  fill: #ccc;
+  fill: #666;
   transition: fill 0.2s;
 }
 
@@ -571,7 +571,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #ff3b30;
 }
 
-.mark-button.favorite.active svg {
+.mark-button.favorite.active .mark-icon {
   fill: #ff3b30;
 }
 
@@ -580,7 +580,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #34C759;
 }
 
-.mark-button.visited.active svg {
+.mark-button.visited.active .mark-icon {
   fill: #34C759;
 }
 
@@ -589,7 +589,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #007AFF;
 }
 
-.mark-button.wantToGo.active svg {
+.mark-button.wantToGo.active .mark-icon {
   fill: #007AFF;
 }
 
