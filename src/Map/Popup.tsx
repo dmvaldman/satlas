@@ -6,7 +6,6 @@ import Carousel from './Carousel';
 interface PopupProps {
   sit: Sit;
   images: Image[];
-  currentLocation: { latitude: number; longitude: number };
   user: User | null;
   marks: Set<MarkType>;
   favoriteCount: number;
@@ -14,6 +13,8 @@ interface PopupProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onClose?: () => void;
+  onOpenPhotoModal: () => void;
+  onOpenProfileModal: () => void;
 }
 
 interface PopupState {
@@ -31,20 +32,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       error: null
     };
   }
-
-  componentDidMount() {
-    document.addEventListener('keydown', this.handleKeyPress);
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener('keydown', this.handleKeyPress);
-  }
-
-  private handleKeyPress = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this.props.onClose) {
-      this.props.onClose();
-    }
-  };
 
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
