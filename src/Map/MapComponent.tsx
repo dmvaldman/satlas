@@ -31,6 +31,10 @@ interface MapState {
 
 class MapComponent extends React.Component<MapProps, MapState> {
   private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
+  private popupRoot: any = null;
+  private popupContainer: HTMLElement | null = null;
+  private currentPopupSitId: string | null = null;
+  private currentPopupImages: Image[] = [];
 
   constructor(props: MapProps) {
     super(props);
@@ -88,28 +92,23 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { map, currentLocation, marks, favoriteCount, user } = this.props;
     if (!map || !currentLocation) return;
 
-    const { activePopup } = this.state;
-    if (activePopup) {
-      activePopup.remove();
+    if (this.state.activePopup) {
+      this.state.activePopup.remove();
     }
 
-    const popup = new mapboxgl.Popup({
-      closeButton: false,
-      maxWidth: '300px',
-      offset: 25,
-      anchor: 'bottom',
-      className: 'satlas-popup-container'
-    });
-
     const container = document.createElement('div');
-    const root = createRoot(container);
+    this.popupContainer = container;
+    this.popupRoot = createRoot(container);
+    this.currentPopupSitId = sit.id;
 
     try {
       const images = sit.imageCollectionId
         ? await this.props.getImagesForSit(sit.imageCollectionId)
         : [];
+      // Store images so that future re-renders preserve them
+      this.currentPopupImages = images;
 
-      root.render(
+      this.popupRoot.render(
         <PopupComponent
           sit={sit}
           images={images}
@@ -123,25 +122,50 @@ class MapComponent extends React.Component<MapProps, MapState> {
         />
       );
 
-      popup
-        .setDOMContent(container)
-        .setLngLat([sit.location.longitude, sit.location.latitude])
-        .addTo(map);
+      const popup = new mapboxgl.Popup({
+        closeButton: false,
+        maxWidth: '300px',
+        offset: 25,
+        anchor: 'bottom',
+        className: 'satlas-popup-container'
+      });
+
+      popup.setDOMContent(container)
+           .setLngLat([sit.location.longitude, sit.location.latitude])
+           .addTo(map);
 
       this.setState({ activePopup: popup });
     } catch (error) {
       console.error('Error loading popup content:', error);
-      root.render(
-        <div className="satlas-popup-error">
-          Failed to load content
-        </div>
-      );
-      popup
-        .setDOMContent(container)
-        .setLngLat([sit.location.longitude, sit.location.latitude])
-        .addTo(map);
     }
   };
+
+  componentDidUpdate(prevProps: MapProps) {
+    if (
+      this.popupRoot &&
+      this.currentPopupSitId &&
+      (prevProps.marks !== this.props.marks ||
+       prevProps.favoriteCount !== this.props.favoriteCount)
+    ) {
+      const sitId = this.currentPopupSitId;
+      const sit = this.props.sits.get(sitId);
+      if (sit) {
+        this.popupRoot.render(
+          <PopupComponent
+            sit={sit}
+            images={this.currentPopupImages}
+            currentLocation={this.props.currentLocation}
+            user={this.props.user}
+            marks={this.props.marks.get(sitId) || new Set()}
+            favoriteCount={this.props.favoriteCount.get(sitId) || 0}
+            onToggleMark={this.props.onToggleMark}
+            onDeleteImage={this.props.onDeleteImage}
+            onReplaceImage={this.handleReplaceImage}
+          />
+        );
+      }
+    }
+  }
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
     if (this.props.onModalOpen) {
