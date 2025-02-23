@@ -42,7 +42,7 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      data: { sitId: string; imageId: string; } | null;
+      data: Sit | null;
     };
     profile: {
       isOpen: boolean;
@@ -271,13 +271,13 @@ class App extends React.Component<{}, AppState> {
     }));
   };
 
-  private togglePhotoUpload = () => {
+  private togglePhotoUpload = (sit?: Sit) => {
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,
         photo: {
           isOpen: !prevState.modals.photo.isOpen,
-          data: prevState.modals.photo.data
+          data: sit || null
         }
       }
     }));
@@ -424,21 +424,32 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Add this new method to handle photo upload completion
-  private handlePhotoUploadComplete = async (photoResult: PhotoResult) => {
-    const { user, currentLocation } = this.state;
+  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit) => {
+    const { user } = this.state;
     if (!user) return;
 
-    // Use photo location if available, otherwise fall back to current location
-    const location = photoResult.location || currentLocation;
-    if (!location) {
-      throw new Error('No location available');
+    const location = photoResult.location;
+    if (!location) throw new Error('No location available');
+
+    if (existingSit?.imageCollectionId) {
+      try {
+        await SitManager.addPhotoToSit(
+          photoResult.base64Data,
+          existingSit.imageCollectionId,
+          user.uid,
+          user.displayName || 'Anonymous'
+        );
+        return;
+      } catch (error) {
+        console.error('Error adding photo to sit:', error);
+        throw error;
+      }
     }
 
-    let initialSit: Sit | null = null;
+    // Create a new sit if not adding to existing one
+    const initialSit = SitManager.createInitialSit(location, user.uid);
 
     try {
-      initialSit = SitManager.createInitialSit(location, user.uid);
-
       // Add to local state
       this.setState(prevState => ({
         sits: new Map(prevState.sits).set(initialSit.id, initialSit)
@@ -595,7 +606,7 @@ class App extends React.Component<{}, AppState> {
             isOpen={modals.photo.isOpen}
             onClose={this.togglePhotoUpload}
             onPhotoCapture={this.handlePhotoUploadComplete}
-            replaceInfo={modals.photo.data}
+            sit={modals.photo.data}
           />
         )}
 

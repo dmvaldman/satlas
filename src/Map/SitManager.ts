@@ -1,6 +1,9 @@
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Sit, Image, Coordinates } from '../types';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { addDoc } from 'firebase/firestore';
+import { storage } from '../firebase';
 
 export class SitManager {
   // Load sits within map bounds
@@ -71,9 +74,9 @@ export class SitManager {
     );
 
     const snapshot = await getDocs(q);
-    console.log('Found images:', snapshot.docs.map(doc => ({
+    console.log('Raw image docs:', snapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
+      data: doc.data()
     })));
 
     return snapshot.docs.map(doc => ({
@@ -109,5 +112,30 @@ export class SitManager {
       id: sitRef.id,
       ...sitData
     };
+  }
+
+  static async addPhotoToSit(
+    photoData: string,
+    imageCollectionId: string,
+    userId: string,
+    userName: string
+  ): Promise<void> {
+    // Upload photo
+    const filename = `sit_${Date.now()}.jpg`;
+    const storageRef = ref(storage, `sits/${filename}`);
+    const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
+
+    await uploadString(storageRef, base64WithoutPrefix, 'base64');
+    const photoURL = await getDownloadURL(storageRef);
+
+    // Add to existing collection
+    await addDoc(collection(db, 'images'), {
+      photoURL,
+      userId,
+      userName,
+      collectionId: imageCollectionId,
+      createdAt: new Date(),
+      deleted: false
+    });
   }
 }

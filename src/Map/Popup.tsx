@@ -2,6 +2,7 @@ import React from 'react';
 import { User } from 'firebase/auth';
 import { Sit, Image, MarkType } from '../types';
 import Carousel from './Carousel';
+import { getDistanceInFeet } from '../utils/geo';
 
 interface PopupProps {
   sit: Sit;
@@ -13,8 +14,9 @@ interface PopupProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onClose?: () => void;
-  onOpenPhotoModal: () => void;
+  onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
+  currentLocation: { latitude: number; longitude: number } | null;
 }
 
 interface PopupState {
@@ -135,6 +137,37 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     );
   }
 
+  private renderUploadButton() {
+    const { sit, user, currentLocation } = this.props;
+
+    if (!currentLocation) return null;
+
+    const distance = getDistanceInFeet(currentLocation, sit.location);
+    if (distance > 300) return null; // Only show if within 300 feet
+
+    const handleClick = async () => {
+      if (!user) {
+        this.props.onOpenProfileModal();
+        return;
+      }
+      if (!sit.imageCollectionId) return;
+      this.props.onOpenPhotoModal(sit);
+    };
+
+    return (
+      <button
+        className="photo-option-button"
+        onClick={handleClick}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
+          <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+        </svg>
+        {user ? 'Upload Photo' : 'Sign in to Upload Photo'}
+      </button>
+    );
+  }
+
   render() {
     const { sit, user, images } = this.props;
     const { error } = this.state;
@@ -154,6 +187,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
             <p>Uploading new sit...</p>
           </div>
         )}
+
+        {this.renderUploadButton()}
 
         {/* Only show mark buttons if the sit is fully created */}
         {sit.imageCollectionId && user && this.renderMarkButtons()}

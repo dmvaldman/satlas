@@ -1,6 +1,6 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
-import { Coordinates } from '../types';
+import { Coordinates, Sit } from '../types';
 
 /// <reference types="vite/client" />
 
@@ -22,9 +22,10 @@ function convertDMSToDD(dms: number[], direction: string): number {
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
-  onPhotoCapture: (result: PhotoResult) => Promise<void>;
+  onPhotoCapture: (result: PhotoResult, existingSit?: Sit) => Promise<void>;
   replaceInfo: { sitId: string; imageId: string; } | null;
   isUploading?: boolean;
+  sit?: Sit;
 }
 
 interface PhotoUploadState {
@@ -58,16 +59,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       window.removeEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
     }
   }
-
-  /** @deprecated Use props for modal control instead */
-  private handleGlobalOpen = (event: Event) => {
-    const customEvent = event as CustomEvent<{ sitId: string; imageId: string }>;
-    this.props.onClose();
-    this.props.onPhotoCapture({
-      base64Data: '',
-      location: undefined
-    });
-  };
 
   private showNotification(message: string, type: 'success' | 'error') {
     const notification = document.createElement('div');
@@ -154,7 +145,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         this.props.onPhotoCapture({
           base64Data,
           location: location || undefined
-        });
+        }, this.props.sit);
       };
 
       input.click();
@@ -193,7 +184,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         this.props.onPhotoCapture({
           base64Data,
           location: location || undefined
-        });
+        }, this.props.sit);
       };
 
       input.click();
