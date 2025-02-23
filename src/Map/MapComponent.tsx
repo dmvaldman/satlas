@@ -22,7 +22,7 @@ interface MapProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
-  onOpenPhotoModal: () => void;
+  onOpenPhotoModal: (sit?: Sit) => void;
   onOpenProfileModal: () => void;
 }
 
@@ -121,6 +121,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
           onReplaceImage={this.handleReplaceImage}
           onOpenPhotoModal={this.props.onOpenPhotoModal}
           onOpenProfileModal={this.props.onOpenProfileModal}
+          currentLocation={this.props.currentLocation}
         />
       );
 
@@ -164,6 +165,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
             onReplaceImage={this.handleReplaceImage}
             onOpenPhotoModal={this.props.onOpenPhotoModal}
             onOpenProfileModal={this.props.onOpenProfileModal}
+            currentLocation={this.props.currentLocation}
           />
         );
       }
