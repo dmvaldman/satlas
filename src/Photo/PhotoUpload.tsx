@@ -126,7 +126,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           reader.readAsDataURL(file);
         });
 
-        // Get the location from the base64 image using the legacy EXIF method
         const location = await this.getImageLocationFromBase64(base64Data);
 
         this.props.onClose();

@@ -98,8 +98,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </label>
           </div>
 
-
-
           <div className="profile-actions">
             <button
               className="profile-button primary"

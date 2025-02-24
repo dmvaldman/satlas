@@ -614,14 +614,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #666;
 }
 
-/* Legacy app styles */
-#legacy-app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-}
-
 /* React app styles */
 #root {
   height: 100%;
