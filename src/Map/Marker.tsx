@@ -96,7 +96,7 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
 
     const el = marker.getElement();
     // Remove all existing classes
-    el.className = '';
+    el.className = 'mapboxgl-marker';
     // Add updated classes
     this.getMarkerClasses().forEach(className => {
       el.classList.add(className);

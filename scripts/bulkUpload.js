@@ -47,9 +47,11 @@ async function extractLocationFromExif(filePath) {
     let latitude = result.tags.GPSLatitude;
     let longitude = result.tags.GPSLongitude;
 
-    // Apply reference if available
-    if (result.tags.GPSLatitudeRef === 'S') latitude = -latitude;
-    if (result.tags.GPSLongitudeRef === 'W') longitude = -longitude;
+    console.log('Extracted coordinates:', {
+      latitude, longitude,
+      latRef: result.tags.GPSLatitudeRef,
+      lngRef: result.tags.GPSLongitudeRef
+    });
 
     return { latitude, longitude };
   } catch (error) {
@@ -209,4 +211,16 @@ async function bulkUploadImages(directoryPath, userId, userName) {
   return results;
 }
 
-export { bulkUploadImages };
+// Example usage
+const userId = 'bEorC36iZYZGWKydUqFo6VZ7RSn2'; // Replace with your user ID
+const userName = 'Dave'; // Replace with your name
+const imagesDir = './satlas_images'; // Directory containing images
+
+bulkUploadImages(imagesDir, userId, userName)
+  .then(results => {
+    console.log(`Successfully uploaded ${results.length} images`);
+    console.log('First few results:', results.slice(0, 3));
+  })
+  .catch(error => {
+    console.error('Upload failed:', error);
+  });
