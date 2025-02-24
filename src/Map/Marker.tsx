@@ -95,8 +95,8 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
     if (!marker) return;
 
     const el = marker.getElement();
-    // Remove existing classes
-    el.classList.remove('satlas-marker', 'own-sit', 'favorite', 'visited', 'want-to-go', 'new');
+    // Remove all existing classes
+    el.className = '';
     // Add updated classes
     this.getMarkerClasses().forEach(className => {
       el.classList.add(className);

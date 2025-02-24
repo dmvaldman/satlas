@@ -21,6 +21,7 @@ import { UserPreferences } from './types';
 import { SitManager } from './Map/SitManager';
 import AddSitButton from './Map/AddSitButton';
 import { MarksManager } from './Map/MarksManager';
+import { LocationService } from './Map/LocationService';
 
 interface AppState {
   // Auth state
@@ -66,6 +67,7 @@ interface PhotoResult {
 class App extends React.Component<{}, AppState> {
   private provider: GoogleAuthProvider;
   private mapContainer: React.RefObject<HTMLDivElement>;
+  private locationService: LocationService;
 
   constructor(props: {}) {
     super(props);
@@ -100,6 +102,7 @@ class App extends React.Component<{}, AppState> {
 
     this.provider = new GoogleAuthProvider();
     this.mapContainer = React.createRef();
+    this.locationService = new LocationService();
   }
 
   componentDidMount() {
@@ -130,7 +133,7 @@ class App extends React.Component<{}, AppState> {
         throw new Error('Map container not found');
       }
 
-      const coordinates = await this.getCurrentLocation();
+      const coordinates = await this.locationService.getCurrentLocation();
 
       const map = new mapboxgl.Map({
         container: this.mapContainer.current,
@@ -180,32 +183,6 @@ class App extends React.Component<{}, AppState> {
         });
       }
     }
-  };
-
-  private getCurrentLocation = (): Promise<{ latitude: number; longitude: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-        },
-        (error) => {
-          reject(error);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 10000
-        }
-      );
-    });
   };
 
   private async loadUserData(userId: string) {
