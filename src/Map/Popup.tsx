@@ -197,11 +197,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
         {/* Show appropriate status message */}
         <div className="sit-info">
-          {sit.uploadedBy && (
-            <p className="sit-author">
-              Added by {sit.uploadedBy === user?.uid ? 'you' : 'another user'}
-            </p>
-          )}
           {!sit.imageCollectionId && (
             <p className="sit-status">Processing upload...</p>
           )}

@@ -5,6 +5,7 @@ interface CarouselProps {
     id: string;
     photoURL: string;
     userId: string;
+    userName: string;
   }>;
   currentUserId: string | null;
   onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
@@ -93,7 +94,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               alt={`Image ${activeIndex + 1}`}
               className="carousel-image"
             />
-            {canShowControls && onImageAction && (showControlsState || !('ontouchstart' in window)) && (
+            {(showControlsState || ('ontouchstart' in window)) && (
+              <div className="image-uploader">
+                {currentImage.userName}
+              </div>
+            )}
+            {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
               <div className="image-controls">
                 <button
                   className="image-control-button"
