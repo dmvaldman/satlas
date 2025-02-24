@@ -21,7 +21,7 @@ import { UserPreferences } from './types';
 import { SitManager } from './Map/SitManager';
 import AddSitButton from './Map/AddSitButton';
 import { MarksManager } from './Map/MarksManager';
-import { LocationService } from './Map/LocationService';
+import { LocationService } from './utils/LocationService';
 
 interface AppState {
   // Auth state
