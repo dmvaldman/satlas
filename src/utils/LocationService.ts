@@ -10,8 +10,8 @@ interface Location {
 }
 
 const LAST_LOCATION_KEY = 'lastKnownLocation';
-const LOCATION_TIMEOUT = 5000;
-const LOCATION_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+const LOCATION_TIMEOUT = 3000;
+const LOCATION_MAX_AGE = 1 * 24 * 60 * 60 * 1000; // 1 days
 
 export class LocationService {
   private storage: Storage;
@@ -55,7 +55,7 @@ export class LocationService {
           }
         },
         {
-          enableHighAccuracy: false,
+          enableHighAccuracy: true,
           timeout: LOCATION_TIMEOUT,
           maximumAge: 10000
         }

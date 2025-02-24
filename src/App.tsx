@@ -22,6 +22,7 @@ import { SitManager } from './Map/SitManager';
 import AddSitButton from './Map/AddSitButton';
 import { MarksManager } from './Map/MarksManager';
 import { LocationService } from './utils/LocationService';
+import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
 
 interface AppState {
   // Auth state
@@ -48,6 +49,10 @@ interface AppState {
     profile: {
       isOpen: boolean;
       data: any | null;
+    };
+    nearbySit: {
+      isOpen: boolean;
+      data: Sit | null;
     };
   };
 
@@ -91,7 +96,8 @@ class App extends React.Component<{}, AppState> {
       // Modal state
       modals: {
         photo: { isOpen: false, data: null },
-        profile: { isOpen: false, data: null }
+        profile: { isOpen: false, data: null },
+        nearbySit: { isOpen: false, data: null }
       },
 
       userPreferences: {
@@ -254,6 +260,18 @@ class App extends React.Component<{}, AppState> {
         ...prevState.modals,
         photo: {
           isOpen: !prevState.modals.photo.isOpen,
+          data: sit || null
+        }
+      }
+    }));
+  };
+
+  private toggleNearbySitModal = (sit?: Sit) => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        nearbySit: {
+          isOpen: !prevState.modals.nearbySit.isOpen,
           data: sit || null
         }
       }
@@ -520,6 +538,11 @@ class App extends React.Component<{}, AppState> {
     return null;
   };
 
+  private handleUploadToExisting = (sit: Sit) => {
+    this.toggleNearbySitModal();
+    this.togglePhotoUpload(sit);
+  };
+
   render() {
     const {
       user,
@@ -615,7 +638,15 @@ class App extends React.Component<{}, AppState> {
           onSignIn={this.handleSignIn}
           currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
+          onNearbySitFound={this.toggleNearbySitModal}
           onPhotoUploadOpen={this.togglePhotoUpload}
+        />
+
+        <NearbyExistingSitModal
+          isOpen={modals.nearbySit.isOpen}
+          sit={modals.nearbySit.data}
+          onClose={this.toggleNearbySitModal}
+          onUploadToExisting={this.handleUploadToExisting}
         />
       </div>
     );

@@ -1,13 +1,15 @@
 import React from 'react';
 import { Coordinates } from '../types';
 import { User } from '../types';
+import { Sit } from '../types';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;
   user: User | null;
   onSignIn: () => Promise<void>;
   currentLocation: Coordinates | null;
-  findNearbySit: (coordinates: Coordinates) => Promise<any>;
+  findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
+  onNearbySitFound: (sit: Sit) => void;
   onPhotoUploadOpen: () => void;
 }
 
@@ -38,7 +40,7 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
 
   private handleClick = async () => {
     console.log('AddSitButton clicked');
-    const { isAuthenticated, onSignIn, currentLocation, findNearbySit, user, onPhotoUploadOpen } = this.props;
+    const { isAuthenticated, onSignIn, currentLocation, findNearbySit, onNearbySitFound, onPhotoUploadOpen } = this.props;
 
     if (!isAuthenticated) {
       console.log('Not authenticated, triggering sign in');
@@ -52,17 +54,13 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
     }
 
     try {
-      // const nearbySit = await findNearbySit(currentLocation);
-      // console.log('Nearby sit check result:', nearbySit);
+      const nearbySit = await findNearbySit(currentLocation);
+      console.log('Nearby sit check result:', nearbySit);
 
-      // if (nearbySit) {
-      //   if (nearbySit.uploadedBy === user?.uid) {
-      //     this.showNotification("You've already added a sit here", 'error');
-      //   } else {
-      //     this.showNotification('There is already a sit nearby', 'error');
-      //   }
-      //   return;
-      // }
+      if (nearbySit) {
+        onNearbySitFound(nearbySit);
+        return;
+      }
 
       console.log('Opening photo upload modal');
       onPhotoUploadOpen();

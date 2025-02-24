@@ -14,7 +14,9 @@ header {
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 2;
-  height: 60px; /* Adjust based on your header content */
+  height: 64px;
+  display: flex;
+  align-items: center;
 }
 
 #profile-icon {
@@ -101,23 +103,29 @@ header {
   transform: scale(0.95);
 }
 
-/* Add styles for the photo selection modal */
-.modal-overlay {
+/* Base modal styles shared between both types */
+.modal-overlay,
+.modal-overlay-center {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  display: none;
+  display: flex;
   justify-content: center;
-  align-items: flex-end;
   z-index: 2000;
   cursor: pointer;
 }
 
-.modal-overlay.active {
-  display: flex;
+/* Bottom-aligned modal (photo upload) */
+.modal-overlay {
+  align-items: flex-end;
+}
+
+/* Center-aligned modal (nearby sit) */
+.modal-overlay-center {
+  align-items: center;
 }
 
 .photo-options {
@@ -214,6 +222,8 @@ header {
 /* Update auth styles */
 #auth-container {
   margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .auth-button {
@@ -247,6 +257,9 @@ header {
   overflow: hidden;
   cursor: pointer;
   border: 2px solid #31d53d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #profile-image {
