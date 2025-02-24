@@ -56,6 +56,13 @@ interface AppState {
     };
   };
 
+  // Notification state
+  notification: {
+    message: string;
+    type: 'success' | 'error';
+    isVisible: boolean;
+  } | null;
+
   userPreferences: UserPreferences;
 }
 
@@ -99,6 +106,9 @@ class App extends React.Component<{}, AppState> {
         profile: { isOpen: false, data: null },
         nearbySit: { isOpen: false, data: null }
       },
+
+      // Notification state
+      notification: null,
 
       userPreferences: {
         nickname: '',
@@ -438,6 +448,12 @@ class App extends React.Component<{}, AppState> {
     if (!location) throw new Error('No location available');
 
     if (existingSit?.imageCollectionId) {
+      // Check if the new photo's location is near the existing sit
+      if (getDistanceInFeet(location, existingSit.location) > 100) {
+        this.showNotification('Your photo location is too far from the existing sit. Please take a photo closer to the sit location.', 'error');
+        return;
+      }
+
       try {
         await SitManager.addPhotoToSit(
           photoResult.base64Data,
@@ -445,10 +461,12 @@ class App extends React.Component<{}, AppState> {
           user.uid,
           user.displayName || 'Anonymous'
         );
+        this.showNotification('Photo added successfully!', 'success');
         return;
       } catch (error) {
         console.error('Error adding photo to sit:', error);
-        throw error;
+        this.showNotification(error instanceof Error ? error.message : 'Failed to add photo', 'error');
+        return;
       }
     }
 
@@ -491,6 +509,7 @@ class App extends React.Component<{}, AppState> {
         return { sits: newSits };
       });
 
+      this.showNotification('New sit created successfully!', 'success');
     } catch (error) {
       if (initialSit) {  // Only try to remove if it was created
         this.setState(prevState => {
@@ -499,7 +518,8 @@ class App extends React.Component<{}, AppState> {
           return { sits: newSits };
         });
       }
-      throw error;
+      console.error('Error creating sit:', error);
+      this.showNotification('Failed to create new sit', 'error');
     }
   };
 
@@ -543,6 +563,16 @@ class App extends React.Component<{}, AppState> {
     this.togglePhotoUpload(sit);
   };
 
+  private showNotification = (message: string, type: 'success' | 'error') => {
+    this.setState({
+      notification: { message, type, isVisible: true }
+    }, () => {
+      setTimeout(() => {
+        this.setState({ notification: null });
+      }, 3000);
+    });
+  };
+
   render() {
     const {
       user,
@@ -555,7 +585,8 @@ class App extends React.Component<{}, AppState> {
       currentLocation,
       modals,
       userPreferences,
-      isMapLoading
+      isMapLoading,
+      notification
     } = this.state;
 
     // Still show loading, but include the map container
@@ -640,6 +671,7 @@ class App extends React.Component<{}, AppState> {
           findNearbySit={this.findNearbySit}
           onNearbySitFound={this.toggleNearbySitModal}
           onPhotoUploadOpen={this.togglePhotoUpload}
+          showNotification={this.showNotification}
         />
 
         <NearbyExistingSitModal
@@ -648,6 +680,12 @@ class App extends React.Component<{}, AppState> {
           onClose={this.toggleNearbySitModal}
           onUploadToExisting={this.handleUploadToExisting}
         />
+
+        {notification && (
+          <div className={`notification ${notification.type}`}>
+            {notification.message}
+          </div>
+        )}
       </div>
     );
   }

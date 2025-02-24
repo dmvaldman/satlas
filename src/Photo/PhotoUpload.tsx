@@ -48,18 +48,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     };
   }
 
-  componentDidMount() {
-    if (import.meta.env.VITE_LEGACY_SUPPORT === 'true') {
-      window.addEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
-    }
-  }
-
-  componentWillUnmount() {
-    if (import.meta.env.VITE_LEGACY_SUPPORT === 'true') {
-      window.removeEventListener('openPhotoUploadModal', this.handleGlobalOpen as EventListener);
-    }
-  }
-
   private showNotification(message: string, type: 'success' | 'error') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -142,7 +130,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         const location = await this.getImageLocationFromBase64(base64Data);
 
         this.props.onClose();
-        this.props.onPhotoCapture({
+        await this.props.onPhotoCapture({
           base64Data,
           location: location || undefined
         }, this.props.sit);
@@ -151,8 +139,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       input.click();
     } catch (error) {
       console.error('Error choosing photo:', error);
-      this.setState({ error: 'Error choosing photo' });
-      this.showNotification('Error choosing photo', 'error');
     }
   };
 

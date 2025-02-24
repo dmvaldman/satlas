@@ -11,31 +11,14 @@ interface AddSitButtonProps {
   findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
   onNearbySitFound: (sit: Sit) => void;
   onPhotoUploadOpen: () => void;
+  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
-interface AddSitButtonState {
-  notification: {
-    message: string;
-    type: 'success' | 'error';
-  } | null;
-}
+interface AddSitButtonState {}
 
 class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState> {
   constructor(props: AddSitButtonProps) {
     super(props);
-    this.state = {
-      notification: null
-    };
-  }
-
-  private showNotification(message: string, type: 'success' | 'error') {
-    this.setState({
-      notification: { message, type }
-    }, () => {
-      setTimeout(() => {
-        this.setState({ notification: null });
-      }, 3000);
-    });
   }
 
   private handleClick = async () => {
@@ -49,7 +32,7 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
     }
 
     if (!currentLocation) {
-      this.showNotification('Location not available', 'error');
+      this.props.showNotification('Location not available', 'error');
       return;
     }
 
@@ -66,13 +49,11 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
       onPhotoUploadOpen();
     } catch (error) {
       console.error('Error in handleClick:', error);
-      this.showNotification('Error checking location', 'error');
+      this.props.showNotification('Error checking location', 'error');
     }
   };
 
   render() {
-    const { notification } = this.state;
-
     return (
       <>
         <button
@@ -85,12 +66,6 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
           </svg>
         </button>
-
-        {notification && (
-          <div className={`notification ${notification.type}`}>
-            {notification.message}
-          </div>
-        )}
       </>
     );
   }
