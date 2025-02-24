@@ -71,12 +71,11 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private renderCarousel() {
     const { images, user, sit } = this.props;
-    const showControls = user?.uid === sit.uploadedBy;
 
     return (
       <Carousel
         images={images}
-        showControls={showControls}
+        currentUserId={user?.uid || null}
         onImageAction={this.handleImageAction}
         isDeleting={this.state.isDeleting}
       />

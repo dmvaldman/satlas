@@ -4,8 +4,9 @@ interface CarouselProps {
   images: Array<{
     id: string;
     photoURL: string;
+    userId: string;
   }>;
-  showControls?: boolean;
+  currentUserId: string | null;
   onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
   isDeleting?: boolean;
 }
@@ -37,7 +38,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, showControls, onImageAction, isDeleting } = this.props;
+    const { images, currentUserId, onImageAction, isDeleting } = this.props;
     const { activeIndex } = this.state;
 
     if (images.length === 0) {
@@ -45,6 +46,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
 
     const currentImage = images[activeIndex];
+    const showControls = currentUserId && currentImage.userId === currentUserId;
 
     return (
       <div className="carousel">
