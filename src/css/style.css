@@ -860,3 +860,18 @@ input[type="checkbox"]:checked + .toggle-slider:before {
     opacity: 0.7;
   }
 }
+
+.maps-link {
+  display: block;
+  text-align: center;
+  color: #4285f4;
+  text-decoration: none;
+  font-size: 12px;
+  margin: 8px auto;
+  transition: background-color 0.2s;
+}
+
+.maps-link:hover {
+  color: #3367d6;
+  text-decoration: underline;
+}

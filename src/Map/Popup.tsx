@@ -136,6 +136,32 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     );
   }
 
+  private renderGoogleMapsLink() {
+    const { sit } = this.props;
+    // Use geo: URI scheme which will open default maps app
+    const mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}`;
+    // Fallback to Google Maps on desktop
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${sit.location.latitude},${sit.location.longitude}`;
+
+    return (
+      <a
+        href={mapsUrl}
+        onClick={(e) => {
+          // If geo: URI fails, fall back to Google Maps
+          if (!navigator.userAgent.match(/iPhone|iPad|iPod|Android/i)) {
+            e.preventDefault();
+            window.open(googleMapsUrl, '_blank');
+          }
+        }}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="maps-link"
+      >
+        open in maps
+      </a>
+    );
+  }
+
   private renderUploadButton() {
     const { sit, user, currentLocation } = this.props;
 
@@ -194,6 +220,9 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
         {/* Only show favorite count for established sits */}
         {sit.imageCollectionId && this.renderFavoriteCount()}
+
+        {/* Show Google Maps link */}
+        {sit.imageCollectionId && this.renderGoogleMapsLink()}
 
         {/* Show appropriate status message */}
         <div className="sit-info">
