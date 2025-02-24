@@ -842,3 +842,21 @@ input[type="checkbox"]:checked + .toggle-slider:before {
     opacity: 0.7;
   }
 }
+
+.image-uploader {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* For mobile, show with less opacity */
+@media (hover: none) {
+  .image-uploader {
+    opacity: 0.7;
+  }
+}
