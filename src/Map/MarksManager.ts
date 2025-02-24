@@ -1,4 +1,4 @@
-import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { MarkType } from '../types';
 
@@ -6,8 +6,7 @@ export class MarksManager {
   static async loadFavoriteCounts(): Promise<Map<string, number>> {
     try {
       const marksQuery = query(
-        collection(db, 'marks'),
-        where('types', 'array-contains', 'favorite')
+        collection(db, 'favorites')
       );
       const querySnapshot = await getDocs(marksQuery);
 
@@ -29,18 +28,41 @@ export class MarksManager {
 
   static async loadUserMarks(userId: string): Promise<Map<string, Set<MarkType>>> {
     try {
-      const marksQuery = query(
-        collection(db, 'marks'),
-        where('userId', '==', userId)
-      );
-      const querySnapshot = await getDocs(marksQuery);
+      // Query each collection separately
+      const favoritesQuery = query(collection(db, 'favorites'), where('userId', '==', userId));
+      const visitedQuery = query(collection(db, 'visited'), where('userId', '==', userId));
+      const wantToGoQuery = query(collection(db, 'wantToGo'), where('userId', '==', userId));
+
+      const [favoritesSnapshot, visitedSnapshot, wantToGoSnapshot] = await Promise.all([
+        getDocs(favoritesQuery),
+        getDocs(visitedQuery),
+        getDocs(wantToGoQuery)
+      ]);
 
       const marksMap = new Map<string, Set<MarkType>>();
-      querySnapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        if (data?.sitId && data?.types && Array.isArray(data.types)) {
-          marksMap.set(data.sitId, new Set<MarkType>(data.types));
-        }
+
+      // Process favorites
+      favoritesSnapshot.forEach(doc => {
+        const sitId = doc.data().sitId;
+        const marks = marksMap.get(sitId) || new Set<MarkType>();
+        marks.add('favorite');
+        marksMap.set(sitId, marks);
+      });
+
+      // Process visited
+      visitedSnapshot.forEach(doc => {
+        const sitId = doc.data().sitId;
+        const marks = marksMap.get(sitId) || new Set<MarkType>();
+        marks.add('visited');
+        marksMap.set(sitId, marks);
+      });
+
+      // Process want to go
+      wantToGoSnapshot.forEach(doc => {
+        const sitId = doc.data().sitId;
+        const marks = marksMap.get(sitId) || new Set<MarkType>();
+        marks.add('wantToGo');
+        marksMap.set(sitId, marks);
       });
 
       return marksMap;
@@ -50,53 +72,138 @@ export class MarksManager {
     }
   }
 
-  static async toggleMark(
+  static async toggleFavorite(
     userId: string,
     sitId: string,
-    type: MarkType,
     currentMarks: Set<MarkType>
-  ): Promise<{
-    marks: Set<MarkType>;
-    favoriteCount?: number;  // Only returned if type is 'favorite'
-  }> {
+  ): Promise<{ marks: Set<MarkType>; favoriteCount: number }> {
     try {
-      const newMarks = new Set(currentMarks);
-      const wasFavorite = newMarks.has('favorite');
+      const newMarks = new Set<MarkType>();
+      const docRef = doc(db, 'favorites', `${userId}_${sitId}`);
+      const visitedRef = doc(db, 'visited', `${userId}_${sitId}`);
+      const wantToGoRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
 
-      if (newMarks.has(type)) {
-        newMarks.delete(type);
+      if (currentMarks.has('favorite')) {
+        await deleteDoc(docRef);
       } else {
-        newMarks.add(type);
+        // Clear other marks
+        await Promise.all([
+          deleteDoc(visitedRef),
+          deleteDoc(wantToGoRef)
+        ]);
+        newMarks.add('favorite');
+        await setDoc(docRef, {
+          userId,
+          sitId,
+          createdAt: new Date()
+        });
       }
 
-      // Update Firestore
-      await setDoc(doc(db, 'marks', `${userId}_${sitId}`), {
-        userId,
-        sitId,
-        types: Array.from(newMarks),
-        updatedAt: new Date()
-      });
+      const countQuery = query(
+        collection(db, 'favorites'),
+        where('sitId', '==', sitId)
+      );
+      const snapshot = await getDocs(countQuery);
+      return {
+        marks: newMarks,
+        favoriteCount: snapshot.size
+      };
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      throw error;
+    }
+  }
 
-      // If this was a favorite toggle, get the new count
-      if (type === 'favorite') {
-        const isFavorite = newMarks.has('favorite');
-        if (wasFavorite !== isFavorite) {
-          const countQuery = query(
-            collection(db, 'marks'),
-            where('sitId', '==', sitId),
-            where('types', 'array-contains', 'favorite')
-          );
-          const snapshot = await getDocs(countQuery);
-          return {
-            marks: newMarks,
-            favoriteCount: snapshot.size
-          };
-        }
+  static async toggleVisited(
+    userId: string,
+    sitId: string,
+    currentMarks: Set<MarkType>
+  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
+    try {
+      const newMarks = new Set<MarkType>();
+      const docRef = doc(db, 'visited', `${userId}_${sitId}`);
+      const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
+      const wantToGoRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
+
+      if (currentMarks.has('visited')) {
+        await deleteDoc(docRef);
+      } else {
+        // Clear other marks
+        await Promise.all([
+          deleteDoc(favoriteRef),
+          deleteDoc(wantToGoRef)
+        ]);
+        newMarks.add('visited');
+        await setDoc(docRef, {
+          userId,
+          sitId,
+          createdAt: new Date()
+        });
+      }
+
+      // If we removed a favorite, get new count
+      if (currentMarks.has('favorite')) {
+        const countQuery = query(
+          collection(db, 'favorites'),
+          where('sitId', '==', sitId)
+        );
+        const snapshot = await getDocs(countQuery);
+        return {
+          marks: newMarks,
+          favoriteCount: snapshot.size
+        };
       }
 
       return { marks: newMarks };
     } catch (error) {
-      console.error('Error toggling mark:', error);
+      console.error('Error toggling visited:', error);
+      throw error;
+    }
+  }
+
+  static async toggleWantToGo(
+    userId: string,
+    sitId: string,
+    currentMarks: Set<MarkType>
+  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
+    try {
+      const newMarks = new Set<MarkType>();
+      const docRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
+      const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
+      const visitedRef = doc(db, 'visited', `${userId}_${sitId}`);
+
+      if (currentMarks.has('wantToGo')) {
+        await deleteDoc(docRef);
+      } else {
+        // Clear other marks
+        await Promise.all([
+          deleteDoc(favoriteRef),
+          deleteDoc(visitedRef)
+        ]);
+        newMarks.add('wantToGo');
+        await setDoc(docRef, {
+          userId,
+          sitId,
+          createdAt: new Date()
+        });
+      }
+
+      // If we removed a favorite, get new count
+      if (currentMarks.has('favorite')) {
+        const countQuery = query(
+          collection(db, 'favorites'),
+          where('sitId', '==', sitId)
+        );
+        const snapshot = await getDocs(countQuery);
+        return {
+          marks: newMarks,
+          favoriteCount: snapshot.size
+        };
+      }
+
+      return { marks: newMarks };
+    } catch (error) {
+      console.error('Error toggling want-to-go:', error);
       throw error;
     }
   }

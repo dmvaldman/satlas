@@ -335,7 +335,18 @@ class App extends React.Component<{}, AppState> {
 
     try {
       const currentMarks = marks.get(sitId) || new Set();
-      const result = await MarksManager.toggleMark(user.uid, sitId, type, currentMarks);
+      let result;
+      switch (type) {
+        case 'favorite':
+          result = await MarksManager.toggleFavorite(user.uid, sitId, currentMarks);
+          break;
+        case 'visited':
+          result = await MarksManager.toggleVisited(user.uid, sitId, currentMarks);
+          break;
+        case 'wantToGo':
+          result = await MarksManager.toggleWantToGo(user.uid, sitId, currentMarks);
+          break;
+      }
 
       // Update local state immediately for responsiveness
       this.setState(prevState => {
