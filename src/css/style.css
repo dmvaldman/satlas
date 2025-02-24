@@ -799,3 +799,46 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: flex;
   gap: 4px;
 }
+
+.carousel-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: opacity 0.2s;
+  opacity: 0;
+}
+
+.carousel-content:hover .carousel-nav {
+  opacity: 1;
+}
+
+.carousel-nav svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
+.carousel-nav.prev {
+  left: 10px;
+}
+
+.carousel-nav.next {
+  right: 10px;
+}
+
+/* For mobile, always show nav buttons with less opacity */
+@media (hover: none) {
+  .carousel-nav {
+    opacity: 0.7;
+  }
+}
