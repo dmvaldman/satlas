@@ -98,14 +98,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </label>
           </div>
 
-          <div className="profile-section">
-            <button
-              className="profile-button"
-              onClick={() => {/* TODO: Implement favorites view */}}
-            >
-              View Favorite Sits
-            </button>
-          </div>
+
 
           <div className="profile-actions">
             <button
