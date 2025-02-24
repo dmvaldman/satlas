@@ -60,6 +60,28 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     return (
       <div className="carousel">
         <div className="carousel-content">
+          {images.length > 1 && (
+            <>
+              <button
+                className="carousel-nav prev"
+                onClick={this.prev}
+                aria-label="Previous image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                </svg>
+              </button>
+              <button
+                className="carousel-nav next"
+                onClick={this.next}
+                aria-label="Next image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                </svg>
+              </button>
+            </>
+          )}
           <div
             className="carousel-img-container"
             onMouseEnter={() => this.setState({ showControls: true })}
