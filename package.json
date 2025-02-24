@@ -1,7 +1,7 @@
 {
   "name": "capacitor-app",
   "version": "1.0.0",
-  "description": "An Amazing Capacitor App",
+  "description": "Satlas",
   "type": "module",
   "keywords": [
     "capacitor",
@@ -21,7 +21,9 @@
     "@types/node": "^22.13.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "dotenv": "^16.4.7",
     "exif-js": "^2.3.0",
+    "exif-parser": "^0.1.12",
     "firebase": "^11.2.0",
     "mapbox-gl": "^3.9.4",
     "react": "^18.2.0",
