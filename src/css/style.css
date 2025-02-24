@@ -362,11 +362,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background-color: #007AFF;  /* Blue for own sits */
 }
 
-/* More specific selector to override own-sit */
-.satlas-marker.own-sit.favorite,
-.satlas-marker.favorite {
-  background-color: #ff3b30;  /* Red for favorites */
-}
 
 .favorite-count {
   font-size: 0.9em;
@@ -874,4 +869,16 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .maps-link:hover {
   color: #3367d6;
   text-decoration: underline;
+}
+
+.satlas-marker.favorite {
+  background-color: #ff4081;
+}
+
+.satlas-marker.visited {
+  background-color: #808080;
+}
+
+.satlas-marker.want-to-go {
+  background-color: #9c27b0;
 }
