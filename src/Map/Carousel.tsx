@@ -13,15 +13,24 @@ interface CarouselProps {
 
 interface CarouselState {
   activeIndex: number;
+  showControls: boolean;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
   constructor(props: CarouselProps) {
     super(props);
     this.state = {
-      activeIndex: 0
+      activeIndex: 0,
+      showControls: false
     };
   }
+
+  private handleImageInteraction = () => {
+    // For mobile, toggle controls on tap
+    if ('ontouchstart' in window) {
+      this.setState(prev => ({ showControls: !prev.showControls }));
+    }
+  };
 
   next = () => {
     this.setState(prev => ({
@@ -39,25 +48,30 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   render() {
     const { images, currentUserId, onImageAction, isDeleting } = this.props;
-    const { activeIndex } = this.state;
+    const { activeIndex, showControls: showControlsState } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
     }
 
     const currentImage = images[activeIndex];
-    const showControls = currentUserId && currentImage.userId === currentUserId;
+    const canShowControls = currentUserId && currentImage.userId === currentUserId;
 
     return (
       <div className="carousel">
         <div className="carousel-content">
-          <div className="carousel-img-container">
+          <div
+            className="carousel-img-container"
+            onMouseEnter={() => this.setState({ showControls: true })}
+            onMouseLeave={() => this.setState({ showControls: false })}
+            onClick={this.handleImageInteraction}
+          >
             <img
               src={currentImage.photoURL}
               alt={`Image ${activeIndex + 1}`}
               className="carousel-image"
             />
-            {showControls && onImageAction && (
+            {canShowControls && onImageAction && (showControlsState || !('ontouchstart' in window)) && (
               <div className="image-controls">
                 <button
                   className="image-control-button"
