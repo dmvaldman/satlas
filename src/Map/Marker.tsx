@@ -60,6 +60,14 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
       classes.push('favorite');
     }
 
+    if (marks.has('visited')) {
+      classes.push('visited');
+    }
+
+    if (marks.has('wantToGo')) {
+      classes.push('want-to-go');
+    }
+
     if (!sit.imageCollectionId) {
       classes.push('new');
     }
@@ -88,7 +96,7 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
 
     const el = marker.getElement();
     // Remove existing classes
-    el.classList.remove('satlas-marker', 'own-sit', 'favorite');
+    el.classList.remove('satlas-marker', 'own-sit', 'favorite', 'visited', 'want-to-go', 'new');
     // Add updated classes
     this.getMarkerClasses().forEach(className => {
       el.classList.add(className);
