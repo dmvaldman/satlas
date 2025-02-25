@@ -5,3 +5,5 @@ node_modules/
 .DS_Store
 .sourcemaps
 dist/
+satlas_images/
+satlas_images_test/
