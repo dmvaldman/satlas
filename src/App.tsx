@@ -334,42 +334,32 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleToggleMark = async (sitId: string, type: MarkType) => {
+  private handleToggleMark = async (sitId: string, markType: MarkType) => {
     const { user, marks } = this.state;
     if (!user) return;
 
     try {
       const currentMarks = marks.get(sitId) || new Set();
-      let result;
-      switch (type) {
-        case 'favorite':
-          result = await MarksManager.toggleFavorite(user.uid, sitId, currentMarks);
-          break;
-        case 'visited':
-          result = await MarksManager.toggleVisited(user.uid, sitId, currentMarks);
-          break;
-        case 'wantToGo':
-          result = await MarksManager.toggleWantToGo(user.uid, sitId, currentMarks);
-          break;
+      const result = await MarksManager.toggleMark(user.uid, sitId, markType, currentMarks);
+
+      // Update marks
+      const updatedMarks = new Map(marks);
+      updatedMarks.set(sitId, result.marks);
+
+      // Update favorite count if provided
+      let updatedFavoriteCounts = this.state.favoriteCount;
+      if (result.favoriteCount !== undefined) {
+        updatedFavoriteCounts = new Map(updatedFavoriteCounts);
+        updatedFavoriteCounts.set(sitId, result.favoriteCount);
       }
 
-      // Update local state immediately for responsiveness
-      this.setState(prevState => {
-        const updates = {
-          ...prevState,
-          marks: new Map(prevState.marks).set(sitId, result.marks)
-        };
-        if (result.favoriteCount !== undefined) {
-          updates.favoriteCount = new Map(prevState.favoriteCount).set(sitId, result.favoriteCount);
-        }
-        return updates;
+      this.setState({
+        marks: updatedMarks,
+        favoriteCount: updatedFavoriteCounts
       });
     } catch (error) {
       console.error('Error toggling mark:', error);
-      this.setState(prevState => ({
-        marks: new Map(prevState.marks)
-      }));
-      throw error;
+      // You might want to show an error message to the user here
     }
   };
 
