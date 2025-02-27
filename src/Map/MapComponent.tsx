@@ -28,6 +28,7 @@ interface MapProps {
 
 interface MapState {
   activePopup: mapboxgl.Popup | null;
+  clusterSourceAdded: boolean;
 }
 
 class MapComponent extends React.Component<MapProps, MapState> {
@@ -36,11 +37,14 @@ class MapComponent extends React.Component<MapProps, MapState> {
   private popupContainer: HTMLElement | null = null;
   private currentPopupSitId: string | null = null;
   private currentPopupImages: Image[] = [];
+  private markers: Map<string, mapboxgl.Marker> = new Map();
+  private clusterMarkers: Map<number, mapboxgl.Marker> = new Map();
 
   constructor(props: MapProps) {
     super(props);
     this.state = {
-      activePopup: null
+      activePopup: null,
+      clusterSourceAdded: false
     };
 
     // Create debounced version of handleMapMove
@@ -57,6 +61,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { map } = this.props;
     if (map) {
       this.setupMapListeners(map);
+      this.setupClusterLayer(map);
     }
   }
 
@@ -64,7 +69,13 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { map } = this.props;
     if (map) {
       map.off('moveend', this.handleMapMove);
+      map.off('click', 'clusters', this.handleClusterClick);
+
+      // Remove all markers
+      this.markers.forEach(marker => marker.remove());
+      this.clusterMarkers.forEach(marker => marker.remove());
     }
+
     if (this.state.activePopup) {
       this.state.activePopup.remove();
     }
@@ -170,11 +181,269 @@ class MapComponent extends React.Component<MapProps, MapState> {
         );
       }
     }
+
+    const { map, sits } = this.props;
+
+    // If map is available and sits have changed, update the GeoJSON source
+    if (map && prevProps.sits !== sits && this.state.clusterSourceAdded) {
+      this.updateClusterSource(map, sits);
+    }
   }
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
     this.props.onOpenPhotoModal();
   };
+
+  private setupClusterLayer(map: mapboxgl.Map) {
+    // Check if the map is already loaded
+    if (map.loaded()) {
+      this.initializeClusterLayers(map);
+    } else {
+      // If not loaded yet, wait for the load event
+      map.on('load', () => {
+        this.initializeClusterLayers(map);
+      });
+    }
+  }
+
+  private initializeClusterLayers(map: mapboxgl.Map) {
+    // Add a new source from our GeoJSON data
+    map.addSource('sits', {
+      type: 'geojson',
+      data: this.createGeoJSONFromSits(this.props.sits),
+      cluster: true,
+      clusterMaxZoom: 14, // Max zoom to cluster points on
+      clusterRadius: 50 // Radius of each cluster when clustering points
+    });
+
+    // Add a layer for the clusters
+    map.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'sits',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step',
+          ['get', 'point_count'],
+          '#51bbd6', // color for clusters with < 10 points
+          10,
+          '#f1f075', // color for clusters with < 50 points
+          50,
+          '#f28cb1' // color for clusters with >= 50 points
+        ],
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          20, // radius for clusters with < 10 points
+          10,
+          30, // radius for clusters with < 50 points
+          50,
+          40 // radius for clusters with >= 50 points
+        ]
+      }
+    });
+
+    // Add a layer for the cluster count labels
+    map.addLayer({
+      id: 'cluster-count',
+      type: 'symbol',
+      source: 'sits',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 12
+      },
+      paint: {
+        'text-color': '#ffffff'
+      }
+    });
+
+    // Add a layer for unclustered points (we'll hide this and use our custom markers)
+    map.addLayer({
+      id: 'unclustered-point',
+      type: 'circle',
+      source: 'sits',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': 'rgba(0, 0, 0, 0)', // Transparent
+        'circle-radius': 0, // Size 0 to hide
+        'circle-stroke-width': 0
+      }
+    });
+
+    // Set state to indicate the cluster source is added
+    this.setState({ clusterSourceAdded: true });
+
+    // Add click handler for clusters
+    map.on('click', 'clusters', this.handleClusterClick);
+
+    // Change cursor when hovering over clusters
+    map.on('mouseenter', 'clusters', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.on('mouseleave', 'clusters', () => {
+      map.getCanvas().style.cursor = '';
+    });
+
+    // Listen for zoom changes to update markers
+    map.on('zoomend', this.updateVisibleMarkers);
+
+    // Initial update of markers
+    this.updateVisibleMarkers();
+  }
+
+  private createGeoJSONFromSits(sits: Map<string, Sit>) {
+    const features = Array.from(sits.values()).map(sit => ({
+      type: 'Feature' as const,
+      properties: {
+        id: sit.id,
+        // Include any other properties you want to access in the cluster
+        uploadedBy: sit.uploadedBy
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [sit.location.longitude, sit.location.latitude]
+      }
+    }));
+
+    return {
+      type: 'FeatureCollection' as const,
+      features
+    };
+  }
+
+  private updateClusterSource(map: mapboxgl.Map, sits: Map<string, Sit>) {
+    const source = map.getSource('sits') as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData(this.createGeoJSONFromSits(sits));
+      this.updateVisibleMarkers();
+    }
+  }
+
+  private handleClusterClick = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+    const { map } = this.props;
+    if (!map || !e.features) return;
+
+    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+    if (!features.length) return;
+
+    const clusterId = features[0].properties?.cluster_id;
+    if (clusterId === undefined) return;
+
+    // Get the cluster source
+    const source = map.getSource('sits') as mapboxgl.GeoJSONSource;
+
+    // Get the cluster expansion zoom
+    source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+      if (err || zoom === undefined) return;
+
+      // Center the map on the cluster and zoom in
+      map.easeTo({
+        center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number],
+        zoom: zoom
+      });
+    });
+  };
+
+  private updateVisibleMarkers = () => {
+    const { map, sits, marks, user } = this.props;
+    if (!map || !this.state.clusterSourceAdded) return;
+
+    // Get current zoom level
+    const zoom = map.getZoom();
+    const clusterMaxZoom = 14; // Should match the value in setupClusterLayer
+
+    // If zoomed in beyond clustering threshold, show individual markers
+    if (zoom >= clusterMaxZoom) {
+      // Hide cluster layers
+      map.setLayoutProperty('clusters', 'visibility', 'none');
+      map.setLayoutProperty('cluster-count', 'visibility', 'none');
+
+      // Show individual markers
+      Array.from(sits.values()).forEach(sit => {
+        // Check if marker already exists
+        if (!this.markers.has(sit.id)) {
+          // Create new marker
+          const el = document.createElement('div');
+          el.className = this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).join(' ');
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleMarkerClick(sit);
+          });
+
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat([sit.location.longitude, sit.location.latitude])
+            .addTo(map);
+
+          this.markers.set(sit.id, marker);
+        } else {
+          // Update existing marker
+          const marker = this.markers.get(sit.id)!;
+          const el = marker.getElement();
+
+          // Update classes
+          el.className = 'mapboxgl-marker';
+          this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).forEach(className => {
+            el.classList.add(className);
+          });
+
+          // Update position if needed
+          marker.setLngLat([sit.location.longitude, sit.location.latitude]);
+
+          // Make sure the marker is visible and added to the map
+          marker.addTo(map);
+        }
+      });
+
+      // Remove any markers that no longer exist
+      this.markers.forEach((marker, id) => {
+        if (!sits.has(id)) {
+          marker.remove();
+          this.markers.delete(id);
+        }
+      });
+
+      // Remove any cluster markers
+      this.clusterMarkers.forEach(marker => marker.remove());
+      this.clusterMarkers.clear();
+    } else {
+      // Show cluster layers
+      map.setLayoutProperty('clusters', 'visibility', 'visible');
+      map.setLayoutProperty('cluster-count', 'visibility', 'visible');
+
+      // Hide individual markers
+      this.markers.forEach(marker => {
+        marker.remove();
+      });
+      // Note: We don't clear the markers Map here, just remove them from the map
+      // This way we can reuse them when zooming back in
+    }
+  };
+
+  private getMarkerClasses(sit: Sit, user: User | null, marks: Set<MarkType>): string[] {
+    const classes = ['satlas-marker'];
+
+    if (user && sit.uploadedBy && sit.uploadedBy === user.uid) {
+      classes.push('own-sit');
+    }
+
+    if (marks.has('favorite')) {
+      classes.push('favorite');
+    }
+
+    if (marks.has('visited')) {
+      classes.push('visited');
+    }
+
+    if (marks.has('wantToGo')) {
+      classes.push('want-to-go');
+    }
+
+    return classes;
+  }
 
   render() {
     const { map, sits, isLoading } = this.props;
@@ -187,21 +456,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
       );
     }
 
-    return (
-      <>
-        {map && Array.from(sits.values()).map(sit => (
-          <MarkerComponent
-            key={sit.id}
-            sit={sit}
-            map={map}
-            user={this.props.user}
-            marks={this.props.marks.get(sit.id) || new Set()}
-            onMarkerClick={this.handleMarkerClick}
-            onMarkUpdate={this.props.onToggleMark}
-          />
-        ))}
-      </>
-    );
+    // We're now handling markers directly in the component
+    return null;
   }
 }
 
