@@ -239,6 +239,19 @@ class MapComponent extends React.Component<MapProps, MapState> {
       favoriteCount: updatedFavoriteCount
     });
 
+    // Update the marker styling directly
+    if (this.markers.has(sitId)) {
+      const sit = this.props.sits.get(sitId);
+      if (sit) {
+        const marker = this.markers.get(sitId)!;
+        const el = marker.getElement();
+        el.className = 'mapboxgl-marker';
+        this.getMarkerClasses(sit, this.props.user, newMarks).forEach(className => {
+          el.classList.add(className);
+        });
+      }
+    }
+
     // Update the popup if it's for this sit
     if (this.popupRoot && this.currentPopupSitId === sitId) {
       const sit = this.props.sits.get(sitId);
@@ -279,6 +292,19 @@ class MapComponent extends React.Component<MapProps, MapState> {
         marks: revertedMarks,
         favoriteCount: revertedFavoriteCount
       });
+
+      // Also update the marker styling directly
+      if (this.markers.has(sitId)) {
+        const sit = this.props.sits.get(sitId);
+        if (sit) {
+          const marker = this.markers.get(sitId)!;
+          const el = marker.getElement();
+          el.className = 'mapboxgl-marker';
+          this.getMarkerClasses(sit, this.props.user, currentMarks).forEach(className => {
+            el.classList.add(className);
+          });
+        }
+      }
 
       // Also update the popup with reverted state
       if (this.popupRoot && this.currentPopupSitId === sitId) {
