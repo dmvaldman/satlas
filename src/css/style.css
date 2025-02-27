@@ -870,3 +870,35 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .satlas-marker.want-to-go {
   background-color: #9c27b0;
 }
+
+/* Cluster styles */
+.cluster-marker {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #31d53d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-weight: bold;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.cluster-marker-count {
+  font-size: 14px;
+}
+
+/* Adjust cluster colors based on size */
+.cluster-marker.small {
+  background-color: #51bbd6;
+}
+
+.cluster-marker.medium {
+  background-color: #f1f075;
+}
+
+.cluster-marker.large {
+  background-color: #f28cb1;
+}
