@@ -1,3 +1,6 @@
+import { FieldValue, Timestamp } from 'firebase/firestore';
+import { User } from 'firebase/auth';
+
 // Add Image type to existing types
 export interface Image {
   id: string;
@@ -7,9 +10,6 @@ export interface Image {
   collectionId: string;
   createdAt: Date | any; // Using any for Firestore timestamp
 }
-
-import { FieldValue, Timestamp } from 'firebase/firestore';
-import { User } from 'firebase/auth';
 
 export interface Sit {
   id: string;
@@ -48,12 +48,5 @@ export interface UserPreferences {
 }
 
 export type MarkType = 'favorite' | 'wantToGo' | 'visited';
-
-export interface UserSitMark {
-  userId: string;
-  sitId: string;
-  type: MarkType;
-  createdAt: Timestamp;
-}
 
 export type { User }; // Use export type for re-exporting types

@@ -46,6 +46,10 @@ header {
   height: 100%;
 }
 
+.mapboxgl-control-container {
+  display: none;
+}
+
 .satlas-marker {
   width: 25px;
   height: 25px;
@@ -901,4 +905,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .cluster-marker.large {
   background-color: #f28cb1;
+}
+
+.mapboxgl-user-location {
+  z-index: 1000;
+  pointer-events: none !important;
+}
+
+.mapboxgl-user-location-accuracy-circle {
+  pointer-events: none !important;
 }
