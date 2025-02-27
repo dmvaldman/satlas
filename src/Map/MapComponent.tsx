@@ -6,7 +6,7 @@ import { MarkerManager } from './MarkerManager';
 import { PopupManager } from './PopupManager';
 import { ClusterManager } from './ClusterManager';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZG12YWxkbWFuIiwiYSI6ImNpbXRmNXpjaTAxem92OWtrcHkxcTduaHEifQ.6sfBuE2sOf5bVUU6cQJLVQ';
+mapboxgl.accessToken = process.env.MAPBOX_ACCESS_TOKEN || '';
 
 interface MapProps {
   map: mapboxgl.Map | null;
