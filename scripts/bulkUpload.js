@@ -9,6 +9,10 @@ import ExifParser from 'exif-parser';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -16,9 +20,15 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 
 // Read the shared Firebase config
-const firebaseConfig = JSON.parse(
-  fs.readFileSync(join(projectRoot, 'firebaseConfig.json'), 'utf8')
-);
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
