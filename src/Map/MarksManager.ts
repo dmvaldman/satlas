@@ -5,9 +5,7 @@ import { MarkType } from '../types';
 export class MarksManager {
   static async loadFavoriteCounts(): Promise<Map<string, number>> {
     try {
-      const marksQuery = query(
-        collection(db, 'favorites')
-      );
+      const marksQuery = query(collection(db, 'favorites'));
       const querySnapshot = await getDocs(marksQuery);
 
       // Count favorites per sitId
@@ -72,26 +70,52 @@ export class MarksManager {
     }
   }
 
-  static async toggleFavorite(
+  static async toggleMark(
     userId: string,
     sitId: string,
+    markType: MarkType,
     currentMarks: Set<MarkType>
-  ): Promise<{ marks: Set<MarkType>; favoriteCount: number }> {
+  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
     try {
       const newMarks = new Set<MarkType>();
-      const docRef = doc(db, 'favorites', `${userId}_${sitId}`);
+
+      // Document references for all mark types
+      const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
       const visitedRef = doc(db, 'visited', `${userId}_${sitId}`);
       const wantToGoRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
 
-      if (currentMarks.has('favorite')) {
+      // If the mark is already set, remove it
+      if (currentMarks.has(markType)) {
+        // Get the appropriate document reference
+        const docRef = markType === 'favorite'
+          ? favoriteRef
+          : markType === 'visited'
+            ? visitedRef
+            : wantToGoRef;
+
         await deleteDoc(docRef);
       } else {
-        // Clear other marks
+        // Clear all existing marks first
         await Promise.all([
+          deleteDoc(favoriteRef),
           deleteDoc(visitedRef),
           deleteDoc(wantToGoRef)
         ]);
-        newMarks.add('favorite');
+
+        // Add the new mark
+        newMarks.add(markType);
+
+        // Get the appropriate document reference and data
+        let docRef;
+        if (markType === 'favorite') {
+          docRef = favoriteRef;
+        } else if (markType === 'visited') {
+          docRef = visitedRef;
+        } else {
+          docRef = wantToGoRef;
+        }
+
+        // Set the new mark
         await setDoc(docRef, {
           userId,
           sitId,
@@ -99,50 +123,8 @@ export class MarksManager {
         });
       }
 
-      const countQuery = query(
-        collection(db, 'favorites'),
-        where('sitId', '==', sitId)
-      );
-      const snapshot = await getDocs(countQuery);
-      return {
-        marks: newMarks,
-        favoriteCount: snapshot.size
-      };
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      throw error;
-    }
-  }
-
-  static async toggleVisited(
-    userId: string,
-    sitId: string,
-    currentMarks: Set<MarkType>
-  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
-    try {
-      const newMarks = new Set<MarkType>();
-      const docRef = doc(db, 'visited', `${userId}_${sitId}`);
-      const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
-      const wantToGoRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
-
-      if (currentMarks.has('visited')) {
-        await deleteDoc(docRef);
-      } else {
-        // Clear other marks
-        await Promise.all([
-          deleteDoc(favoriteRef),
-          deleteDoc(wantToGoRef)
-        ]);
-        newMarks.add('visited');
-        await setDoc(docRef, {
-          userId,
-          sitId,
-          createdAt: new Date()
-        });
-      }
-
-      // If we removed a favorite, get new count
-      if (currentMarks.has('favorite')) {
+      // If we're dealing with favorites, get the updated count
+      if (markType === 'favorite' || currentMarks.has('favorite')) {
         const countQuery = query(
           collection(db, 'favorites'),
           where('sitId', '==', sitId)
@@ -156,54 +138,7 @@ export class MarksManager {
 
       return { marks: newMarks };
     } catch (error) {
-      console.error('Error toggling visited:', error);
-      throw error;
-    }
-  }
-
-  static async toggleWantToGo(
-    userId: string,
-    sitId: string,
-    currentMarks: Set<MarkType>
-  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
-    try {
-      const newMarks = new Set<MarkType>();
-      const docRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
-      const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
-      const visitedRef = doc(db, 'visited', `${userId}_${sitId}`);
-
-      if (currentMarks.has('wantToGo')) {
-        await deleteDoc(docRef);
-      } else {
-        // Clear other marks
-        await Promise.all([
-          deleteDoc(favoriteRef),
-          deleteDoc(visitedRef)
-        ]);
-        newMarks.add('wantToGo');
-        await setDoc(docRef, {
-          userId,
-          sitId,
-          createdAt: new Date()
-        });
-      }
-
-      // If we removed a favorite, get new count
-      if (currentMarks.has('favorite')) {
-        const countQuery = query(
-          collection(db, 'favorites'),
-          where('sitId', '==', sitId)
-        );
-        const snapshot = await getDocs(countQuery);
-        return {
-          marks: newMarks,
-          favoriteCount: snapshot.size
-        };
-      }
-
-      return { marks: newMarks };
-    } catch (error) {
-      console.error('Error toggling want-to-go:', error);
+      console.error(`Error toggling ${markType}:`, error);
       throw error;
     }
   }
