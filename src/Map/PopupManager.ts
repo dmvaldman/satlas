@@ -61,15 +61,17 @@ export class PopupManager {
 
       const popup = new mapboxgl.Popup({
         closeButton: false,
-        maxWidth: '300px',
-        offset: 25,
-        anchor: 'bottom',
+        offset: 10,
         className: 'satlas-popup-container'
       });
 
       popup.setDOMContent(container)
            .setLngLat([sit.location.longitude, sit.location.latitude])
            .addTo(map);
+
+      popup.on('close', () => {
+        this.cleanupPopup();
+      });
 
       this.activePopup = popup;
     } catch (error) {
@@ -106,9 +108,10 @@ export class PopupManager {
   public closePopup(): void {
     if (this.activePopup) {
       this.activePopup.remove();
-      this.activePopup = null;
     }
+  }
 
+  private cleanupPopup(): void {
     if (this.popupRoot) {
       this.popupRoot.unmount();
       this.popupRoot = null;
@@ -117,6 +120,7 @@ export class PopupManager {
     this.popupContainer = null;
     this.currentSitId = null;
     this.currentImages = [];
+    this.activePopup = null;
   }
 
   public getCurrentSitId(): string | null {

@@ -121,6 +121,12 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { marks, favoriteCount } = this.state;
     if (!map) return;
 
+    // Check if clicked marker is the currently open one
+    if (this.popupManager.getCurrentSitId() === sit.id) {
+      this.popupManager.closePopup();
+      return;
+    }
+
     await this.popupManager.showPopup(
       map,
       sit,
