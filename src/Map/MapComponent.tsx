@@ -29,6 +29,8 @@ interface MapProps {
 interface MapState {
   activePopup: mapboxgl.Popup | null;
   clusterSourceAdded: boolean;
+  marks: Map<string, Set<MarkType>>;
+  favoriteCount: Map<string, number>;
 }
 
 class MapComponent extends React.Component<MapProps, MapState> {
@@ -44,7 +46,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
     super(props);
     this.state = {
       activePopup: null,
-      clusterSourceAdded: false
+      clusterSourceAdded: false,
+      marks: new Map(props.marks),
+      favoriteCount: new Map(props.favoriteCount)
     };
 
     // Create debounced version of handleMapMove
@@ -101,7 +105,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private handleMarkerClick = async (sit: Sit) => {
-    const { map, marks, favoriteCount, user } = this.props;
+    const { map, user } = this.props;
+    const { marks, favoriteCount } = this.state;
     if (!map) return;
 
     if (this.state.activePopup) {
@@ -127,7 +132,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
           user={user}
           marks={marks.get(sit.id) || new Set()}
           favoriteCount={favoriteCount.get(sit.id) || 0}
-          onToggleMark={this.props.onToggleMark}
+          onToggleMark={this.handleToggleMark}
           onDeleteImage={this.props.onDeleteImage}
           onReplaceImage={this.handleReplaceImage}
           onOpenPhotoModal={this.props.onOpenPhotoModal}
@@ -155,42 +160,13 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   componentDidUpdate(prevProps: MapProps) {
-    if (
-      this.popupRoot &&
-      this.currentPopupSitId &&
-      (prevProps.marks !== this.props.marks ||
-       prevProps.favoriteCount !== this.props.favoriteCount)
-    ) {
-      const sitId = this.currentPopupSitId;
-      const sit = this.props.sits.get(sitId);
-      if (sit) {
-        this.popupRoot.render(
-          <PopupComponent
-            sit={sit}
-            images={this.currentPopupImages}
-            user={this.props.user}
-            marks={this.props.marks.get(sitId) || new Set()}
-            favoriteCount={this.props.favoriteCount.get(sitId) || 0}
-            onToggleMark={this.props.onToggleMark}
-            onDeleteImage={this.props.onDeleteImage}
-            onReplaceImage={this.handleReplaceImage}
-            onOpenPhotoModal={this.props.onOpenPhotoModal}
-            onOpenProfileModal={this.props.onOpenProfileModal}
-            currentLocation={this.props.currentLocation}
-          />
-        );
+    // If props marks or favoriteCount changed, update state
+    if (prevProps.marks !== this.props.marks) {
+      this.setState({ marks: new Map(this.props.marks) });
+    }
 
-        // Update the marker styling if it exists
-        if (this.markers.has(sitId)) {
-          const marker = this.markers.get(sitId)!;
-          const el = marker.getElement();
-          el.className = 'mapboxgl-marker';
-          this.getMarkerClasses(sit, this.props.user, this.props.marks.get(sitId) || new Set())
-            .forEach(className => {
-              el.classList.add(className);
-            });
-        }
-      }
+    if (prevProps.favoriteCount !== this.props.favoriteCount) {
+      this.setState({ favoriteCount: new Map(this.props.favoriteCount) });
     }
 
     const { map, sits } = this.props;
@@ -218,6 +194,114 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
     this.props.onOpenPhotoModal();
+  };
+
+  private handleToggleMark = async (sitId: string, type: MarkType) => {
+    // Get current state
+    const { marks, favoriteCount } = this.state;
+
+    // Get current marks for this sit
+    const currentMarks = new Set(marks.get(sitId) || new Set());
+    const currentFavoriteCount = favoriteCount.get(sitId) || 0;
+
+    // Create new marks set - start with an empty set to match MarksManager behavior
+    const newMarks = new Set<MarkType>();
+    let newFavoriteCount = currentFavoriteCount;
+
+    // If the mark was already active, we're removing it
+    if (currentMarks.has(type)) {
+      // Just leave newMarks empty
+      if (type === 'favorite') {
+        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
+      }
+    } else {
+      // Add only the new mark type (clearing others)
+      newMarks.add(type);
+
+      // Update favorite count if needed
+      if (type === 'favorite') {
+        newFavoriteCount++;
+      } else if (currentMarks.has('favorite')) {
+        // If we're switching from favorite to another type, decrement favorite count
+        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
+      }
+    }
+
+    // Update state immediately
+    const updatedMarks = new Map(marks);
+    updatedMarks.set(sitId, newMarks);
+
+    const updatedFavoriteCount = new Map(favoriteCount);
+    updatedFavoriteCount.set(sitId, newFavoriteCount);
+
+    this.setState({
+      marks: updatedMarks,
+      favoriteCount: updatedFavoriteCount
+    });
+
+    // Update the popup if it's for this sit
+    if (this.popupRoot && this.currentPopupSitId === sitId) {
+      const sit = this.props.sits.get(sitId);
+      if (sit) {
+        this.popupRoot.render(
+          <PopupComponent
+            sit={sit}
+            images={this.currentPopupImages}
+            user={this.props.user}
+            marks={newMarks}
+            favoriteCount={newFavoriteCount}
+            onToggleMark={this.handleToggleMark}
+            onDeleteImage={this.props.onDeleteImage}
+            onReplaceImage={this.handleReplaceImage}
+            onOpenPhotoModal={this.props.onOpenPhotoModal}
+            onOpenProfileModal={this.props.onOpenProfileModal}
+            currentLocation={this.props.currentLocation}
+          />
+        );
+      }
+    }
+
+    // Make the actual API call
+    try {
+      await this.props.onToggleMark(sitId, type);
+      // Server update successful, state will be updated via props in componentDidUpdate
+    } catch (error) {
+      console.error('Error toggling mark:', error);
+
+      // On error, revert to previous state
+      const revertedMarks = new Map(this.state.marks);
+      revertedMarks.set(sitId, currentMarks);
+
+      const revertedFavoriteCount = new Map(this.state.favoriteCount);
+      revertedFavoriteCount.set(sitId, currentFavoriteCount);
+
+      this.setState({
+        marks: revertedMarks,
+        favoriteCount: revertedFavoriteCount
+      });
+
+      // Also update the popup with reverted state
+      if (this.popupRoot && this.currentPopupSitId === sitId) {
+        const sit = this.props.sits.get(sitId);
+        if (sit) {
+          this.popupRoot.render(
+            <PopupComponent
+              sit={sit}
+              images={this.currentPopupImages}
+              user={this.props.user}
+              marks={currentMarks}
+              favoriteCount={currentFavoriteCount}
+              onToggleMark={this.handleToggleMark}
+              onDeleteImage={this.props.onDeleteImage}
+              onReplaceImage={this.handleReplaceImage}
+              onOpenPhotoModal={this.props.onOpenPhotoModal}
+              onOpenProfileModal={this.props.onOpenProfileModal}
+              currentLocation={this.props.currentLocation}
+            />
+          );
+        }
+      }
+    }
   };
 
   private setupClusterLayer(map: mapboxgl.Map) {
@@ -412,12 +496,18 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private showIndividualMarkers(map: mapboxgl.Map, sits: Map<string, Sit>, marks: Map<string, Set<MarkType>>, user: User | null) {
+    // Use component state for marks
+    const stateMarks = this.state.marks;
+
     Array.from(sits.values()).forEach(sit => {
+      // Get marks from state
+      const sitMarks = stateMarks.get(sit.id) || new Set();
+
       // Check if marker already exists
       if (!this.markers.has(sit.id)) {
         // Create new marker
         const el = document.createElement('div');
-        el.className = this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).join(' ');
+        el.className = this.getMarkerClasses(sit, user, sitMarks).join(' ');
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           this.handleMarkerClick(sit);
@@ -435,7 +525,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
         // Update classes
         el.className = 'mapboxgl-marker';
-        this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).forEach(className => {
+        this.getMarkerClasses(sit, user, sitMarks).forEach(className => {
           el.classList.add(className);
         });
 
