@@ -68,10 +68,6 @@ class MarkerComponent extends React.Component<MarkerProps, MarkerState> {
       classes.push('want-to-go');
     }
 
-    if (!sit.imageCollectionId) {
-      classes.push('new');
-    }
-
     return classes;
   }
 
