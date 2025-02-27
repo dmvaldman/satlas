@@ -179,6 +179,17 @@ class MapComponent extends React.Component<MapProps, MapState> {
             currentLocation={this.props.currentLocation}
           />
         );
+
+        // Update the marker styling if it exists
+        if (this.markers.has(sitId)) {
+          const marker = this.markers.get(sitId)!;
+          const el = marker.getElement();
+          el.className = 'mapboxgl-marker';
+          this.getMarkerClasses(sit, this.props.user, this.props.marks.get(sitId) || new Set())
+            .forEach(className => {
+              el.classList.add(className);
+            });
+        }
       }
     }
 
@@ -187,6 +198,21 @@ class MapComponent extends React.Component<MapProps, MapState> {
     // If map is available and sits have changed, update the GeoJSON source
     if (map && prevProps.sits !== sits && this.state.clusterSourceAdded) {
       this.updateClusterSource(map, sits);
+    }
+
+    // If marks have changed, update all visible markers
+    if (prevProps.marks !== this.props.marks && map) {
+      this.markers.forEach((marker, sitId) => {
+        const sit = this.props.sits.get(sitId);
+        if (sit) {
+          const el = marker.getElement();
+          el.className = 'mapboxgl-marker';
+          this.getMarkerClasses(sit, this.props.user, this.props.marks.get(sitId) || new Set())
+            .forEach(className => {
+              el.classList.add(className);
+            });
+        }
+      });
     }
   }
 
@@ -212,7 +238,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
       type: 'geojson',
       data: this.createGeoJSONFromSits(this.props.sits),
       cluster: true,
-      clusterMaxZoom: 14, // Max zoom to cluster points on
+      clusterMaxZoom: 13, // Max zoom to cluster points on
+      clusterMinPoints: 2, // Minimum points to form a cluster
       clusterRadius: 50 // Radius of each cluster when clustering points
     });
 
@@ -354,7 +381,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     // Get current zoom level
     const zoom = map.getZoom();
-    const clusterMaxZoom = 14; // Should match the value in setupClusterLayer
+    const clusterMaxZoom = 13; // Should match the value in setupClusterLayer
 
     // If zoomed in beyond clustering threshold, show individual markers
     if (zoom >= clusterMaxZoom) {
@@ -363,65 +390,75 @@ class MapComponent extends React.Component<MapProps, MapState> {
       map.setLayoutProperty('cluster-count', 'visibility', 'none');
 
       // Show individual markers
-      Array.from(sits.values()).forEach(sit => {
-        // Check if marker already exists
-        if (!this.markers.has(sit.id)) {
-          // Create new marker
-          const el = document.createElement('div');
-          el.className = this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).join(' ');
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.handleMarkerClick(sit);
-          });
-
-          const marker = new mapboxgl.Marker(el)
-            .setLngLat([sit.location.longitude, sit.location.latitude])
-            .addTo(map);
-
-          this.markers.set(sit.id, marker);
-        } else {
-          // Update existing marker
-          const marker = this.markers.get(sit.id)!;
-          const el = marker.getElement();
-
-          // Update classes
-          el.className = 'mapboxgl-marker';
-          this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).forEach(className => {
-            el.classList.add(className);
-          });
-
-          // Update position if needed
-          marker.setLngLat([sit.location.longitude, sit.location.latitude]);
-
-          // Make sure the marker is visible and added to the map
-          marker.addTo(map);
-        }
-      });
-
-      // Remove any markers that no longer exist
-      this.markers.forEach((marker, id) => {
-        if (!sits.has(id)) {
-          marker.remove();
-          this.markers.delete(id);
-        }
-      });
-
-      // Remove any cluster markers
-      this.clusterMarkers.forEach(marker => marker.remove());
-      this.clusterMarkers.clear();
+      this.showIndividualMarkers(map, sits, marks, user);
     } else {
       // Show cluster layers
       map.setLayoutProperty('clusters', 'visibility', 'visible');
       map.setLayoutProperty('cluster-count', 'visibility', 'visible');
 
-      // Hide individual markers
-      this.markers.forEach(marker => {
-        marker.remove();
-      });
-      // Note: We don't clear the markers Map here, just remove them from the map
-      // This way we can reuse them when zooming back in
+      // Check if there are any clusters in the current view
+      const features = map.queryRenderedFeatures({ layers: ['clusters'] });
+
+      // If no clusters are found but we're just below the threshold, keep individual markers
+      if (features.length === 0 && zoom > clusterMaxZoom - 0.5) {
+        this.showIndividualMarkers(map, sits, marks, user);
+      } else {
+        // Hide individual markers
+        this.markers.forEach(marker => {
+          marker.remove();
+        });
+      }
     }
   };
+
+  private showIndividualMarkers(map: mapboxgl.Map, sits: Map<string, Sit>, marks: Map<string, Set<MarkType>>, user: User | null) {
+    Array.from(sits.values()).forEach(sit => {
+      // Check if marker already exists
+      if (!this.markers.has(sit.id)) {
+        // Create new marker
+        const el = document.createElement('div');
+        el.className = this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).join(' ');
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.handleMarkerClick(sit);
+        });
+
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([sit.location.longitude, sit.location.latitude])
+          .addTo(map);
+
+        this.markers.set(sit.id, marker);
+      } else {
+        // Update existing marker
+        const marker = this.markers.get(sit.id)!;
+        const el = marker.getElement();
+
+        // Update classes
+        el.className = 'mapboxgl-marker';
+        this.getMarkerClasses(sit, user, marks.get(sit.id) || new Set()).forEach(className => {
+          el.classList.add(className);
+        });
+
+        // Update position if needed
+        marker.setLngLat([sit.location.longitude, sit.location.latitude]);
+
+        // Make sure the marker is visible and added to the map
+        marker.addTo(map);
+      }
+    });
+
+    // Remove any markers that no longer exist
+    this.markers.forEach((marker, id) => {
+      if (!sits.has(id)) {
+        marker.remove();
+        this.markers.delete(id);
+      }
+    });
+
+    // Remove any cluster markers
+    this.clusterMarkers.forEach(marker => marker.remove());
+    this.clusterMarkers.clear();
+  }
 
   private getMarkerClasses(sit: Sit, user: User | null, marks: Set<MarkType>): string[] {
     const classes = ['satlas-marker'];
