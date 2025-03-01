@@ -23,7 +23,6 @@ interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
   onPhotoCapture: (result: PhotoResult, existingSit?: Sit) => Promise<void>;
-  replaceInfo: { sitId: string; imageId: string; } | null;
   isUploading?: boolean;
   sit?: Sit;
 }

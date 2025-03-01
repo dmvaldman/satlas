@@ -1,7 +1,7 @@
 import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Sit, Image, Coordinates } from '../types';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { addDoc } from 'firebase/firestore';
 import { storage } from '../firebase';
 
@@ -202,5 +202,44 @@ export class SitManager {
 
     // Create the sit
     return await this.createSit(location, imageCollectionId, userId);
+  }
+
+  static async deleteImage(imageId: string, userId: string): Promise<void> {
+    // Get image data first
+    const imageDoc = await getDoc(doc(db, 'images', imageId));
+    if (!imageDoc.exists()) throw new Error('Image not found');
+
+    const imageData = imageDoc.data();
+
+    // Verify ownership
+    if (imageData.userId !== userId) {
+      throw new Error('Can only delete your own images');
+    }
+
+    // Delete from storage first
+    const filename = imageData.photoURL.split('/').pop()?.split('?')[0];
+    if (filename) {
+      const storageRef = ref(storage, `sits/${filename}`);
+      try {
+        await deleteObject(storageRef);
+        console.log(`Deleted original image: ${filename}`);
+        // The Cloud Function will handle deleting variations
+      } catch (error) {
+        console.error('Error deleting image file:', error);
+      }
+    }
+
+    // Then mark as deleted in Firestore
+    await setDoc(doc(db, 'images', imageId), {
+      deleted: true,
+      deletedAt: new Date(),
+      deletedBy: userId
+    }, { merge: true });
+  }
+
+  static replaceImage(sitId: string, imageId: string): { sitId: string, imageId: string } {
+    // This method doesn't need to do much - it just returns the data in a structured format
+    // In the future, you might add validation or other logic here
+    return { sitId, imageId };
   }
 }

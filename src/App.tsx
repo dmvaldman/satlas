@@ -8,8 +8,6 @@ import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from '
 import MapComponent from './Map/MapComponent';
 import { Image, Sit, Coordinates } from './types';
 import { getDistanceInFeet } from './utils/geo';
-import { ref, deleteObject } from 'firebase/storage';
-import { storage } from './firebase';
 import PhotoUploadComponent from './Photo/PhotoUpload';
 import ProfileModal from './Auth/ProfileModal';
 import { UserPreferences } from './types';
@@ -302,11 +300,6 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleSitClick = (sit: Sit) => {
-    // This will be expanded when we implement popup functionality
-    console.log('Sit clicked:', sit);
-  };
-
   private handleLoadNearbySits = async (bounds: { north: number; south: number }) => {
     try {
       const newSits = await SitManager.loadNearbySits(bounds);
@@ -365,43 +358,14 @@ class App extends React.Component<{}, AppState> {
     const sit = sits.get(sitId);
     if (!sit) throw new Error('Sit not found');
 
-    // Check if user owns the sit
-    if (sit.uploadedBy !== user.uid) {
-      throw new Error('Can only delete your own images');
-    }
-
     try {
-      // Get image data first
-      const imageDoc = await getDoc(doc(db, 'images', imageId));
-      if (!imageDoc.exists()) throw new Error('Image not found');
-
-      const imageData = imageDoc.data();
-
-      // Delete from storage first
-      const filename = imageData.photoURL.split('/').pop()?.split('?')[0];
-      if (filename) {
-        const storageRef = ref(storage, `sits/${filename}`);
-        try {
-          await deleteObject(storageRef);
-          console.log(`Deleted original image: ${filename}`);
-          // The Cloud Function will handle deleting variations
-        } catch (error) {
-          console.error('Error deleting image file:', error);
-        }
-      }
-
-      // Then delete from Firestore
-      await setDoc(doc(db, 'images', imageId), {
-        deleted: true,
-        deletedAt: new Date(),
-        deletedBy: user.uid
-      }, { merge: true });
+      // Use SitManager to delete the image
+      await SitManager.deleteImage(imageId, user.uid);
 
       // Update local state
       if (sit.imageCollectionId) {
         await this.getImagesForSit(sit.imageCollectionId);
       }
-
     } catch (error) {
       console.error('Error deleting image:', error);
       throw error;
@@ -409,13 +373,16 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
-    // Open photo upload modal with replace info
+    // Use SitManager to prepare the replacement data
+    const replacementData = SitManager.replaceImage(sitId, imageId);
+
+    // Open photo upload modal with replacement info
     this.setState({
       modals: {
         ...this.state.modals,
         photo: {
           isOpen: true,
-          data: { sitId, imageId }
+          data: replacementData
         }
       }
     });
@@ -609,7 +576,6 @@ class App extends React.Component<{}, AppState> {
             currentLocation={currentLocation}
             user={user}
             isLoading={isMapLoading}
-            onSitClick={this.handleSitClick}
             onLoadNearbySits={this.handleLoadNearbySits}
             onToggleMark={this.handleToggleMark}
             onDeleteImage={this.handleDeleteImage}
@@ -625,7 +591,7 @@ class App extends React.Component<{}, AppState> {
             isOpen={modals.photo.isOpen}
             onClose={this.togglePhotoUpload}
             onPhotoCapture={this.handlePhotoUploadComplete}
-            sit={modals.photo.data}
+            sit={modals.photo.data || undefined}
           />
         )}
 

@@ -19,6 +19,7 @@ interface MapProps {
   onLoadNearbySits: (bounds: { north: number; south: number }) => void;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
+  onReplaceImage: (sitId: string, imageId: string) => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
