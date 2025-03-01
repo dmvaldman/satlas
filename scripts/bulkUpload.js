@@ -175,10 +175,15 @@ async function bulkUploadImages(directoryPath, userId, userName) {
       // Read the file
       const fileBuffer = fs.readFileSync(filePath);
 
+      // Generate a unique filename with timestamp
+      const uniqueFilename = `${Date.now()}_${filename}`;
+
       // Upload to Firebase Storage
-      const storageRef = ref(storage, `sits/${Date.now()}_${filename}`);
+      const storageRef = ref(storage, `sits/${uniqueFilename}`);
       await uploadBytes(storageRef, fileBuffer);
-      const photoURL = await getDownloadURL(storageRef);
+
+      // Use CDN URL instead of direct storage URL
+      const photoURL = `https://satlas-world.web.app/images/sits/${uniqueFilename}`;
 
       // Create image collection
       const imageCollectionId = `${Date.now()}_${userId}_${index}`;

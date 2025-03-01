@@ -143,3 +143,53 @@ exports.serveImages = functions.https.onRequest(async (req, res) => {
     res.status(500).send('Error serving image');
   }
 });
+
+exports.deleteImageVariations = storage.onObjectDeleted({
+  bucket: 'satlas-world.firebasestorage.app'
+}, async (event) => {
+  const filePath = event.data.name;
+
+  // Only process files in the "sits" folder that aren't already variations
+  if (!filePath.startsWith('sits/') || filePath.includes('_med') || filePath.includes('_thumb')) {
+    return logger.log('Not a main image, skipping cleanup');
+  }
+
+  logger.log(`Original image deleted: ${filePath}, cleaning up variations`);
+
+  try {
+    // Extract the base name and extension
+    const fileName = path.basename(filePath);
+    const extension = path.extname(fileName);
+    const baseName = fileName.substring(0, fileName.length - extension.length);
+    const dirName = path.dirname(filePath);
+
+    // Paths for variations
+    const medFilePath = path.join(dirName, `${baseName}_med${extension}`);
+    const thumbFilePath = path.join(dirName, `${baseName}_thumb${extension}`);
+
+    const bucket = getStorage().bucket('satlas-world.firebasestorage.app');
+
+    // Check if medium version exists and delete it
+    const [medExists] = await bucket.file(medFilePath).exists();
+    if (medExists) {
+      await bucket.file(medFilePath).delete();
+      logger.log(`Deleted medium version: ${medFilePath}`);
+    } else {
+      logger.log(`Medium version not found: ${medFilePath}`);
+    }
+
+    // Check if thumbnail version exists and delete it
+    const [thumbExists] = await bucket.file(thumbFilePath).exists();
+    if (thumbExists) {
+      await bucket.file(thumbFilePath).delete();
+      logger.log(`Deleted thumbnail version: ${thumbFilePath}`);
+    } else {
+      logger.log(`Thumbnail version not found: ${thumbFilePath}`);
+    }
+
+    return logger.log('Cleanup complete');
+  } catch (error) {
+    logger.error('Error during cleanup:', error);
+    return logger.error('Cleanup failed');
+  }
+});
