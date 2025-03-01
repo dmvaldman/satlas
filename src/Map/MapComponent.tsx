@@ -70,15 +70,23 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   componentDidUpdate(prevProps: MapProps) {
-    const { map, sits, marks, favoriteCount } = this.props;
+    const { map, sits, marks, favoriteCount, user } = this.props;
 
     // If props marks or favoriteCount changed, update state
     if (prevProps.marks !== marks) {
-      this.setState({ marks: new Map(marks) });
+      this.setState({ marks: new Map(marks) }, () => {
+        // After marks state is updated, refresh the markers
+        this.updateVisibleMarkers();
+      });
     }
 
     if (prevProps.favoriteCount !== favoriteCount) {
       this.setState({ favoriteCount: new Map(favoriteCount) });
+    }
+
+    // If user auth state changed, refresh markers
+    if (prevProps.user !== user) {
+      this.updateVisibleMarkers();
     }
 
     // If map is available and sits have changed, update the GeoJSON source
