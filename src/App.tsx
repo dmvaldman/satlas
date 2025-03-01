@@ -386,7 +386,13 @@ class App extends React.Component<{}, AppState> {
       const filename = imageData.photoURL.split('/').pop()?.split('?')[0];
       if (filename) {
         const storageRef = ref(storage, `sits/${filename}`);
-        await deleteObject(storageRef);
+        try {
+          await deleteObject(storageRef);
+          console.log(`Deleted original image: ${filename}`);
+          // The Cloud Function will handle deleting variations
+        } catch (error) {
+          console.error('Error deleting image file:', error);
+        }
       }
 
       // Then delete from Firestore
