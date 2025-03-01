@@ -27,15 +27,6 @@ export interface ImageCollection {
   sitId: string;  // Back reference to Sit
 }
 
-export interface SitImage {
-  id: string;
-  collectionId: string;  // Reference to ImageCollection
-  photoURL: string;
-  userId: string;
-  userName: string;
-  createdAt: Date | FieldValue;
-}
-
 export interface Coordinates {
   latitude: number;
   longitude: number;
