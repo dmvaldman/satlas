@@ -37,7 +37,7 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      data: Sit | null;
+      data: Sit | { sitId: string; imageId: string; } | null;
     };
     profile: {
       isOpen: boolean;
@@ -413,14 +413,44 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Add this new method to handle photo upload completion
-  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit) => {
+  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => {
     const { user } = this.state;
     if (!user) return;
 
     const location = photoResult.location;
     if (!location) throw new Error('No location available');
 
-    if (existingSit?.imageCollectionId) {
+    // Handle replacement data case
+    if (existingSit && 'sitId' in existingSit && 'imageId' in existingSit) {
+      try {
+        const sitId = existingSit.sitId;
+        const sit = await SitManager.getSit(sitId);
+        if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
+
+        // Now we have the full Sit object with a valid imageCollectionId
+        await SitManager.addPhotoToSit(
+          photoResult.base64Data,
+          sit.imageCollectionId,
+          user.uid,
+          user.displayName || 'Anonymous'
+        );
+        this.showNotification('Photo replaced successfully!', 'success');
+        return;
+      } catch (error) {
+        console.error('Error replacing photo:', error);
+        this.showNotification(error instanceof Error ? error.message : 'Failed to replace photo', 'error');
+        return;
+      }
+    }
+
+    // Handle existing Sit case
+    if (existingSit && 'imageCollectionId' in existingSit) {
+      // Check if the collection ID is defined
+      if (!existingSit.imageCollectionId) {
+        this.showNotification('Cannot add photo: no image collection found', 'error');
+        return;
+      }
+
       // Check if the new photo's location is near the existing sit
       if (getDistanceInFeet(location, existingSit.location) > 100) {
         this.showNotification('Your photo location is too far from the existing sit. Please take a photo closer to the sit location.', 'error');

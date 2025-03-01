@@ -1,5 +1,4 @@
 import React from 'react';
-import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 import { Coordinates, Sit } from '../types';
 
 /// <reference types="vite/client" />
@@ -22,9 +21,9 @@ function convertDMSToDD(dms: number[], direction: string): number {
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
-  onPhotoCapture: (result: PhotoResult, existingSit?: Sit) => Promise<void>;
+  onPhotoCapture: (result: PhotoResult, existingSit?: Sit) => void;
   isUploading?: boolean;
-  sit?: Sit;
+  sit?: Sit | { sitId: string; imageId: string; };
 }
 
 interface PhotoUploadState {
