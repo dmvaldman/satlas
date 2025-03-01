@@ -204,6 +204,30 @@ export class SitManager {
     return await this.createSit(location, imageCollectionId, userId);
   }
 
+  static async deleteSit(sitId: string, userId: string): Promise<boolean> {
+    // Get the sit first to verify ownership
+    const sitRef = doc(db, 'sits', sitId);
+    const sitDoc = await getDoc(sitRef);
+
+    if (!sitDoc.exists()) {
+      console.log(`Sit ${sitId} not found`);
+      return false;
+    }
+
+    const sitData = sitDoc.data();
+
+    // Verify ownership
+    if (sitData.uploadedBy !== userId) {
+      console.log(`User ${userId} is not the owner of sit ${sitId}, not deleting`);
+      return false;
+    }
+
+    // Delete the sit
+    await deleteDoc(sitRef);
+    console.log(`Deleted sit ${sitId}`);
+    return true;
+  }
+
   static async deleteImage(imageId: string, userId: string): Promise<void> {
     // Get image data first
     const imageDoc = await getDoc(doc(db, 'images', imageId));
@@ -266,15 +290,8 @@ export class SitManager {
         const sitDoc = sitSnapshot.docs[0];
         const sitId = sitDoc.id;
 
-        // Verify ownership or admin status before deleting
-        const sitData = sitDoc.data();
-        if (sitData.uploadedBy === userId) {
-          // Delete the sit
-          await deleteDoc(doc(db, 'sits', sitId));
-          console.log(`Deleted sit ${sitId} after removing last image`);
-        } else {
-          console.log(`User ${userId} is not the owner of sit ${sitId}, not deleting`);
-        }
+        // Use the deleteSit method to handle the deletion
+        await this.deleteSit(sitId, userId);
       }
     }
   }
