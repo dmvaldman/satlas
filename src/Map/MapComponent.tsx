@@ -269,6 +269,10 @@ class MapComponent extends React.Component<MapProps, MapState> {
     }
   };
 
+  public closePopup = () => {
+    this.popupManager.closePopup();
+  };
+
   render() {
     const { isLoading } = this.props;
 

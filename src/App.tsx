@@ -71,7 +71,8 @@ interface PhotoResult {
 
 class App extends React.Component<{}, AppState> {
   private provider: GoogleAuthProvider;
-  private mapContainer: React.RefObject<HTMLDivElement>;
+  private mapContainer = React.createRef<HTMLDivElement>();
+  private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
 
   constructor(props: {}) {
@@ -110,7 +111,6 @@ class App extends React.Component<{}, AppState> {
     };
 
     this.provider = new GoogleAuthProvider();
-    this.mapContainer = React.createRef();
     this.locationService = new LocationService();
   }
 
@@ -362,8 +362,23 @@ class App extends React.Component<{}, AppState> {
       // Use SitManager to delete the image
       await SitManager.deleteImage(imageId, user.uid);
 
-      // Update local state
-      if (sit.imageCollectionId) {
+      // Check if the sit still exists in Firestore
+      const sitExists = await SitManager.getSit(sitId);
+
+      if (!sitExists) {
+        // Sit was deleted, remove from local state
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.delete(sitId);
+          return { sits: newSits };
+        });
+
+        // Close any open popup
+        if (this.mapComponentRef.current) {
+          this.mapComponentRef.current.closePopup();
+        }
+      } else if (sit.imageCollectionId) {
+        // Sit still exists, just update the images
         await this.getImagesForSit(sit.imageCollectionId);
       }
     } catch (error) {
@@ -569,6 +584,7 @@ class App extends React.Component<{}, AppState> {
 
         {!isMapLoading && map && (
           <MapComponent
+            ref={this.mapComponentRef}
             map={map}
             sits={sits}
             marks={marks}
