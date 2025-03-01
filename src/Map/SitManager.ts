@@ -126,7 +126,9 @@ export class SitManager {
     const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
 
     await uploadString(storageRef, base64WithoutPrefix, 'base64');
-    const photoURL = await getDownloadURL(storageRef);
+
+    // Use this:
+    const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
 
     // Add to existing collection
     await addDoc(collection(db, 'images'), {
