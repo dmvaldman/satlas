@@ -111,7 +111,20 @@ exports.serveImages = functions.https.onRequest(async (req, res) => {
 
     // Check if file exists
     const [exists] = await file.exists();
-    if (!exists) {
+
+    // If the requested size doesn't exist, fall back to the original
+    if (!exists && (size === 'med' || size === 'medium' || size === 'thumb' || size === 'thumbnail')) {
+      logger.log(`Requested size ${size} not found for ${imagePath}, falling back to original`);
+      finalPath = imagePath;
+      file = bucket.file(finalPath);
+
+      // Check if original exists
+      const [originalExists] = await file.exists();
+      if (!originalExists) {
+        res.status(404).send('Image not found');
+        return;
+      }
+    } else if (!exists) {
       res.status(404).send('Image not found');
       return;
     }
