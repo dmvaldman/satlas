@@ -216,6 +216,12 @@ export class SitManager {
       throw new Error('Can only delete your own images');
     }
 
+    // Get the collection ID for this image
+    const collectionId = imageData.collectionId;
+    if (!collectionId) {
+      throw new Error('Image is not associated with a collection');
+    }
+
     // Delete from storage first
     const filename = imageData.photoURL.split('/').pop()?.split('?')[0];
     if (filename) {
@@ -229,12 +235,48 @@ export class SitManager {
       }
     }
 
-    // Then mark as deleted in Firestore
+    // Mark image as deleted in Firestore
     await setDoc(doc(db, 'images', imageId), {
       deleted: true,
       deletedAt: new Date(),
       deletedBy: userId
     }, { merge: true });
+
+    // Check if this was the last image in the collection
+    const imagesRef = collection(db, 'images');
+    const q = query(
+      imagesRef,
+      where('collectionId', '==', collectionId),
+      where('deleted', '==', false)
+    );
+
+    const remainingImages = await getDocs(q);
+
+    // If no images remain, find and delete the sit
+    if (remainingImages.empty) {
+      console.log('No images remain in collection, deleting sit');
+
+      // Find the sit with this collection ID
+      const sitsRef = collection(db, 'sits');
+      const sitQuery = query(sitsRef, where('imageCollectionId', '==', collectionId));
+      const sitSnapshot = await getDocs(sitQuery);
+
+      if (!sitSnapshot.empty) {
+        // There should be only one sit with this collection ID
+        const sitDoc = sitSnapshot.docs[0];
+        const sitId = sitDoc.id;
+
+        // Verify ownership or admin status before deleting
+        const sitData = sitDoc.data();
+        if (sitData.uploadedBy === userId) {
+          // Delete the sit
+          await deleteDoc(doc(db, 'sits', sitId));
+          console.log(`Deleted sit ${sitId} after removing last image`);
+        } else {
+          console.log(`User ${userId} is not the owner of sit ${sitId}, not deleting`);
+        }
+      }
+    }
   }
 
   static replaceImage(sitId: string, imageId: string): { sitId: string, imageId: string } {
