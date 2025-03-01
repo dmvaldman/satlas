@@ -3,6 +3,8 @@ import { Sit } from '../types';
 
 export class ClusterManager {
   private clusterSourceAdded: boolean = false;
+  private clusterColor: string = '#51bbd6';
+  private clusterRadius: number = 25;
 
   public setupClusterLayer(map: mapboxgl.Map, sits: Map<string, Sit>): void {
     if (map.loaded()) {
@@ -45,24 +47,8 @@ export class ClusterManager {
       source: 'sits',
       filter: ['has', 'point_count'],
       paint: {
-        'circle-color': [
-          'step',
-          ['get', 'point_count'],
-          '#51bbd6', // color for clusters with < 10 points
-          10,
-          '#f1f075', // color for clusters with < 50 points
-          50,
-          '#f28cb1' // color for clusters with >= 50 points
-        ],
-        'circle-radius': [
-          'step',
-          ['get', 'point_count'],
-          20, // radius for clusters with < 10 points
-          10,
-          30, // radius for clusters with < 50 points
-          50,
-          40 // radius for clusters with >= 50 points
-        ]
+        'circle-color': this.clusterColor,
+        'circle-radius': this.clusterRadius
       }
     });
 
