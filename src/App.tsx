@@ -475,7 +475,12 @@ class App extends React.Component<{}, AppState> {
       const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       await uploadString(storageRef, base64WithoutPrefix, 'base64');
-      const photoURL = await getDownloadURL(storageRef);
+
+      // Instead of this:
+      // const photoURL = await getDownloadURL(storageRef);
+
+      // Use this:
+      const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
 
       // Create image collection
       const imageCollectionId = `${Date.now()}_${user.uid}`;

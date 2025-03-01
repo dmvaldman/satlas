@@ -90,7 +90,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             onClick={this.handleImageInteraction}
           >
             <img
-              src={currentImage.photoURL}
+              src={`${currentImage.photoURL}?size=med`}
               alt={`Image ${activeIndex + 1}`}
               className="carousel-image"
             />
