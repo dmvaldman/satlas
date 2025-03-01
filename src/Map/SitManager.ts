@@ -123,11 +123,27 @@ export class SitManager {
     // Upload photo
     const filename = `sit_${Date.now()}.jpg`;
     const storageRef = ref(storage, `sits/${filename}`);
+
+    // Detect content type from base64 data
+    let contentType = 'image/jpeg'; // Default
+    if (photoData.startsWith('data:')) {
+      const matches = photoData.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (matches && matches.length > 1) {
+        contentType = matches[1];
+      }
+    }
+
     const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
 
-    await uploadString(storageRef, base64WithoutPrefix, 'base64');
+    // Add metadata with detected content type
+    const metadata = {
+      contentType: contentType
+    };
 
-    // Use this:
+    // Upload with metadata
+    await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
+
+    // Use CDN URL
     const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
 
     // Add to existing collection
@@ -139,5 +155,52 @@ export class SitManager {
       createdAt: new Date(),
       deleted: false
     });
+  }
+
+  static async createSitWithPhoto(
+    photoData: string,
+    location: Coordinates,
+    userId: string,
+    userName: string
+  ): Promise<Sit> {
+    // Upload photo
+    const filename = `sit_${Date.now()}.jpg`;
+    const storageRef = ref(storage, `sits/${filename}`);
+
+    // Detect content type from base64 data
+    let contentType = 'image/jpeg'; // Default
+    if (photoData.startsWith('data:')) {
+      const matches = photoData.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (matches && matches.length > 1) {
+        contentType = matches[1];
+      }
+    }
+
+    const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
+
+    // Add metadata with detected content type
+    const metadata = {
+      contentType: contentType
+    };
+
+    // Upload with metadata
+    await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
+
+    // Use CDN URL
+    const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
+
+    // Create image collection
+    const imageCollectionId = `${Date.now()}_${userId}`;
+    await addDoc(collection(db, 'images'), {
+      photoURL,
+      userId,
+      userName,
+      collectionId: imageCollectionId,
+      createdAt: new Date(),
+      deleted: false
+    });
+
+    // Create the sit
+    return await this.createSit(location, imageCollectionId, userId);
   }
 }

@@ -8,12 +8,7 @@ import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from '
 import MapComponent from './Map/MapComponent';
 import { Image, Sit, Coordinates } from './types';
 import { getDistanceInFeet } from './utils/geo';
-import {
-  ref,
-  uploadString,
-  getDownloadURL,
-  deleteObject
-} from 'firebase/storage';
+import { ref, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 import PhotoUploadComponent from './Photo/PhotoUpload';
 import ProfileModal from './Auth/ProfileModal';
@@ -475,32 +470,13 @@ class App extends React.Component<{}, AppState> {
         sits: new Map(prevState.sits).set(initialSit.id, initialSit)
       }));
 
-      // Upload photo and create actual sit
-      const filename = `sit_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `sits/${filename}`);
-      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-      await uploadString(storageRef, base64WithoutPrefix, 'base64');
-
-      // Instead of this:
-      // const photoURL = await getDownloadURL(storageRef);
-
-      // Use this:
-      const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
-
-      // Create image collection
-      const imageCollectionId = `${Date.now()}_${user.uid}`;
-      await addDoc(collection(db, 'images'), {
-        photoURL,
-        userId: user.uid,
-        userName: user.displayName || 'Anonymous',
-        collectionId: imageCollectionId,
-        createdAt: new Date(),
-        deleted: false
-      });
-
-      // Create actual sit
-      const sit = await SitManager.createSit(location, imageCollectionId, user.uid);
+      // Create sit with photo using SitManager
+      const sit = await SitManager.createSitWithPhoto(
+        photoResult.base64Data,
+        location,
+        user.uid,
+        user.displayName || 'Anonymous'
+      );
 
       // Replace initial sit with complete sit
       this.setState(prevState => {

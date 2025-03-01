@@ -24,13 +24,13 @@ exports.processImage = storage.onObjectFinalized({
   const fileBucket = file.bucket;
 
   // Exit if this is not an image
-  if (!fileType.startsWith('image/')) {
+  if (!fileType.startsWith('image/') && fileType !== 'application/octet-stream') {
     return logger.log('This is not an image.');
   }
 
   // Get file name and extension
   const fileName = path.basename(filePath, path.extname(filePath));
-  const fileExt = path.extname(filePath);
+  const fileExt = path.extname(filePath).toLowerCase();
 
   // Skip processing if the file is already a processed version
   if (fileName.endsWith('_med') || fileName.endsWith('_thumb')) {
