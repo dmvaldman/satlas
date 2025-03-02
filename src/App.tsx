@@ -105,8 +105,9 @@ class App extends React.Component<{}, AppState> {
       notification: null,
 
       userPreferences: {
-        nickname: '',
-        pushNotificationsEnabled: false
+        username: '',
+        pushNotificationsEnabled: false,
+        lastVisit: 0
       },
     };
 
@@ -209,12 +210,16 @@ class App extends React.Component<{}, AppState> {
 
   private loadUserPreferences = async (userId: string) => {
     try {
-      const prefsDoc = await getDoc(doc(db, 'userPreferences', userId));
-      if (prefsDoc.exists()) {
+      const userPrefsDoc = await getDoc(doc(db, 'userPreferences', userId));
+      if (userPrefsDoc.exists()) {
+        this.setState({ userPreferences: userPrefsDoc.data() as UserPreferences });
+      } else {
+        // Initialize with default values if no preferences exist yet
         this.setState({
           userPreferences: {
-            nickname: prefsDoc.data().nickname || '',
-            pushNotificationsEnabled: prefsDoc.data().pushNotificationsEnabled || false
+            username: '',
+            pushNotificationsEnabled: false,
+            lastVisit: Date.now()
           }
         });
       }
@@ -287,7 +292,7 @@ class App extends React.Component<{}, AppState> {
 
     try {
       await setDoc(doc(db, 'userPreferences', user.uid), {
-        nickname: prefs.nickname,
+        username: prefs.username,
         pushNotificationsEnabled: prefs.pushNotificationsEnabled,
         updatedAt: new Date()
       });
