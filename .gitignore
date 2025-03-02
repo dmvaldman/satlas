@@ -7,3 +7,4 @@ node_modules/
 dist/
 satlas_images/
 satlas_images_test/
+.env
