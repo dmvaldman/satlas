@@ -163,12 +163,24 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   }
 
   private renderUploadButton() {
-    const { sit, user, currentLocation } = this.props;
+    const { sit, user, currentLocation, images } = this.props;
 
-    if (!currentLocation) return null;
+    // The "Upload Photo" button is only shown when ALL of these conditions are met:
+    // 1. User is authenticated (logged in)
+    // 2. User's current location is available
+    // 3. User is within 300 feet of the sit
+    // 4. User has NOT already uploaded an image to this sit
 
+    // Don't show if user is not logged in or no location available
+    if (!user || !currentLocation) return null;
+
+    // Don't show if user is too far away (more than 300 feet)
     const distance = getDistanceInFeet(currentLocation, sit.location);
-    if (distance > 300) return null; // Only show if within 300 feet
+    if (distance > 300) return null;
+
+    // Don't show if user has already contributed an image to this sit
+    const hasUserUploadedImage = images.some(image => image.userId === user.uid);
+    if (hasUserUploadedImage) return null;
 
     const handleClick = async () => {
       if (!user) {
@@ -188,7 +200,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
           <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
           <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
         </svg>
-        {user ? 'Upload Photo' : 'Sign in to Upload Photo'}
+        Upload Photo
       </button>
     );
   }
