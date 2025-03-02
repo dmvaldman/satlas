@@ -38,13 +38,11 @@ export const isUsernameTaken = async (
  * Generates a unique username based on user information
  * @param userId The user's ID (to exclude from uniqueness check)
  * @param displayName The user's display name (optional)
- * @param email The user's email (optional)
  * @returns Promise<string> A unique username
  */
 export const generateUniqueUsername = async (
   userId: string,
-  displayName?: string | null,
-  email?: string | null
+  displayName?: string | null
 ): Promise<string> => {
   // Create base name from user info
   let baseName = '';

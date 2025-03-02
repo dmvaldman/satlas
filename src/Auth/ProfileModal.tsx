@@ -57,8 +57,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     const username = await generateUniqueUsername(
       user.uid,
-      user.displayName,
-      user.email
+      user.displayName
     );
 
     this.setState({ username });

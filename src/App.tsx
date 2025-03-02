@@ -16,11 +16,7 @@ import AddSitButton from './Map/AddSitButton';
 import { MarksManager } from './Map/MarksManager';
 import { LocationService } from './utils/LocationService';
 import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
-import {
-  isUsernameTaken,
-  generateUniqueUsername,
-  createBaseUsername
-} from './utils/userUtils';
+import { generateUniqueUsername } from './utils/userUtils';
 
 interface AppState {
   // Auth state
@@ -154,8 +150,7 @@ class App extends React.Component<{}, AppState> {
         // Generate a unique username
         const username = await generateUniqueUsername(
           user.uid,
-          user.displayName,
-          user.email
+          user.displayName
         );
 
         await setDoc(doc(db, 'users', user.uid), {
@@ -463,7 +458,7 @@ class App extends React.Component<{}, AppState> {
 
   // Add this new method to handle photo upload completion
   private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => {
-    const { user } = this.state;
+    const { user, userPreferences } = this.state;
     if (!user) return;
 
     const location = photoResult.location;
@@ -481,7 +476,7 @@ class App extends React.Component<{}, AppState> {
           photoResult.base64Data,
           sit.imageCollectionId,
           user.uid,
-          user.displayName || 'Anonymous'
+          userPreferences.username  // Use username instead of displayName
         );
         this.showNotification('Photo replaced successfully!', 'success');
         return;
@@ -511,7 +506,7 @@ class App extends React.Component<{}, AppState> {
           photoResult.base64Data,
           existingSit.imageCollectionId,
           user.uid,
-          user.displayName || 'Anonymous'
+          userPreferences.username  // Use username instead of displayName
         );
         this.showNotification('Photo added successfully!', 'success');
         return;
@@ -536,7 +531,7 @@ class App extends React.Component<{}, AppState> {
         photoResult.base64Data,
         location,
         user.uid,
-        user.displayName || 'Anonymous'
+        userPreferences.username  // Use username instead of displayName
       );
 
       // Replace initial sit with complete sit
