@@ -17,6 +17,7 @@ import { MarksManager } from './Map/MarksManager';
 import { LocationService } from './utils/LocationService';
 import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
 import { generateUniqueUsername } from './utils/userUtils';
+import FullScreenCarousel from './Map/FullScreenCarousel';
 
 interface AppState {
   // Auth state
@@ -47,6 +48,11 @@ interface AppState {
     nearbySit: {
       isOpen: boolean;
       data: Sit | null;
+    };
+    fullScreenCarousel: {
+      isOpen: boolean;
+      images: Image[];
+      initialIndex: number;
     };
   };
 
@@ -99,7 +105,12 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false, data: null },
         profile: { isOpen: false, data: null },
-        nearbySit: { isOpen: false, data: null }
+        nearbySit: { isOpen: false, data: null },
+        fullScreenCarousel: {
+          isOpen: false,
+          images: [],
+          initialIndex: 0
+        }
       },
 
       // Notification state
@@ -605,6 +616,31 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
+  private openFullScreenCarousel = (images: Image[], initialIndex: number) => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        fullScreenCarousel: {
+          isOpen: true,
+          images,
+          initialIndex
+        }
+      }
+    }));
+  };
+
+  private closeFullScreenCarousel = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        fullScreenCarousel: {
+          ...prevState.modals.fullScreenCarousel,
+          isOpen: false
+        }
+      }
+    }));
+  };
+
   render() {
     const {
       user,
@@ -672,6 +708,7 @@ class App extends React.Component<{}, AppState> {
             getImagesForSit={this.getImagesForSit}
             onOpenPhotoModal={this.togglePhotoUpload}
             onOpenProfileModal={this.toggleProfile}
+            onOpenFullScreenCarousel={this.openFullScreenCarousel}
           />
         )}
 
@@ -712,6 +749,14 @@ class App extends React.Component<{}, AppState> {
           onClose={this.toggleNearbySitModal}
           onUploadToExisting={this.handleUploadToExisting}
         />
+
+        {modals.fullScreenCarousel.isOpen && (
+          <FullScreenCarousel
+            images={modals.fullScreenCarousel.images}
+            initialIndex={modals.fullScreenCarousel.initialIndex}
+            onClose={this.closeFullScreenCarousel}
+          />
+        )}
 
         {notification && (
           <div className={`notification ${notification.type}`}>

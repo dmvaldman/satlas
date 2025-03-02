@@ -17,6 +17,7 @@ interface PopupProps {
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   currentLocation: { latitude: number; longitude: number } | null;
+  onImageClick?: (index: number) => void;
 }
 
 interface PopupState {
@@ -70,7 +71,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   };
 
   private renderCarousel() {
-    const { images, user, sit } = this.props;
+    const { images, user, onImageClick } = this.props;
 
     return (
       <Carousel
@@ -78,6 +79,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         currentUserId={user?.uid || null}
         onImageAction={this.handleImageAction}
         isDeleting={this.state.isDeleting}
+        onImageClick={onImageClick}
       />
     );
   }
