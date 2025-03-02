@@ -33,7 +33,7 @@ export interface Coordinates {
 }
 
 export interface UserPreferences {
-  nickname: string;
+  username: string;
   pushNotificationsEnabled: boolean;
   lastVisit?: number;  // Making lastVisit optional since it's not used in the profile modal
 }
