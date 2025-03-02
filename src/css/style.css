@@ -913,3 +913,127 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .mapboxgl-user-location-accuracy-circle {
   pointer-events: none !important;
 }
+
+/* Full-screen carousel styles */
+.fullscreen-carousel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+}
+
+.fullscreen-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.fullscreen-image-container {
+  position: relative;
+  max-width: 90%;
+  max-height: 80%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.fullscreen-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.fullscreen-close-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3001;
+}
+
+.fullscreen-close-button svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
+.fullscreen-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3001;
+}
+
+.fullscreen-nav svg {
+  width: 30px;
+  height: 30px;
+  fill: white;
+}
+
+.fullscreen-nav.prev {
+  left: 20px;
+}
+
+.fullscreen-nav.next {
+  right: 20px;
+}
+
+.fullscreen-carousel-dots {
+  position: absolute;
+  bottom: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fullscreen-carousel-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ccc;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.fullscreen-carousel-dot.active {
+  background: #31d53d;
+}
+
+.image-info {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: white;
+  padding: 8px;
+}

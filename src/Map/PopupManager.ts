@@ -17,7 +17,8 @@ export class PopupManager {
     private onReplaceImage: (sitId: string, imageId: string) => void,
     private onOpenPhotoModal: (sit: Sit) => void,
     private onOpenProfileModal: () => void,
-    private getImagesForSit: (imageCollectionId: string) => Promise<Image[]>
+    private getImagesForSit: (imageCollectionId: string) => Promise<Image[]>,
+    private onOpenFullScreenCarousel: (images: Image[], initialIndex: number) => void
   ) {}
 
   public async showPopup(
@@ -50,12 +51,13 @@ export class PopupManager {
           user,
           marks,
           favoriteCount,
+          currentLocation,
           onToggleMark: this.onToggleMark,
           onDeleteImage: this.onDeleteImage,
           onReplaceImage: this.onReplaceImage,
           onOpenPhotoModal: () => this.onOpenPhotoModal(sit),
           onOpenProfileModal: this.onOpenProfileModal,
-          currentLocation
+          onImageClick: (index) => this.onOpenFullScreenCarousel(images, index)
         })
       );
 

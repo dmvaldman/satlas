@@ -23,6 +23,7 @@ interface MapProps {
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
+  onOpenFullScreenCarousel: (images: Image[], initialIndex: number) => void;
 }
 
 interface MapState {
@@ -50,7 +51,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
       this.handleReplaceImage,
       props.onOpenPhotoModal,
       props.onOpenProfileModal,
-      props.getImagesForSit
+      props.getImagesForSit,
+      props.onOpenFullScreenCarousel
     );
     this.clusterManager = new ClusterManager();
 

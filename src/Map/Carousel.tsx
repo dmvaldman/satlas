@@ -1,15 +1,12 @@
 import React from 'react';
+import { Image } from '../types';
 
 interface CarouselProps {
-  images: Array<{
-    id: string;
-    photoURL: string;
-    userId: string;
-    userName: string;
-  }>;
+  images: Image[];
   currentUserId: string | null;
   onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
   isDeleting?: boolean;
+  onImageClick?: (index: number) => void;
 }
 
 interface CarouselState {
@@ -48,7 +45,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, currentUserId, onImageAction, isDeleting } = this.props;
+    const { images, currentUserId, onImageAction, isDeleting, onImageClick } = this.props;
     const { activeIndex, showControls: showControlsState } = this.state;
 
     if (images.length === 0) {
@@ -57,11 +54,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     const currentImage = images[activeIndex];
     const canShowControls = currentUserId && currentImage.userId === currentUserId;
+    const hasMultipleImages = images.length > 1;
 
     return (
       <div className="carousel">
         <div className="carousel-content">
-          {images.length > 1 && (
+          {hasMultipleImages && (
             <>
               <button
                 className="carousel-nav prev"
@@ -93,6 +91,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               src={`${currentImage.photoURL}?size=med`}
               alt={`Image ${activeIndex + 1}`}
               className="carousel-image"
+              onClick={() => onImageClick && onImageClick(activeIndex)}
+              style={{ cursor: 'pointer' }}
             />
             {(showControlsState || ('ontouchstart' in window)) && (
               <div className="image-uploader">
@@ -122,16 +122,19 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               </div>
             )}
           </div>
-          <div className="carousel-dots">
-            {images.map((_, index) => (
-              <button
-                key={index}
-                className={`carousel-dot${index === activeIndex ? ' active' : ''}`}
-                onClick={() => this.setState({ activeIndex: index })}
-                aria-label={`Go to image ${index + 1}`}
-              />
-            ))}
-          </div>
+          {/* Only show dots if there are multiple images */}
+          {hasMultipleImages && (
+            <div className="carousel-dots">
+              {images.map((_, index) => (
+                <button
+                  key={index}
+                  className={`carousel-dot${index === activeIndex ? ' active' : ''}`}
+                  onClick={() => this.setState({ activeIndex: index })}
+                  aria-label={`Go to image ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
