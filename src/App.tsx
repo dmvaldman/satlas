@@ -198,7 +198,6 @@ class App extends React.Component<{}, AppState> {
       map.addControl(geolocate);
 
       map.on('load', () => {
-        console.log('Map loaded');
         // Trigger geolocation on map load
         geolocate.trigger();
         this.setState({ isMapLoading: false });
