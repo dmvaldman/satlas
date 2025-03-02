@@ -3,6 +3,11 @@ import { User } from 'firebase/auth';
 import { UserPreferences } from '../types';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import {
+  isUsernameTaken,
+  generateUniqueUsername,
+  validateUsername,
+} from '../utils/userUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -50,49 +55,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const { user } = this.props;
     if (!user) return;
 
-    // Get first name from displayName or email
-    let baseName = '';
-    if (user.displayName) {
-      baseName = user.displayName.split(' ')[0];
-    } else if (user.email) {
-      baseName = user.email.split('@')[0];
-    } else {
-      baseName = 'user';
-    }
+    const username = await generateUniqueUsername(
+      user.uid,
+      user.displayName,
+      user.email
+    );
 
-    // Clean up the name (remove special chars, lowercase)
-    baseName = baseName.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // Try the base name first
-    let uniqueName = baseName;
-    let counter = 1;
-
-    // Keep trying until we find a unique name
-    while (await this.isUsernameTaken(uniqueName)) {
-      uniqueName = `${baseName}${counter}`;
-      counter++;
-    }
-
-    this.setState({ username: uniqueName });
-  }
-
-  private isUsernameTaken = async (username: string): Promise<boolean> => {
-    // Skip check if it's the user's current username
-    const originalUsername = this.props.preferences?.username || '';
-    if (username === originalUsername) {
-      return false;
-    }
-
-    try {
-      const userPrefsRef = collection(db, 'userPreferences');
-      const q = query(userPrefsRef, where('username', '==', username));
-      const querySnapshot = await getDocs(q);
-
-      return !querySnapshot.empty;
-    } catch (error) {
-      console.error('Error checking username:', error);
-      return false; // Assume it's not taken if there's an error
-    }
+    this.setState({ username });
   }
 
   private handleUsernameChange = async (username: string) => {
@@ -102,24 +71,26 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     });
 
     // Don't check empty usernames or if it's the original
-    if (!username || username === this.state.username) {
+    const originalUsername = this.props.preferences?.username;
+    if (!username || username === originalUsername) {
       return;
     }
 
     // Basic validation
-    if (username.length < 3) {
-      this.setState({ usernameError: 'Username must be at least 3 characters' });
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      this.setState({ usernameError: 'Only letters, numbers, and underscores allowed' });
+    const validation = validateUsername(username);
+    if (!validation.isValid) {
+      this.setState({ usernameError: validation.error });
       return;
     }
 
     // Check if username is taken
     this.setState({ isCheckingUsername: true });
-    const isTaken = await this.isUsernameTaken(username);
+    const isTaken = await isUsernameTaken(
+      username,
+      this.props.user?.uid,
+      originalUsername
+    );
+
     this.setState({
       isCheckingUsername: false,
       usernameError: isTaken ? 'This username is already taken' : null
@@ -145,7 +116,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     try {
       // Final check to make sure username isn't taken
-      const isTaken = await this.isUsernameTaken(username);
+      const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
       if (isTaken) {
         this.setState({
           usernameError: 'This username is already taken',

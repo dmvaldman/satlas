@@ -16,6 +16,11 @@ import AddSitButton from './Map/AddSitButton';
 import { MarksManager } from './Map/MarksManager';
 import { LocationService } from './utils/LocationService';
 import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
+import {
+  isUsernameTaken,
+  generateUniqueUsername,
+  createBaseUsername
+} from './utils/userUtils';
 
 interface AppState {
   // Auth state
@@ -129,12 +134,46 @@ class App extends React.Component<{}, AppState> {
       });
 
       if (user) {
+        // Check if user document exists, create if not
+        await this.ensureUserExists(user);
+
         await Promise.all([
           this.loadUserData(user.uid),
           this.loadUserPreferences(user.uid)
         ]);
       }
     });
+  };
+
+  private ensureUserExists = async (user: User) => {
+    try {
+      // Check if user document exists
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+      if (!userDoc.exists()) {
+        // Generate a unique username
+        const username = await generateUniqueUsername(
+          user.uid,
+          user.displayName,
+          user.email
+        );
+
+        await setDoc(doc(db, 'users', user.uid), {
+          username: username,
+          pushNotificationsEnabled: false,
+          lastVisit: Date.now(),
+          createdAt: new Date(),
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL
+        });
+
+        console.log(`Created new user document with username: ${username}`);
+      }
+    } catch (error) {
+      console.error('Error ensuring user exists:', error);
+      throw error;
+    }
   };
 
   private initializeMap = async () => {
@@ -210,21 +249,25 @@ class App extends React.Component<{}, AppState> {
 
   private loadUserPreferences = async (userId: string) => {
     try {
-      const userPrefsDoc = await getDoc(doc(db, 'userPreferences', userId));
-      if (userPrefsDoc.exists()) {
-        this.setState({ userPreferences: userPrefsDoc.data() as UserPreferences });
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserPreferences;
+
+        // Validate username
+        if (!userData.username || userData.username.length < 3) {
+          console.error('Invalid username in user document:', userData);
+          throw new Error('User document contains invalid username');
+        }
+
+        this.setState({ userPreferences: userData });
       } else {
-        // Initialize with default values if no preferences exist yet
-        this.setState({
-          userPreferences: {
-            username: '',
-            pushNotificationsEnabled: false,
-            lastVisit: Date.now()
-          }
-        });
+        // This should never happen since we create the document on auth
+        console.error('User document not found for authenticated user');
+        throw new Error('User document not found');
       }
     } catch (error) {
       console.error('Error loading user preferences:', error);
+      // Don't set state with invalid data
     }
   };
 
@@ -291,11 +334,12 @@ class App extends React.Component<{}, AppState> {
     if (!user) return;
 
     try {
-      await setDoc(doc(db, 'userPreferences', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         username: prefs.username,
         pushNotificationsEnabled: prefs.pushNotificationsEnabled,
-        updatedAt: new Date()
-      });
+        updatedAt: new Date(),
+        lastVisit: Date.now()
+      }, { merge: true }); // Use merge to preserve other fields
 
       this.setState({ userPreferences: prefs });
       this.toggleProfile();
