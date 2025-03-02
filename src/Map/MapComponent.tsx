@@ -275,8 +275,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
           .filter(id => id != null)
       );
 
-      console.log(`Found ${unclusteredIds.size} unclustered points`);
-
       // Create a map of only the unclustered sits
       const unclusteredSits = new Map(
         Array.from(sits.entries())

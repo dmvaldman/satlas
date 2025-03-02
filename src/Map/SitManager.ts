@@ -16,10 +16,6 @@ export class SitManager {
     );
 
     const querySnapshot = await getDocs(q);
-    console.log('Found sits:', querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })));
 
     const sits = new Map<string, Sit>();
 
