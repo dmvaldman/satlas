@@ -264,15 +264,29 @@ class MapComponent extends React.Component<MapProps, MapState> {
       map.setLayoutProperty('clusters', 'visibility', 'visible');
       map.setLayoutProperty('cluster-count', 'visibility', 'visible');
 
-      // Check if there are any clusters in the current view
-      const features = map.queryRenderedFeatures({ layers: ['clusters'] });
+      // Get the IDs of points that are in clusters
+      const clusteredFeatures = map.queryRenderedFeatures({ layers: ['clusters'] });
+      const unclusteredFeatures = map.queryRenderedFeatures({ layers: ['unclustered-point'] });
 
-      // If no clusters are found but we're just below the threshold, keep individual markers
-      if (features.length === 0 && zoom > clusterMaxZoom - 0.5) {
-        this.markerManager.showMarkers(map, sits, marks, user);
-      } else {
-        // Hide individual markers
-        this.markerManager.removeAllMarkers();
+      // Extract the sit IDs from unclustered features
+      const unclusteredIds = new Set(
+        unclusteredFeatures
+          .map(feature => feature.properties?.id)
+          .filter(id => id != null)
+      );
+
+      console.log(`Found ${unclusteredIds.size} unclustered points`);
+
+      // Create a map of only the unclustered sits
+      const unclusteredSits = new Map(
+        Array.from(sits.entries())
+          .filter(([id]) => unclusteredIds.has(id))
+      );
+
+      // Show markers only for unclustered points
+      this.markerManager.removeAllMarkers();
+      if (unclusteredSits.size > 0) {
+        this.markerManager.showMarkers(map, unclusteredSits, marks, user);
       }
     }
   };
