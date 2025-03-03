@@ -7,6 +7,7 @@ interface AuthProps {
   user: User | null;
   isAuthenticated: boolean;
   isProfileOpen: boolean;
+  userPreferences: UserPreferences;
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onToggleProfile: () => void;
@@ -97,6 +98,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
         <ProfileModal
           isOpen={isProfileOpen}
           user={user}
+          preferences={this.props.userPreferences}
           onClose={onToggleProfile}
           onSignOut={onSignOut}
           onSave={onSavePreferences}
