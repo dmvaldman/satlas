@@ -1,8 +1,6 @@
 import React from 'react';
 import { Coordinates, Sit } from '../types';
 
-/// <reference types="vite/client" />
-
 // Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
 function convertDMSToDD(dms: number[], direction: string): number {
   const degrees = dms[0];

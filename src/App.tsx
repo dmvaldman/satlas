@@ -1,16 +1,16 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
-import AuthComponent from './Auth/AuthComponent';
-import MapComponent from './Map/MapComponent';
+import AuthComponent from './components/AuthComponent';
+import MapComponent from './components/MapComponent';
 import { Image, Sit, Coordinates, MarkType } from './types';
 import { getDistanceInFeet } from './utils/geo';
-import PhotoUploadComponent from './Photo/PhotoUpload';
-import ProfileModal from './Auth/ProfileModal';
+import PhotoUploadComponent from './components/PhotoUpload';
+import ProfileModal from './components/ProfileModal';
 import { UserPreferences } from './types';
-import AddSitButton from './Map/AddSitButton';
-import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
-import FullScreenCarousel from './Map/FullScreenCarousel';
+import AddSitButton from './components/AddSitButton';
+import NearbyExistingSitModal from './components/NearbyExistingSitModal';
+import FullScreenCarousel from './components/FullScreenCarousel';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './utils/LocationService';
 
