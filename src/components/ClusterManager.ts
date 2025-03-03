@@ -8,10 +8,24 @@ export class ClusterManager {
 
   public setupClusterLayer(map: mapboxgl.Map, sits: Map<string, Sit>): void {
     if (map.loaded()) {
-      this.initializeClusterLayers(map, sits);
+      // Check if source already exists before initializing
+      if (!this.sourceExists(map, 'sits')) {
+        this.initializeClusterLayers(map, sits);
+      } else {
+        // Source already exists, just update it and mark as added
+        this.clusterSourceAdded = true;
+        this.updateClusterSource(map, sits);
+      }
     } else {
       map.on('load', () => {
-        this.initializeClusterLayers(map, sits);
+        // Check if source already exists before initializing
+        if (!this.sourceExists(map, 'sits')) {
+          this.initializeClusterLayers(map, sits);
+        } else {
+          // Source already exists, just update it and mark as added
+          this.clusterSourceAdded = true;
+          this.updateClusterSource(map, sits);
+        }
       });
     }
   }
@@ -27,6 +41,16 @@ export class ClusterManager {
 
   public isClusterSourceAdded(): boolean {
     return this.clusterSourceAdded;
+  }
+
+  public areClusterLayersReady(map: mapboxgl.Map): boolean {
+    try {
+      return map.getLayer('clusters') !== undefined &&
+             map.getLayer('cluster-count') !== undefined &&
+             map.getLayer('unclustered-point') !== undefined;
+    } catch (error) {
+      return false;
+    }
   }
 
   private initializeClusterLayers(map: mapboxgl.Map, sits: Map<string, Sit>): void {
@@ -140,5 +164,14 @@ export class ClusterManager {
       type: 'FeatureCollection' as const,
       features
     };
+  }
+
+  // Add a helper method to check if a source exists
+  private sourceExists(map: mapboxgl.Map, sourceId: string): boolean {
+    try {
+      return !!map.getSource(sourceId);
+    } catch (error) {
+      return false;
+    }
   }
 }

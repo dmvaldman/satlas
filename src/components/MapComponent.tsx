@@ -249,6 +249,13 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const { marks } = this.state;
     if (!map || !this.clusterManager.isClusterSourceAdded()) return;
 
+    // Check if cluster layers are ready before proceeding
+    if (!this.clusterManager.areClusterLayersReady(map)) {
+      // Cluster layers aren't ready yet, just show markers for now
+      this.markerManager.showMarkers(map, sits, marks, user);
+      return;
+    }
+
     // Get current zoom level
     const zoom = map.getZoom();
     const clusterMaxZoom = 13; // Should match the value in ClusterManager
@@ -292,7 +299,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   public closePopup = () => {
-    this.popupManager.closePopup();
+    this.popupManager.closePopup()
   };
 
   render() {
