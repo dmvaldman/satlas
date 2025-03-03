@@ -10,13 +10,13 @@ interface PopupProps {
   user: User | null;
   marks: Set<MarkType>;
   favoriteCount: number;
+  currentLocation: { latitude: number; longitude: number } | null;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onClose?: () => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
-  currentLocation: { latitude: number; longitude: number } | null;
   onImageClick?: (index: number) => void;
 }
 

@@ -112,7 +112,7 @@ export class ClusterManager {
 
     // Get the cluster expansion zoom
     source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-      if (err || zoom === undefined) return;
+      if (err || zoom === null || zoom === undefined) return;
 
       // Center the map on the cluster and zoom in
       map.easeTo({

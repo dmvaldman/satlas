@@ -6,8 +6,8 @@ import { Sit } from '../types';
 interface AddSitButtonProps {
   isAuthenticated: boolean;
   user: User | null;
-  onSignIn: () => Promise<void>;
   currentLocation: Coordinates | null;
+  onSignIn: () => Promise<void>;
   findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
   onNearbySitFound: (sit: Sit) => void;
   onPhotoUploadOpen: () => void;

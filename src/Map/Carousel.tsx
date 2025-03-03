@@ -4,8 +4,8 @@ import { Image } from '../types';
 interface CarouselProps {
   images: Image[];
   currentUserId: string | null;
-  onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
   isDeleting?: boolean;
+  onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
   onImageClick?: (index: number) => void;
 }
 
