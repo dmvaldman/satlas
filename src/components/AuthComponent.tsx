@@ -85,8 +85,18 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
     );
   }
 
+  shouldComponentUpdate(nextProps: AuthProps, nextState: AuthState) {
+    // Only update if these props/state have changed
+    return (
+      this.props.user !== nextProps.user ||
+      this.props.isAuthenticated !== nextProps.isAuthenticated ||
+      this.props.isProfileOpen !== nextProps.isProfileOpen ||
+      this.state.error !== nextState.error
+    );
+  }
+
   render() {
-    const { isAuthenticated, isProfileOpen, onSignOut, onToggleProfile, onSavePreferences, user } = this.props;
+    const { isAuthenticated, isProfileOpen, onToggleProfile, onSavePreferences, user } = this.props;
     const { error } = this.state;
 
     return (
@@ -103,7 +113,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
           user={user}
           preferences={this.props.userPreferences}
           onClose={onToggleProfile}
-          onSignOut={onSignOut}
+          onSignOut={this.handleSignOut}
           onSave={onSavePreferences}
         />
       </div>
