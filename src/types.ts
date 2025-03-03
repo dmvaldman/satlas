@@ -1,7 +1,6 @@
 import { FieldValue, Timestamp } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
-// Add Image type to existing types
 export interface Image {
   id: string;
   photoURL: string;
