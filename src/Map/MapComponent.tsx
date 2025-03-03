@@ -1,6 +1,6 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
-import { debounce } from 'lodash';
+import { debounce } from '../utils/debounce';
 import { Sit, MarkType, User, Image } from '../types';
 import { MarkerManager } from './MarkerManager';
 import { PopupManager } from './PopupManager';

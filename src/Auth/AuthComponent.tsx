@@ -6,9 +6,9 @@ import ProfileModal from './ProfileModal';
 interface AuthProps {
   user: User | null;
   isAuthenticated: boolean;
+  isProfileOpen: boolean;
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
-  isProfileOpen: boolean;
   onToggleProfile: () => void;
   onSavePreferences: (prefs: UserPreferences) => Promise<void>;
 }
@@ -97,7 +97,6 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
         <ProfileModal
           isOpen={isProfileOpen}
           user={user}
-          preferences={user ? { username: '', pushNotificationsEnabled: false } : null}
           onClose={onToggleProfile}
           onSignOut={onSignOut}
           onSave={onSavePreferences}
