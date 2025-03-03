@@ -78,7 +78,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // Basic validation
     const validation = validateUsername(username);
     if (!validation.isValid) {
-      this.setState({ usernameError: validation.error });
+      this.setState({ usernameError: validation.error || null });
       return;
     }
 

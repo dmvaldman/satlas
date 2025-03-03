@@ -97,6 +97,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
         <ProfileModal
           isOpen={isProfileOpen}
           user={user}
+          preferences={user ? { username: '', pushNotificationsEnabled: false } : null}
           onClose={onToggleProfile}
           onSignOut={onSignOut}
           onSave={onSavePreferences}
