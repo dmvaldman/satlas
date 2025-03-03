@@ -1,5 +1,5 @@
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { FirebaseService } from '../services/FirebaseService';
 
 /**
  * Checks if a username is already taken by another user
@@ -18,7 +18,7 @@ export const isUsernameTaken = async (
   }
 
   try {
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(FirebaseService.db, 'users');
     const q = query(usersRef, where('username', '==', username));
     const querySnapshot = await getDocs(q);
 

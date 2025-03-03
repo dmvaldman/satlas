@@ -1,7 +1,5 @@
 import React from 'react';
-import { Coordinates } from '../types';
-import { User } from '../types';
-import { Sit } from '../types';
+import { Coordinates, User, Sit } from '../types';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;

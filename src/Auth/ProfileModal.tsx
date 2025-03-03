@@ -1,8 +1,7 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { UserPreferences } from '../types';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { FirebaseService } from '../services/FirebaseService';
 import {
   isUsernameTaken,
   generateUniqueUsername,
@@ -153,31 +152,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
   private updateUserImagesWithNewUsername = async (userId: string, newUsername: string) => {
     try {
-      // Query all images uploaded by this user
-      const imagesRef = collection(db, 'images');
-      const q = query(imagesRef, where('userId', '==', userId));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        return; // No images to update
-      }
-
-      // Use a batch write for efficiency
-      const batch = writeBatch(db);
-
-      // Add each image document to the batch update
-      querySnapshot.forEach((imageDoc) => {
-        batch.update(doc(db, 'images', imageDoc.id), {
-          userName: newUsername
-        });
-      });
-
-      // Commit the batch
-      await batch.commit();
-      console.log(`Updated userName in ${querySnapshot.size} images`);
+      // Use FirebaseService to update username in images
+      await FirebaseService.updateUserImagesWithNewUsername(userId, newUsername);
     } catch (error) {
       console.error('Error updating images with new username:', error);
-      throw error; // Propagate the error to be handled by the caller
+      throw error;
     }
   };
 

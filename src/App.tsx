@@ -1,23 +1,18 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
-import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import AuthComponent from './Auth/AuthComponent';
-import { doc, setDoc, getDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import MapComponent from './Map/MapComponent';
-import { Image, Sit, Coordinates } from './types';
+import { Image, Sit, Coordinates, MarkType } from './types';
 import { getDistanceInFeet } from './utils/geo';
 import PhotoUploadComponent from './Photo/PhotoUpload';
 import ProfileModal from './Auth/ProfileModal';
 import { UserPreferences } from './types';
-import { SitManager } from './Map/SitManager';
 import AddSitButton from './Map/AddSitButton';
-import { MarksManager } from './Map/MarksManager';
-import { LocationService } from './utils/LocationService';
 import NearbyExistingSitModal from './Map/NearbyExistingSitModal';
-import { generateUniqueUsername } from './utils/userUtils';
 import FullScreenCarousel from './Map/FullScreenCarousel';
+import { FirebaseService } from './services/FirebaseService';
+import { LocationService } from './utils/LocationService';
 
 interface AppState {
   // Auth state
@@ -66,18 +61,15 @@ interface AppState {
   userPreferences: UserPreferences;
 }
 
-type MarkType = 'favorite' | 'visited' | 'wantToGo';
-
-interface PhotoResult {
+type PhotoResult = {
   base64Data: string;
   location?: {
     latitude: number;
     longitude: number;
   };
-}
+};
 
 class App extends React.Component<{}, AppState> {
-  private provider: GoogleAuthProvider;
   private mapContainer = React.createRef<HTMLDivElement>();
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
@@ -123,7 +115,6 @@ class App extends React.Component<{}, AppState> {
       },
     };
 
-    this.provider = new GoogleAuthProvider();
     this.locationService = new LocationService();
   }
 
@@ -133,7 +124,7 @@ class App extends React.Component<{}, AppState> {
   }
 
   private setupAuthListener = () => {
-    auth.onAuthStateChanged(async (user) => {
+    FirebaseService.onAuthStateChange(async (user) => {
       this.setState({
         user,
         isAuthenticated: !!user,
@@ -142,7 +133,7 @@ class App extends React.Component<{}, AppState> {
 
       if (user) {
         // Check if user document exists, create if not
-        await this.ensureUserExists(user);
+        await FirebaseService.ensureUserExists(user);
 
         await Promise.all([
           this.loadUserData(user.uid),
@@ -150,36 +141,6 @@ class App extends React.Component<{}, AppState> {
         ]);
       }
     });
-  };
-
-  private ensureUserExists = async (user: User) => {
-    try {
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-
-      if (!userDoc.exists()) {
-        // Generate a unique username
-        const username = await generateUniqueUsername(
-          user.uid,
-          user.displayName
-        );
-
-        await setDoc(doc(db, 'users', user.uid), {
-          username: username,
-          pushNotificationsEnabled: false,
-          lastVisit: Date.now(),
-          createdAt: new Date(),
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL
-        });
-
-        console.log(`Created new user document with username: ${username}`);
-      }
-    } catch (error) {
-      console.error('Error ensuring user exists:', error);
-      throw error;
-    }
   };
 
   private initializeMap = async () => {
@@ -241,8 +202,8 @@ class App extends React.Component<{}, AppState> {
 
   private async loadUserData(userId: string) {
     try {
-      const marksMap = await MarksManager.loadUserMarks(userId);
-      const favoriteCounts = await MarksManager.loadFavoriteCounts();
+      const marksMap = await FirebaseService.loadUserMarks(userId);
+      const favoriteCounts = await FirebaseService.loadFavoriteCounts();
       this.setState({
         marks: marksMap,
         favoriteCount: favoriteCounts
@@ -254,22 +215,8 @@ class App extends React.Component<{}, AppState> {
 
   private loadUserPreferences = async (userId: string) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserPreferences;
-
-        // Validate username
-        if (!userData.username || userData.username.length < 3) {
-          console.error('Invalid username in user document:', userData);
-          throw new Error('User document contains invalid username');
-        }
-
-        this.setState({ userPreferences: userData });
-      } else {
-        // This should never happen since we create the document on auth
-        console.error('User document not found for authenticated user');
-        throw new Error('User document not found');
-      }
+      const userData = await FirebaseService.loadUserPreferences(userId);
+      this.setState({ userPreferences: userData });
     } catch (error) {
       console.error('Error loading user preferences:', error);
       // Don't set state with invalid data
@@ -279,7 +226,7 @@ class App extends React.Component<{}, AppState> {
   // Auth methods
   private handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, this.provider);
+      await FirebaseService.signInWithGoogle();
     } catch (error) {
       console.error('Error signing in:', error);
     }
@@ -287,7 +234,7 @@ class App extends React.Component<{}, AppState> {
 
   private handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await FirebaseService.signOut();
       this.setState({
         marks: new Map(),
         favoriteCount: new Map()
@@ -339,13 +286,7 @@ class App extends React.Component<{}, AppState> {
     if (!user) return;
 
     try {
-      await setDoc(doc(db, 'users', user.uid), {
-        username: prefs.username,
-        pushNotificationsEnabled: prefs.pushNotificationsEnabled,
-        updatedAt: new Date(),
-        lastVisit: Date.now()
-      }, { merge: true }); // Use merge to preserve other fields
-
+      await FirebaseService.saveUserPreferences(user.uid, prefs);
       this.setState({ userPreferences: prefs });
       this.toggleProfile();
     } catch (error) {
@@ -356,7 +297,7 @@ class App extends React.Component<{}, AppState> {
 
   private handleLoadNearbySits = async (bounds: { north: number; south: number }) => {
     try {
-      const newSits = await SitManager.loadNearbySits(bounds);
+      const newSits = await FirebaseService.loadNearbySits(bounds);
 
       // Only update state if there are actual changes
       let hasChanges = false;
@@ -382,7 +323,7 @@ class App extends React.Component<{}, AppState> {
 
     try {
       const currentMarks = marks.get(sitId) || new Set();
-      const result = await MarksManager.toggleMark(user.uid, sitId, markType, currentMarks);
+      const result = await FirebaseService.toggleMark(user.uid, sitId, markType, currentMarks);
 
       // Update marks
       const updatedMarks = new Map(marks);
@@ -401,7 +342,6 @@ class App extends React.Component<{}, AppState> {
       });
     } catch (error) {
       console.error('Error toggling mark:', error);
-      // You might want to show an error message to the user here
     }
   };
 
@@ -413,11 +353,11 @@ class App extends React.Component<{}, AppState> {
     if (!sit) throw new Error('Sit not found');
 
     try {
-      // Use SitManager to delete the image
-      await SitManager.deleteImage(imageId, user.uid);
+      // Use FirebaseService to delete the image
+      await FirebaseService.deleteImage(imageId, user.uid);
 
       // Check if the sit still exists in Firestore
-      const sitExists = await SitManager.getSit(sitId);
+      const sitExists = await FirebaseService.getSit(sitId);
 
       if (!sitExists) {
         // Sit was deleted, remove from local state
@@ -442,8 +382,8 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
-    // Use SitManager to prepare the replacement data
-    const replacementData = SitManager.replaceImage(sitId, imageId);
+    // Prepare the replacement data
+    const replacementData = { sitId, imageId };
 
     // Open photo upload modal with replacement info
     this.setState({
@@ -459,7 +399,8 @@ class App extends React.Component<{}, AppState> {
 
   private getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
     try {
-      return await SitManager.getImages(imageCollectionId);
+      // Use FirebaseService to get images
+      return await FirebaseService.getImages(imageCollectionId);
     } catch (error) {
       console.error('Error fetching images:', error);
       throw error;
@@ -478,15 +419,15 @@ class App extends React.Component<{}, AppState> {
     if (existingSit && 'sitId' in existingSit && 'imageId' in existingSit) {
       try {
         const sitId = existingSit.sitId;
-        const sit = await SitManager.getSit(sitId);
+        const sit = await FirebaseService.getSit(sitId);
         if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
 
         // Now we have the full Sit object with a valid imageCollectionId
-        await SitManager.addPhotoToSit(
+        await FirebaseService.addPhotoToSit(
           photoResult.base64Data,
           sit.imageCollectionId,
           user.uid,
-          userPreferences.username  // Use username instead of displayName
+          userPreferences.username
         );
         this.showNotification('Photo replaced successfully!', 'success');
         return;
@@ -512,11 +453,11 @@ class App extends React.Component<{}, AppState> {
       }
 
       try {
-        await SitManager.addPhotoToSit(
+        await FirebaseService.addPhotoToSit(
           photoResult.base64Data,
           existingSit.imageCollectionId,
           user.uid,
-          userPreferences.username  // Use username instead of displayName
+          userPreferences.username
         );
         this.showNotification('Photo added successfully!', 'success');
         return;
@@ -528,7 +469,7 @@ class App extends React.Component<{}, AppState> {
     }
 
     // Create a new sit if not adding to existing one
-    const initialSit = SitManager.createInitialSit(location, user.uid);
+    const initialSit = FirebaseService.createInitialSit(location, user.uid);
 
     try {
       // Add to local state
@@ -536,12 +477,12 @@ class App extends React.Component<{}, AppState> {
         sits: new Map(prevState.sits).set(initialSit.id, initialSit)
       }));
 
-      // Create sit with photo using SitManager
-      const sit = await SitManager.createSitWithPhoto(
+      // Create sit with photo using FirebaseService
+      const sit = await FirebaseService.createSitWithPhoto(
         photoResult.base64Data,
         location,
         user.uid,
-        userPreferences.username  // Use username instead of displayName
+        userPreferences.username
       );
 
       // Replace initial sit with complete sit
@@ -576,26 +517,20 @@ class App extends React.Component<{}, AppState> {
       }
     }
 
-    // If not found in current sits, check database
-    const sitsRef = collection(db, 'sits');
-    const querySnapshot = await getDocs(sitsRef);
+    // If not found in current sits, check database using FirebaseService
+    try {
+      const allSits = await FirebaseService.loadNearbySits({
+        north: coordinates.latitude + 0.001, // Roughly 100 meters
+        south: coordinates.latitude - 0.001
+      });
 
-    for (const doc of querySnapshot.docs) {
-      const sitData = doc.data();
-      const sitLocation = {
-        latitude: sitData.location.latitude,
-        longitude: sitData.location.longitude
-      };
-
-      if (getDistanceInFeet(coordinates, sitLocation) < 100) {
-        return {
-          id: doc.id,
-          location: sitLocation,
-          imageCollectionId: sitData.imageCollectionId,
-          createdAt: sitData.createdAt,
-          uploadedBy: sitData.uploadedBy
-        };
+      for (const sit of allSits.values()) {
+        if (getDistanceInFeet(coordinates, sit.location) < 100) {
+          return sit;
+        }
       }
+    } catch (error) {
+      console.error('Error finding nearby sit:', error);
     }
 
     return null;
