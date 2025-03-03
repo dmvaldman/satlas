@@ -73,7 +73,10 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
           id="profile-image"
           src={user.photoURL || this.defaultProfileImage}
           alt="Profile"
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
           onError={(e) => {
+            console.error('Image failed to load:', user.photoURL);
             const img = e.target as HTMLImageElement;
             img.src = this.defaultProfileImage;
           }}
