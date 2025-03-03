@@ -677,6 +677,7 @@ class App extends React.Component<{}, AppState> {
           <AuthComponent
             user={user}
             isAuthenticated={isAuthenticated}
+            userPreferences={userPreferences}
             onSignIn={this.handleSignIn}
             onSignOut={this.handleSignOut}
             isProfileOpen={modals.profile.isOpen}
