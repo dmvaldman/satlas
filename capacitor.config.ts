@@ -7,6 +7,21 @@ const config: CapacitorConfig = {
   server: {
     url: 'http://192.168.68.102:5173',
     cleartext: true
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      backgroundColor: "#FFFFFF",
+      showSpinner: true,
+      androidSpinnerStyle: 'large',
+      spinnerColor: '#3880ff',
+    },
+    Permissions: {
+      camera: true,
+      geolocation: true,
+      storage: true,
+      photos: true
+    }
   }
 };
 
