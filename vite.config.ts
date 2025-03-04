@@ -25,9 +25,7 @@ export default defineConfig({
     extensions: ['.ts', '.tsx', '.js', '.jsx']
   },
   define: {
-    'process.env': {
-      ...process.env
-    }
+    'process.env': process.env
   },
   base: './', // This ensures paths are relative
 });
