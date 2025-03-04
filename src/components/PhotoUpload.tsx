@@ -19,7 +19,7 @@ function convertDMSToDD(dms: number[], direction: string): number {
 interface PhotoUploadProps {
   isOpen: boolean;
   onClose: () => void;
-  onPhotoCapture: (result: PhotoResult, existingSit?: Sit) => void;
+  onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
   isUploading?: boolean;
   sit?: Sit | { sitId: string; imageId: string; };
 }

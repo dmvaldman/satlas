@@ -7,3 +7,7 @@ node_modules/
 dist/
 scripts/assets/
 .env
+android/
+ios/
+tsconfig.tsbuildinfo
+

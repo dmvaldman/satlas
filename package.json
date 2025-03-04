@@ -10,6 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^7.0.1",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/camera": "^7.0.0",
+    "@capacitor/cli": "^7.0.1",
+    "@capacitor/core": "^7.0.1",
+    "@capacitor/geolocation": "^5.0.6",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/ios": "^7.0.1",
+    "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
     "@types/exif-js": "^2.3.1",
     "@types/node": "^22.13.1",
     "@types/react": "^18.2.0",
