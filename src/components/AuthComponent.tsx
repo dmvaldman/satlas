@@ -29,10 +29,13 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
   }
 
   private handleSignIn = async () => {
+    console.log('[Auth] Sign-in button clicked');
     try {
+      console.log('[Auth] Calling onSignIn...');
       await this.props.onSignIn();
+      console.log('[Auth] Sign-in successful');
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('[Auth] Error signing in:', error);
       this.setState({ error: 'Failed to sign in. Please try again.' });
     }
   };

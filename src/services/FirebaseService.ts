@@ -5,7 +5,10 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithCredential
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -28,6 +31,8 @@ import {
 } from 'firebase/storage';
 import { generateUniqueUsername } from '../utils/userUtils';
 import { Sit, Image, Coordinates, UserPreferences, MarkType } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
@@ -59,13 +64,51 @@ export class FirebaseService {
 
   /**
    * Sign in with Google
+   * @returns Promise that resolves when sign-in is complete
    */
-  static async signInWithGoogle(): Promise<User> {
+  static async signInWithGoogle(): Promise<void> {
+    console.log('[Firebase] Starting Google sign-in process');
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
+      if (Capacitor.isNativePlatform()) {
+        console.log('[Firebase] Using native authentication');
+        try {
+          // Use the native plugin
+          const result = await FirebaseAuthentication.signInWithGoogle();
+          console.log('[Firebase] Native Google sign-in result:', JSON.stringify(result));
+
+          // Always force a manual auth state check right after sign-in
+          const currentUser = auth.currentUser;
+          if (!currentUser && result.user) {
+            console.log('[Firebase] Manually syncing user after sign-in');
+
+            // Force a credential-based sign-in if we have tokens
+            if (result.credential?.idToken) {
+              const credential = GoogleAuthProvider.credential(
+                result.credential.idToken,
+                result.credential.accessToken
+              );
+              await signInWithCredential(auth, credential);
+
+              // Add debug statement here
+              console.log('[Firebase] Credential sign-in completed, current user:',
+                auth.currentUser ? {
+                  uid: auth.currentUser.uid,
+                  email: auth.currentUser.email,
+                  displayName: auth.currentUser.displayName
+                } : 'Still null');
+            }
+          }
+        } catch (pluginError) {
+          console.error('[Firebase] Plugin error:', JSON.stringify(pluginError));
+          throw pluginError;
+        }
+      } else {
+        console.log('[Firebase] Using web authentication');
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      }
     } catch (error) {
-      console.error('Error signing in with Google:', error);
+      console.error('[Firebase] Error signing in with Google:', error);
       throw error;
     }
   }
@@ -75,7 +118,11 @@ export class FirebaseService {
    */
   static async signOut(): Promise<void> {
     try {
-      await firebaseSignOut(auth);
+      if (Capacitor.isNativePlatform()) {
+        await FirebaseAuthentication.signOut();
+      } else {
+        await firebaseSignOut(auth);
+      }
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -88,7 +135,27 @@ export class FirebaseService {
    * @returns Unsubscribe function
    */
   static onAuthStateChange(callback: (user: User | null) => void): () => void {
-    return onAuthStateChanged(auth, callback);
+    if (Capacitor.isNativePlatform()) {
+      // For native platforms, we need to listen to the plugin's auth state changes
+      FirebaseAuthentication.addListener('authStateChange', (event) => {
+        console.log('[Firebase] Auth state change from plugin:', event);
+
+        // Add debug statement for current auth state
+        const currentUser = auth.currentUser;
+        console.log('[Firebase] JS SDK current user:', currentUser);
+
+        // The callback expects a Firebase User object
+        callback(auth.currentUser);
+      });
+
+      // Return a function to remove the listener
+      return () => {
+        FirebaseAuthentication.removeAllListeners();
+      };
+    } else {
+      // For web, use the standard Firebase auth state change
+      return onAuthStateChanged(auth, callback);
+    }
   }
 
   // ===== User Methods =====
@@ -742,3 +809,6 @@ export class FirebaseService {
     }
   }
 }
+
+// Export auth for direct access (moved outside the class)
+export { auth };

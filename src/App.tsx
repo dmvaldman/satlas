@@ -13,6 +13,7 @@ import NearbyExistingSitModal from './components/NearbyExistingSitModal';
 import FullScreenCarousel from './components/FullScreenCarousel';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './utils/LocationService';
+import { auth } from './services/FirebaseService';
 
 interface AppState {
   // Auth state
@@ -73,6 +74,7 @@ class App extends React.Component<{}, AppState> {
   private mapContainer = React.createRef<HTMLDivElement>();
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
+  private authUnsubscribe: (() => void) | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -119,8 +121,34 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
-    // Set up auth listener first
-    this.setupAuthListener();
+    // 1. Set up auth listener (which may never fire in Capacitor)
+    this.authUnsubscribe = FirebaseService.onAuthStateChange(async (user) => {
+      console.log('[App] Auth state changed:', user ? user.displayName : 'null');
+
+      if (user) {
+        this.setState({
+          user,
+          isAuthenticated: true,
+          authIsReady: true
+        });
+      } else {
+        this.setState({
+          user: null,
+          isAuthenticated: false,
+          authIsReady: true
+        });
+      }
+    });
+
+    // 2. Check auth state immediately on mount (workaround)
+    const currentUser = auth.currentUser;
+    console.log('[App] Direct auth check on mount:', currentUser?.displayName || 'not signed in');
+
+    this.setState({
+      user: currentUser,
+      isAuthenticated: !!currentUser,
+      authIsReady: true  // Always make UI available
+    });
 
     // Initialize map after component is mounted
     this.initializeMap();
@@ -131,27 +159,12 @@ class App extends React.Component<{}, AppState> {
     if (this.state.map) {
       this.state.map.remove();
     }
+
+    // Clean up auth listener
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe();
+    }
   }
-
-  private setupAuthListener = () => {
-    FirebaseService.onAuthStateChange(async (user) => {
-      this.setState({
-        user,
-        isAuthenticated: !!user,
-        authIsReady: true
-      });
-
-      if (user) {
-        // Check if user document exists, create if not
-        await FirebaseService.ensureUserExists(user);
-
-        await Promise.all([
-          this.loadUserData(user.uid),
-          this.loadUserPreferences(user.uid)
-        ]);
-      }
-    });
-  };
 
   private initializeMap = () => {
     if (!this.mapContainer.current) {
@@ -328,20 +341,37 @@ class App extends React.Component<{}, AppState> {
 
   // Auth methods
   private handleSignIn = async () => {
+    console.log('[App] handleSignIn called');
     try {
       await FirebaseService.signInWithGoogle();
+      console.log('[App] Sign-in successful');
+
+      // Force update the UI state directly after sign-in
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        this.setState({
+          user: currentUser,
+          isAuthenticated: true,
+          authIsReady: true
+        }, () => console.log('[App] State manually updated after sign-in'));
+      }
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('[App] Sign-in error:', error);
     }
   };
 
   private handleSignOut = async () => {
     try {
       await FirebaseService.signOut();
+
+      // Explicitly update the auth state in React
       this.setState({
+        user: null,
+        isAuthenticated: false,
         marks: new Map(),
         favoriteCount: new Map()
-      });
+      }, () => console.log('[App] State manually updated after sign-out'));
+
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -696,6 +726,8 @@ class App extends React.Component<{}, AppState> {
       notification
     } = this.state;
 
+    console.log('App render:', { isAuthenticated, user: user?.displayName });
+
     // Still show loading, but include the map container
     if (!authIsReady) {
       return (
@@ -712,14 +744,14 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div className="app">
-        <header>
+        <header className="app-header">
           <AuthComponent
             user={user}
             isAuthenticated={isAuthenticated}
+            isProfileOpen={modals.profile.isOpen}
             userPreferences={userPreferences}
             onSignIn={this.handleSignIn}
             onSignOut={this.handleSignOut}
-            isProfileOpen={modals.profile.isOpen}
             onToggleProfile={this.toggleProfile}
             onSavePreferences={this.handleSavePreferences}
           />
