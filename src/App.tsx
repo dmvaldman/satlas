@@ -14,6 +14,8 @@ import FullScreenCarousel from './components/FullScreenCarousel';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './utils/LocationService';
 import { auth } from './services/FirebaseService';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 
 interface AppState {
   // Auth state
@@ -121,6 +123,11 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
+    // Configure status bar for mobile devices
+    if (Capacitor.isNativePlatform()) {
+      this.configureStatusBar();
+    }
+
     // 1. Set up auth listener (which may never fire in Capacitor)
     this.authUnsubscribe = FirebaseService.onAuthStateChange(async (user) => {
       console.log('[App] Auth state changed:', user ? user.displayName : 'null');
@@ -710,6 +717,19 @@ class App extends React.Component<{}, AppState> {
     }));
   };
 
+  private configureStatusBar = async () => {
+    try {
+      // Configure dark system bars (light icons on transparent background)
+      await StatusBar.setOverlaysWebView({ overlay: true });
+      await StatusBar.setStyle({ style: Style.Light });
+      await StatusBar.setBackgroundColor({ color: '#000000' });
+
+      // Android navigation bar is handled by native styles.xml
+    } catch (e) {
+      console.error('Error configuring system bars:', e);
+    }
+  };
+
   render() {
     const {
       user,
@@ -728,6 +748,8 @@ class App extends React.Component<{}, AppState> {
 
     console.log('App render:', { isAuthenticated, user: user?.displayName });
 
+    const isAndroid = Capacitor.getPlatform() === 'android';
+
     // Still show loading, but include the map container
     if (!authIsReady) {
       return (
@@ -736,7 +758,8 @@ class App extends React.Component<{}, AppState> {
           <div
             id="map-container"
             ref={this.mapContainer}
-            style={{ width: '100%', height: 'calc(100vh - 60px)' }}
+            className={isAndroid ? 'with-bottom-nav' : ''}
+            style={{ width: '100%' }}
           />
         </div>
       );
@@ -760,7 +783,8 @@ class App extends React.Component<{}, AppState> {
         <div
           id="map-container"
           ref={this.mapContainer}
-          style={{ width: '100%', height: 'calc(100vh - 60px)' }}
+          className={isAndroid ? 'with-bottom-nav' : ''}
+          style={{ width: '100%' }}
         />
 
         {!isMapLoading && map && (
@@ -835,6 +859,8 @@ class App extends React.Component<{}, AppState> {
             {notification.message}
           </div>
         )}
+
+        {isAndroid && <div className="bottom-nav-space"></div>}
       </div>
     );
   }
