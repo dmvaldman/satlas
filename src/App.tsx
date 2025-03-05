@@ -119,8 +119,18 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
+    // Set up auth listener first
     this.setupAuthListener();
+
+    // Initialize map after component is mounted
     this.initializeMap();
+  }
+
+  componentWillUnmount() {
+    // Clean up map when component unmounts
+    if (this.state.map) {
+      this.state.map.remove();
+    }
   }
 
   private setupAuthListener = () => {
@@ -143,61 +153,154 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private initializeMap = async () => {
-    try {
-      if (!this.mapContainer.current) {
-        throw new Error('Map container not found');
-      }
+  private initializeMap = () => {
+    if (!this.mapContainer.current) {
+      console.error('Map container ref is not available');
+      return;
+    }
 
-      const coordinates = await this.locationService.getCurrentLocation();
+    // Get location first, then initialize map
+    this.locationService.getCurrentLocation()
+      .then(coordinates => {
+        console.log('Initial coordinates for map:', coordinates);
 
-      const map = new mapboxgl.Map({
-        container: this.mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [coordinates.longitude, coordinates.latitude],
-        zoom: 13
-      });
+        if (!this.mapContainer.current) return;
 
-      // Add geolocate control
-      const geolocate = new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        trackUserLocation: true,
-        showUserHeading: false
-      });
-
-      map.addControl(geolocate);
-
-      map.on('load', () => {
-        // Trigger geolocation on map load
-        geolocate.trigger();
-        this.setState({ isMapLoading: false });
-        window.dispatchEvent(new CustomEvent('mapReady'));
-      });
-
-      this.setState({ map, currentLocation: coordinates });
-
-    } catch (error) {
-      console.error('Error initializing map:', error);
-      // If we can't get location, center on San Francisco as default
-      const defaultLocation = { latitude: 37.7749, longitude: -122.4194 };
-
-      if (this.mapContainer.current) {
+        // Create map centered on user location
         const map = new mapboxgl.Map({
           container: this.mapContainer.current,
           style: 'mapbox://styles/mapbox/streets-v12',
-          center: [defaultLocation.longitude, defaultLocation.latitude],
+          center: [coordinates.longitude, coordinates.latitude],
           zoom: 13
         });
 
+        // Create a custom user location marker
+        const userMarker = new mapboxgl.Marker({
+          element: this.createLocationDot(),
+          anchor: 'center'
+        })
+        .setLngLat([coordinates.longitude, coordinates.latitude])
+        .addTo(map);
+
+        // Add geolocate control but hide the dot
+        const geolocate = new mapboxgl.GeolocateControl({
+          positionOptions: {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          },
+          trackUserLocation: true,
+          showAccuracyCircle: false,  // Hide the accuracy circle
+          showUserLocation: false     // Hide the default blue dot
+        });
+
+        // Add the control to the map
+        map.addControl(geolocate, 'top-right');
+
+        // Add event listeners
+        geolocate.on('geolocate', position => {
+          console.log('Geolocate success:', position);
+
+          // Update our custom marker position
+          userMarker.setLngLat([
+            position.coords.longitude,
+            position.coords.latitude
+          ]);
+
+          // Update state with the latest position
+          this.setState({
+            currentLocation: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            }
+          });
+        });
+
+        geolocate.on('error', error => {
+          console.error('Geolocate error:', error);
+        });
+
+        // Set state with map and location
         this.setState({
           map,
-          currentLocation: defaultLocation,
+          currentLocation: coordinates,
           isMapLoading: false
         });
+
+        // When map is fully loaded
+        map.on('load', () => {
+          console.log('Map fully loaded');
+
+          // Trigger geolocate AFTER the map is fully loaded
+          geolocate.trigger();
+
+          // Load sits based on initial map bounds
+          const mapBounds = map.getBounds();
+          if (mapBounds) {
+            this.handleLoadNearbySits({
+              north: mapBounds.getNorth(),
+              south: mapBounds.getSouth()
+            });
+          }
+
+          window.dispatchEvent(new CustomEvent('mapReady'));
+        });
+
+        // Add moveend handler
+        map.on('moveend', () => {
+          const bounds = map.getBounds();
+          if (bounds) {
+            this.handleLoadNearbySits({
+              north: bounds.getNorth(),
+              south: bounds.getSouth()
+            });
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error getting location or initializing map:', error);
+        this.initializeMapWithDefaultLocation();
+      });
+  };
+
+  // Helper method to create the location dot element
+  private createLocationDot(): HTMLElement {
+    // Create a simple container with the right class
+    const container = document.createElement('div');
+    container.className = 'custom-location-marker';
+    return container;
+  }
+
+  // Separate method for fallback initialization
+  private initializeMapWithDefaultLocation = () => {
+    if (!this.mapContainer.current) return;
+
+    const defaultLocation = { latitude: 37.7749, longitude: -122.4194 };
+
+    const map = new mapboxgl.Map({
+      container: this.mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [defaultLocation.longitude, defaultLocation.latitude],
+      zoom: 13
+    });
+
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    this.setState({
+      map,
+      currentLocation: defaultLocation,
+      isMapLoading: false
+    });
+
+    map.on('load', () => {
+      const mapBounds = map.getBounds();
+      if (mapBounds) {
+        this.handleLoadNearbySits({
+          north: mapBounds.getNorth(),
+          south: mapBounds.getSouth()
+        });
       }
-    }
+    });
   };
 
   private async loadUserData(userId: string) {
@@ -310,6 +413,7 @@ class App extends React.Component<{}, AppState> {
       });
 
       if (hasChanges) {
+        console.log(`Loaded ${newSits.size} sits`);
         this.setState({ sits: newSits });
       }
     } catch (error) {

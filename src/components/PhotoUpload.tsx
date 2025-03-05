@@ -1,5 +1,8 @@
 import React from 'react';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Geolocation } from '@capacitor/geolocation';
 import { Coordinates, Sit } from '../types';
+import { Capacitor } from '@capacitor/core';
 
 // Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
 function convertDMSToDD(dms: number[], direction: string): number {
@@ -52,8 +55,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     setTimeout(() => notification.remove(), 3000);
   }
 
-  // ---------------------------------------------------
-  // New method that extracts GPS coordinates from a base64 image
   private async getImageLocationFromBase64(base64Image: string): Promise<Coordinates | null> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -100,75 +101,121 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       };
     });
   }
-  // ---------------------------------------------------
+
+  private async getDeviceLocation(): Promise<Coordinates | null> {
+    try {
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 5000
+      });
+
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+    } catch (error) {
+      console.error('Error getting device location:', error);
+      return null;
+    }
+  }
 
   private handleChooseFromGallery = async () => {
     try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
+      if (Capacitor.getPlatform() === 'web') {
+        // Web implementation using file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
 
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) return;
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) return;
 
-        // Convert the file to a base64 string
-        const base64Data = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const base64 = (e.target?.result as string).split(',')[1];
-            resolve(base64);
-          };
-          reader.readAsDataURL(file);
+          // Convert to base64
+          const base64Data = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const base64 = (e.target?.result as string).split(',')[1];
+              resolve(base64);
+            };
+            reader.readAsDataURL(file);
+          });
+
+          const location = await this.getImageLocationFromBase64(base64Data);
+
+          if (!location) {
+            this.showNotification('No location data in image', 'error');
+            this.setState({ error: 'Image must contain location data' });
+            return;
+          }
+
+          this.props.onClose();
+          await this.props.onPhotoCapture({
+            base64Data,
+            location
+          }, this.props.sit);
+        };
+
+        input.click();
+      } else {
+        // Native implementation using Capacitor
+        const image = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Photos
         });
 
-        const location = await this.getImageLocationFromBase64(base64Data);
+        if (!image.base64String) {
+          throw new Error('No image data received');
+        }
+
+        const location = await this.getImageLocationFromBase64(image.base64String);
+
+        if (!location) {
+          this.showNotification('No location data in image', 'error');
+          this.setState({ error: 'Image must contain location data' });
+          return;
+        }
 
         this.props.onClose();
         await this.props.onPhotoCapture({
-          base64Data,
-          location: location || undefined
+          base64Data: image.base64String,
+          location
         }, this.props.sit);
-      };
-
-      input.click();
+      }
     } catch (error) {
       console.error('Error choosing photo:', error);
+      this.setState({ error: 'Error choosing photo' });
     }
   };
 
   private handleTakePhoto = async () => {
     try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.capture = 'environment';
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera
+      });
 
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) return;
+      if (!image.base64String) {
+        throw new Error('No image data received');
+      }
 
-        // Convert file to base64 string
-        const base64Data = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const base64 = (e.target?.result as string).split(',')[1];
-            resolve(base64);
-          };
-          reader.readAsDataURL(file);
-        });
+      const location = await this.getImageLocationFromBase64(image.base64String);
 
-        // Get location from the base64 image
-        const location = await this.getImageLocationFromBase64(base64Data);
+      if (!location) {
+        this.showNotification('No location data in image', 'error');
+        this.setState({ error: 'Image must contain location data' });
+        return;
+      }
 
-        this.props.onClose();
-        this.props.onPhotoCapture({
-          base64Data,
-          location: location || undefined
-        }, this.props.sit);
-      };
-
-      input.click();
+      this.props.onClose();
+      this.props.onPhotoCapture({
+        base64Data: image.base64String,
+        location
+      }, this.props.sit);
     } catch (error) {
       console.error('Error taking photo:', error);
       this.setState({ error: 'Error taking photo' });
