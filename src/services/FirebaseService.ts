@@ -92,9 +92,9 @@ export class FirebaseService {
               // Add debug statement here
               console.log('[Firebase] Credential sign-in completed, current user:',
                 auth.currentUser ? {
-                  uid: auth.currentUser.uid,
-                  email: auth.currentUser.email,
-                  displayName: auth.currentUser.displayName
+                  uid: (auth.currentUser as User).uid,
+                  email: (auth.currentUser as User).email,
+                  displayName: (auth.currentUser as User).displayName
                 } : 'Still null');
             }
           }
