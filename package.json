@@ -18,7 +18,8 @@
     "deploy:android:clean": "npm run android:clean-build",
     "deploy:ios": "npm run ios:build",
     "deploy:ios:clean": "npm run ios:clean-build",
-    "dev:android": "npx cap run android --live-reload --port=5173"
+    "dev:android": "npx cap run android --live-reload --port=5173",
+    "dev:android-build": "npx cap sync android && cd android && ./gradlew assembleDebug && cd .."
   },
   "main": "index.js",
   "dependencies": {
