@@ -7,16 +7,32 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+
+    "cap:sync": "cap sync",
+    "cap:copy": "cap copy",
+
+    "android:build": "npm run build && npm run cap:copy && cap run android",
+    "android:clean-build": "npm run build && npm run cap:copy && cd android && ./gradlew clean && cd .. && cap run android",
+
+    "ios:build": "npm run build && npm run cap:copy && cap run ios",
+    "ios:clean-build": "npm run build && npm run cap:copy && cd ios && xcodebuild clean && cd .. && cap run ios",
+
+    "deploy:android": "npm run android:build",
+    "deploy:android:clean": "npm run android:clean-build",
+
+    "deploy:ios": "npm run ios:build",
+    "deploy:ios:clean": "npm run ios:clean-build"
   },
+  "main": "index.js",
   "dependencies": {
     "@capacitor/android": "^7.0.1",
     "@capacitor/app": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
     "@capacitor/cli": "^7.0.1",
     "@capacitor/core": "^7.0.1",
-    "@capacitor/geolocation": "^5.0.6",
-    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/geolocation": "^7.1.1",
     "@capacitor/ios": "^7.0.1",
     "@capacitor/keyboard": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0",
@@ -27,7 +43,7 @@
     "dotenv": "^16.4.7",
     "exif-parser": "^0.1.12",
     "firebase": "^11.2.0",
-    "mapbox-gl": "^3.9.4",
+    "mapbox-gl": "^3.10.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "typescript": "^5.7.3"

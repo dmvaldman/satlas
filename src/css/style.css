@@ -1037,3 +1037,36 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: white;
   padding: 8px;
 }
+
+/* Add this to your CSS file */
+.custom-location-marker {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.custom-location-marker::before {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: rgba(66, 133, 244, 0.15);
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+
+.custom-location-marker::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background-color: #4285F4;
+  border: 2px solid white;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.25);
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}

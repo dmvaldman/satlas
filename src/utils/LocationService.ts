@@ -1,3 +1,6 @@
+import { Geolocation, Position } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
+
 interface StoredLocation {
   latitude: number;
   longitude: number;
@@ -22,38 +25,63 @@ export class LocationService {
   }
 
   async getCurrentLocation(): Promise<Location> {
-    // First check if we have permission
     try {
-      const permissionStatus = await this.checkLocationPermission();
+      // Check if we're on a native platform
+      if (Capacitor.getPlatform() !== 'web') {
+        console.log('Checking location permissions...');
+        const permissions = await Geolocation.checkPermissions();
+        console.log('Current permissions:', permissions);
 
-      if (permissionStatus === 'granted') {
-        return this.getLocationFromBrowser();
-      } else if (permissionStatus === 'prompt') {
-        // We'll try to get location which will trigger the prompt
-        return this.getLocationFromBrowser();
+        if (permissions.location !== 'granted') {
+          console.log('Requesting location permissions...');
+          const request = await Geolocation.requestPermissions();
+          console.log('Permission request result:', request);
+
+          if (request.location !== 'granted') {
+            console.warn('Location permission denied');
+            return this.getLocationFallback();
+          }
+        }
+
+        // Native implementation
+        console.log('Getting location on native platform');
+
+        // Request permissions first
+        const permissionStatus = await Geolocation.requestPermissions();
+        console.log('Permission status:', permissionStatus);
+
+        if (permissionStatus.location === 'granted') {
+          try {
+            const position: Position = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: LOCATION_TIMEOUT
+            });
+
+            console.log('Got native position:', position);
+
+            const location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+
+            this.saveLastKnownLocation(location);
+            return location;
+          } catch (error) {
+            console.error('Error getting native position:', error);
+            return this.getLocationFallback();
+          }
+        } else {
+          console.log('Location permission not granted, using fallback');
+          return this.getLocationFallback();
+        }
       } else {
-        // Permission denied, try fallbacks
-        console.log('Location permission denied, using fallbacks');
-        return this.getLocationFallback();
+        // Web implementation
+        console.log('Getting location on web platform');
+        return this.getLocationFromBrowser();
       }
     } catch (error) {
-      console.error('Error checking location permission:', error);
+      console.error('Error getting location:', error);
       return this.getLocationFallback();
-    }
-  }
-
-  private async checkLocationPermission(): Promise<PermissionState> {
-    if (!navigator.permissions || !navigator.permissions.query) {
-      // Browser doesn't support permission API
-      return 'prompt';
-    }
-
-    try {
-      const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-      return result.state;
-    } catch (error) {
-      console.error('Error querying permission:', error);
-      return 'prompt';
     }
   }
 

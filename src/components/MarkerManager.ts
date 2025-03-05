@@ -78,6 +78,7 @@ export class MarkerManager {
         el.classList.add(className);
       });
     }
+
   }
 
   public removeAllMarkers(): void {
