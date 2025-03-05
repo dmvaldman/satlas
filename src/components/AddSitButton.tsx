@@ -1,5 +1,6 @@
 import React from 'react';
 import { Coordinates, User, Sit } from '../types';
+import { Capacitor } from '@capacitor/core';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;
@@ -52,10 +53,12 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
   };
 
   render() {
+    const isAndroid = Capacitor.getPlatform() === 'android';
+
     return (
       <>
         <button
-          className="fab"
+          className={`fab ${isAndroid ? 'fab-android' : ''}`}
           id="add-satlas-btn"
           aria-label="Add new Satlas"
           onClick={this.handleClick}
