@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
-
+import fs from 'fs';
 // Load env file
 dotenv.config();
 
@@ -13,7 +13,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    host: '0.0.0.0',  // This makes it available on all network interfaces
+    host: '0.0.0.0',
     port: 5173,
     headers: {
       'Access-Control-Allow-Origin': '*',

@@ -1,12 +1,13 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'io.satlas.app',
+  appId: 'com.dmvaldman.Satlas',
   appName: 'Satlas',
   webDir: 'dist',
   server: {
     url: 'http://192.168.68.102:5173',
-    cleartext: true
+    cleartext: true,
+    androidScheme: 'http'
   },
   plugins: {
     SplashScreen: {
@@ -21,6 +22,10 @@ const config: CapacitorConfig = {
       geolocation: true,
       storage: true,
       photos: true
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
     }
   }
 };

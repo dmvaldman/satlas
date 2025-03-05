@@ -8,24 +8,21 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-
     "cap:sync": "cap sync",
     "cap:copy": "cap copy",
-
     "android:build": "npm run build && npm run cap:copy && cap run android",
     "android:clean-build": "npm run build && npm run cap:copy && cd android && ./gradlew clean && cd .. && cap run android",
-
     "ios:build": "npm run build && npm run cap:copy && cap run ios",
     "ios:clean-build": "npm run build && npm run cap:copy && cd ios && xcodebuild clean && cd .. && cap run ios",
-
     "deploy:android": "npm run android:build",
     "deploy:android:clean": "npm run android:clean-build",
-
     "deploy:ios": "npm run ios:build",
-    "deploy:ios:clean": "npm run ios:clean-build"
+    "deploy:ios:clean": "npm run ios:clean-build",
+    "dev:android": "npx cap run android --live-reload --port=5173"
   },
   "main": "index.js",
   "dependencies": {
+    "@capacitor-firebase/authentication": "^7.1.0",
     "@capacitor/android": "^7.0.1",
     "@capacitor/app": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
