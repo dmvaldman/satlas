@@ -131,7 +131,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
   // Helper method to create the location dot element
   private createLocationDot(): HTMLElement {
-    // Create a simple container with the right class
     const container = document.createElement('div');
     container.className = 'custom-location-marker';
     return container;
