@@ -303,13 +303,14 @@ class App extends React.Component<{}, AppState> {
     }
   }
 
-  private loadUserPreferences = async (userId: string) => {
+  private loadUserPreferences = async (userId: string): Promise<UserPreferences> => {
     try {
       const userData = await FirebaseService.loadUserPreferences(userId);
       this.setState({ userPreferences: userData });
+      return userData;
     } catch (error) {
       console.error('Error loading user preferences:', error);
-      // Don't set state with invalid data
+      throw error;
     }
   };
 
@@ -327,7 +328,17 @@ class App extends React.Component<{}, AppState> {
           user: currentUser,
           isAuthenticated: true,
           authIsReady: true
-        }, () => console.log('[App] State manually updated after sign-in'));
+        }, async () => {
+          console.log('[App] State manually updated after sign-in');
+
+          // Load user preferences after state is updated
+          try {
+            const preferences = await this.loadUserPreferences(currentUser.uid);
+            console.log('[App] User preferences loaded after sign-in:', preferences);
+          } catch (error) {
+            console.error('[App] Error loading preferences after sign-in:', error);
+          }
+        });
       }
     } catch (error) {
       console.error('[App] Sign-in error:', error);
@@ -353,15 +364,32 @@ class App extends React.Component<{}, AppState> {
 
   // UI methods
   private toggleProfile = () => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        profile: {
-          isOpen: !prevState.modals.profile.isOpen,
-          data: prevState.modals.profile.data
-        }
+    // Use functional state update to prevent race conditions
+    this.setState(prevState => {
+      // If the profile is currently open, just close it
+      if (prevState.modals.profile.isOpen) {
+        return {
+          modals: {
+            ...prevState.modals,
+            profile: {
+              isOpen: false,
+              data: null
+            }
+          }
+        };
       }
-    }));
+
+      // Otherwise, toggle it normally
+      return {
+        modals: {
+          ...prevState.modals,
+          profile: {
+            isOpen: !prevState.modals.profile.isOpen,
+            data: prevState.modals.profile.data
+          }
+        }
+      };
+    });
   };
 
   private togglePhotoUpload = (sit?: Sit) => {
@@ -714,6 +742,11 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
+  // Add a new method to update preferences without toggling the modal
+  private updatePreferences = (preferences: UserPreferences) => {
+    this.setState({ userPreferences: preferences });
+  };
+
   render() {
     const {
       user,
@@ -809,6 +842,8 @@ class App extends React.Component<{}, AppState> {
             onClose={this.toggleProfile}
             onSignOut={this.handleSignOut}
             onSave={this.handleSavePreferences}
+            onUpdatePreferences={this.updatePreferences}
+            showNotification={this.showNotification}
           />
         )}
 
