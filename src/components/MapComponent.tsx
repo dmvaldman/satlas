@@ -122,6 +122,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
     // Setup cluster layer
     this.clusterManager.setupClusterLayer(map, this.props.sits);
 
+    // Listen for zoom changes to update markers
+    map.on('zoomend', this.updateVisibleMarkers);
+
     // Initial marker setup
     this.updateVisibleMarkers();
   }
