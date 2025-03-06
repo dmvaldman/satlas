@@ -16,6 +16,7 @@ import { LocationService } from './utils/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 interface AppState {
   // Auth state
@@ -77,6 +78,10 @@ class App extends React.Component<{}, AppState> {
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
   private authUnsubscribe: (() => void) | null = null;
+
+  // Add these properties here instead
+  private userMarker: mapboxgl.Marker | null = null;
+  private locationWatchId: string | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -167,6 +172,9 @@ class App extends React.Component<{}, AppState> {
       this.state.map.remove();
     }
 
+    // Clean up location watch
+    this.stopLocationTracking();
+
     // Clean up auth listener
     if (this.authUnsubscribe) {
       this.authUnsubscribe();
@@ -174,12 +182,15 @@ class App extends React.Component<{}, AppState> {
   }
 
   private initializeMap = () => {
+    console.log('Initializing map');
+
     if (!this.mapContainer.current) {
       console.error('Map container ref is not available');
       return;
     }
 
     // Get location first, then initialize map
+    console.log('Getting location');
     this.locationService.getCurrentLocation()
       .then(coordinates => {
         console.log('Initial coordinates for map:', coordinates);
@@ -195,50 +206,12 @@ class App extends React.Component<{}, AppState> {
         });
 
         // Create a custom user location marker
-        const userMarker = new mapboxgl.Marker({
+        this.userMarker = new mapboxgl.Marker({
           element: this.createLocationDot(),
           anchor: 'center'
         })
         .setLngLat([coordinates.longitude, coordinates.latitude])
         .addTo(map);
-
-        // Add geolocate control but hide the dot
-        const geolocate = new mapboxgl.GeolocateControl({
-          positionOptions: {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-          },
-          trackUserLocation: true,
-          showAccuracyCircle: false,  // Hide the accuracy circle
-          showUserLocation: false     // Hide the default blue dot
-        });
-
-        // Add the control to the map
-        map.addControl(geolocate, 'top-right');
-
-        // Add event listeners
-        geolocate.on('geolocate', position => {
-          console.log('Geolocate success:', position);
-
-          // Update our custom marker position
-          userMarker.setLngLat([
-            position.coords.longitude,
-            position.coords.latitude
-          ]);
-
-          // Update state with the latest position
-          this.setState({
-            currentLocation: {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            }
-          });
-        });
-
-        geolocate.on('error', error => {
-          console.error('Geolocate error:', error);
-        });
 
         // Set state with map and location
         this.setState({
@@ -251,8 +224,8 @@ class App extends React.Component<{}, AppState> {
         map.on('load', () => {
           console.log('Map fully loaded');
 
-          // Trigger geolocate AFTER the map is fully loaded
-          geolocate.trigger();
+          // Start tracking location
+          this.startLocationTracking();
 
           // Load sits based on initial map bounds
           const mapBounds = map.getBounds();
@@ -727,6 +700,51 @@ class App extends React.Component<{}, AppState> {
       // Android navigation bar is handled by native styles.xml
     } catch (e) {
       console.error('Error configuring system bars:', e);
+    }
+  };
+
+  // Start tracking user location
+  private startLocationTracking = async () => {
+    try {
+      // Request permissions
+      const permissionStatus = await Geolocation.requestPermissions();
+      if (permissionStatus.location !== 'granted') {
+        console.warn('Location permission not granted');
+        return;
+      }
+
+      // Start watching position
+      this.locationWatchId = await Geolocation.watchPosition(
+        { enableHighAccuracy: true },
+        (position) => {
+          if (!position) return;
+
+          const newLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+
+          console.log('Location updated:', newLocation);
+
+          // Update user marker position
+          if (this.userMarker) {
+            this.userMarker.setLngLat([newLocation.longitude, newLocation.latitude]);
+          }
+
+          // Update state
+          this.setState({ currentLocation: newLocation });
+        }
+      );
+    } catch (error) {
+      console.error('Error watching location:', error);
+    }
+  };
+
+  // Stop tracking user location
+  private stopLocationTracking = async () => {
+    if (this.locationWatchId) {
+      await Geolocation.clearWatch({ id: this.locationWatchId });
+      this.locationWatchId = null;
     }
   };
 
