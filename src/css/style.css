@@ -1107,6 +1107,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .custom-location-marker::after {
@@ -1121,6 +1122,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 /* Android bottom navigation space */
