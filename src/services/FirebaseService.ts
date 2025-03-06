@@ -8,7 +8,10 @@ import {
   onAuthStateChanged,
   signInWithRedirect,
   getRedirectResult,
-  signInWithCredential
+  signInWithCredential,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -33,6 +36,7 @@ import { generateUniqueUsername } from '../utils/userUtils';
 import { Sit, Image, Coordinates, UserPreferences, MarkType } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { App } from '@capacitor/app';
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
@@ -53,12 +57,38 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 
+// Set persistence to LOCAL (survives browser restarts)
+setPersistence(auth, browserLocalPersistence);
+
 // Firebase Service class with static methods
 export class FirebaseService {
   // Export Firebase instances for direct use if needed
   static auth = auth;
   static db = db;
   static storage = storage;
+
+  private static isResumeListenerSet = false;
+
+  // Add this method to initialize app state listeners
+  static initializeAppStateListeners() {
+    if (Capacitor.isNativePlatform() && !this.isResumeListenerSet) {
+      // Listen for app resume events
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          console.log('[Firebase] App resumed, checking auth state');
+          // Force refresh the token when app comes back to foreground
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            currentUser.getIdToken(true)
+              .then(() => console.log('[Firebase] Token refreshed on resume'))
+              .catch(error => console.error('[Firebase] Error refreshing token:', error));
+          }
+        }
+      });
+
+      this.isResumeListenerSet = true;
+    }
+  }
 
   // ===== Authentication Methods =====
 
