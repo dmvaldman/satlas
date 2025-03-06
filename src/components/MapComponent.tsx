@@ -67,9 +67,14 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   componentDidMount() {
-    const { map } = this.props;
+    const { map, currentLocation } = this.props;
     if (map) {
       this.setupMap(map);
+
+      // Initialize user marker if we have a location
+      if (currentLocation) {
+        this.updateUserLocation(currentLocation);
+      }
     }
   }
 
@@ -116,19 +121,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     // Setup cluster layer
     this.clusterManager.setupClusterLayer(map, this.props.sits);
-
-    // Setup user location marker
-    if (this.props.currentLocation) {
-      this.userMarker = new mapboxgl.Marker({
-        element: this.createLocationDot(),
-        anchor: 'center'
-      })
-      .setLngLat([
-        this.props.currentLocation.longitude,
-        this.props.currentLocation.latitude
-      ])
-      .addTo(map);
-    }
 
     // Initial marker setup
     this.updateVisibleMarkers();
@@ -363,6 +355,13 @@ class MapComponent extends React.Component<MapProps, MapState> {
   public closePopup = () => {
     this.popupManager.closePopup()
   };
+
+  componentWillUnmount() {
+    if (this.userMarker) {
+      this.userMarker.remove();
+      this.userMarker = null;
+    }
+  }
 
   render() {
     const { isLoading } = this.props;

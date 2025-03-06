@@ -78,10 +78,6 @@ class App extends React.Component<{}, AppState> {
   private locationService: LocationService;
   private authUnsubscribe: (() => void) | null = null;
 
-  // Add these properties here instead
-  private userMarker: mapboxgl.Marker | null = null;
-  private locationWatchId: string | null = null;
-
   constructor(props: {}) {
     super(props);
 
@@ -130,6 +126,9 @@ class App extends React.Component<{}, AppState> {
     // Configure status bar for mobile devices
     if (Capacitor.isNativePlatform()) {
       this.configureStatusBar();
+
+      // Initialize Firebase app state listeners
+      FirebaseService.initializeAppStateListeners();
     }
 
     // 1. Set up auth listener (which may never fire in Capacitor)
@@ -207,14 +206,6 @@ class App extends React.Component<{}, AppState> {
           center: [coordinates.longitude, coordinates.latitude],
           zoom: 13
         });
-
-        // Create a custom user location marker
-        this.userMarker = new mapboxgl.Marker({
-          element: this.createLocationDot(),
-          anchor: 'center'
-        })
-        .setLngLat([coordinates.longitude, coordinates.latitude])
-        .addTo(map);
 
         // Set state with map and location
         this.setState({
