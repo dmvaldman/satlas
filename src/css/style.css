@@ -1092,18 +1092,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 56px;
+  /* Base height plus safe area inset */
+  height: calc(48px + var(--safe-area-bottom));
   background-color: #000000;
   z-index: 1000;
-  padding-bottom: var(--safe-area-bottom);
 }
 
-/* Keep this style for the map container */
+/* Update map container height calculation */
 #map-container.with-bottom-nav {
-  height: calc(100vh - 64px - 56px - var(--safe-area-bottom)) !important;
+  /* Use the same height calculation */
+  height: calc(100vh - 64px - 48px - var(--safe-area-bottom)) !important;
 }
 
-/* Adjust FAB position for Android with bottom nav */
-.with-bottom-nav ~ .fab {
-  bottom: calc(2rem + 56px + var(--safe-area-bottom));
+/* Update FAB position */
+.fab-android {
+  bottom: calc(2rem + 48px + var(--safe-area-bottom));
 }
