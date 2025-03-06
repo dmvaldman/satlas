@@ -134,6 +134,8 @@ header {
   z-index: 2000;
   cursor: pointer;
   padding-bottom: var(--safe-area-bottom);
+  /* Ensure modals don't cover system navigation */
+  bottom: var(--safe-area-bottom) !important;
 }
 
 /* Bottom-aligned modal (photo upload) */
@@ -155,6 +157,8 @@ header {
   transition: transform 0.3s ease-out;
   cursor: default;
   padding-bottom: calc(20px + var(--safe-area-bottom));
+  max-height: calc(80vh - 48px - var(--safe-area-bottom));
+  overflow-y: auto;
 }
 
 .modal-overlay.active .photo-options {
@@ -1086,25 +1090,54 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transform: translate(-50%, -50%);
 }
 
-/* Bottom nav space with adaptive height */
+/* Android bottom navigation space */
 .bottom-nav-space {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  /* Base height plus safe area inset */
   height: calc(48px + var(--safe-area-bottom));
   background-color: #000000;
   z-index: 1000;
 }
 
-/* Update map container height calculation */
-#map-container.with-bottom-nav {
-  /* Use the same height calculation */
-  height: calc(100vh - 64px - 48px - var(--safe-area-bottom)) !important;
+/* Android UI adjustments */
+body:has(.bottom-nav-space) {
+  /* Map container adjustment */
+  #map-container {
+    height: calc(100vh - 64px - 48px - var(--safe-area-bottom)) !important;
+  }
+
+  /* Floating action button */
+  .fab {
+    bottom: calc(2rem + 48px + var(--safe-area-bottom)) !important;
+  }
+
+  /* Modal positioning */
+  .modal-overlay, .modal-overlay-center {
+    bottom: calc(48px + var(--safe-area-bottom)) !important;
+  }
+
+  /* Content containers */
+  .photo-options {
+    max-height: calc(80vh - 48px - var(--safe-area-bottom));
+    padding-bottom: calc(20px + var(--safe-area-bottom));
+  }
+
+  /* Profile modal */
+  .profile-modal {
+    max-height: calc(90vh - 48px - var(--safe-area-bottom));
+    margin-bottom: calc(48px + var(--safe-area-bottom));
+  }
+
+  /* Notifications */
+  .notification {
+    bottom: calc(20px + 48px + var(--safe-area-bottom));
+  }
 }
 
-/* Update FAB position */
-.fab-android {
-  bottom: calc(2rem + 48px + var(--safe-area-bottom));
+/* Non-Android adjustments (apply to all platforms) */
+.modal-overlay, .modal-overlay-center {
+  padding-bottom: var(--safe-area-bottom);
+  bottom: var(--safe-area-bottom) !important;
 }
