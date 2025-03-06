@@ -663,9 +663,15 @@ class App extends React.Component<{}, AppState> {
       notification: { message, type, isVisible: true }
     }, () => {
       setTimeout(() => {
-        this.setState({ notification: null });
-      }, 3000);
+        if (this.state.notification?.isVisible) {
+          this.setState({ notification: null });
+        }
+      }, 6000);
     });
+  };
+
+  private closeNotification = () => {
+    this.setState({ notification: null });
   };
 
   private openFullScreenCarousel = (images: Image[], initialIndex: number) => {
@@ -843,7 +849,14 @@ class App extends React.Component<{}, AppState> {
 
         {notification && (
           <div className={`notification ${notification.type}`}>
-            {notification.message}
+            <span className="notification-message">{notification.message}</span>
+            <button
+              className="notification-close"
+              onClick={this.closeNotification}
+              aria-label="Close notification"
+            >
+              ×
+            </button>
           </div>
         )}
 
