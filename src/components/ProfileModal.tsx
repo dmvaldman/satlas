@@ -24,30 +24,61 @@ interface ProfileModalState {
   isCheckingUsername: boolean;
   error: string | null;
   usernameError: string | null;
+  isLoading: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
+  private static loadedUserIds = new Set<string>();
+
   constructor(props: ProfileModalProps) {
     super(props);
 
-    // Make sure preferences exists before accessing its properties
-    const preferences = props.preferences || {};
+    const isDataCached = props.user && ProfileModal.loadedUserIds.has(props.user.uid);
 
     this.state = {
-      username: preferences.username || '',
-      pushNotifications: preferences.pushNotificationsEnabled || false,
+      username: '',
+      pushNotifications: false,
       isSubmitting: false,
       isCheckingUsername: false,
       error: null,
-      usernameError: null
+      usernameError: null,
+      isLoading: !isDataCached && !!props.user
     };
   }
 
   componentDidMount() {
-    // If no username is set, generate one based on the user's name
-    if (!this.state.username && this.props.user) {
-      this.generateUniqueUsername();
+    this.initializeFromProps();
+  }
+
+  componentDidUpdate(prevProps: ProfileModalProps) {
+    if (prevProps.user !== this.props.user ||
+        prevProps.preferences !== this.props.preferences) {
+      this.initializeFromProps();
     }
+  }
+
+  private initializeFromProps() {
+    const { user, preferences } = this.props;
+
+    if (user && preferences) {
+      this.setState({
+        username: preferences.username || '',
+        pushNotifications: preferences.pushNotificationsEnabled || false,
+        isLoading: false
+      });
+
+      ProfileModal.loadedUserIds.add(user.uid);
+    } else if (user && !preferences) {
+      this.setState({ isLoading: true });
+    }
+  }
+
+  public static clearCache(userId: string) {
+    ProfileModal.loadedUserIds.delete(userId);
+  }
+
+  public static clearAllCache() {
+    ProfileModal.loadedUserIds.clear();
   }
 
   private generateUniqueUsername = async () => {
@@ -68,20 +99,17 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       usernameError: null
     });
 
-    // Don't check empty usernames or if it's the original
     const originalUsername = this.props.preferences?.username;
     if (!username || username === originalUsername) {
       return;
     }
 
-    // Basic validation
     const validation = validateUsername(username);
     if (!validation.isValid) {
       this.setState({ usernameError: validation.error || null });
       return;
     }
 
-    // Check if username is taken
     this.setState({ isCheckingUsername: true });
     const isTaken = await isUsernameTaken(
       username,
@@ -99,12 +127,10 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const { onSave, onClose, preferences, user } = this.props;
     const { username, pushNotifications, usernameError } = this.state;
 
-    // Don't save if there's a username error
     if (usernameError) {
       return;
     }
 
-    // Basic validation
     if (!username || username.length < 3) {
       this.setState({ usernameError: 'Please enter a valid username (min 3 characters)' });
       return;
@@ -113,7 +139,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     this.setState({ isSubmitting: true, error: null });
 
     try {
-      // Final check to make sure username isn't taken
       const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
       if (isTaken) {
         this.setState({
@@ -123,16 +148,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         return;
       }
 
-      // Check if username has changed
       const originalUsername = preferences?.username || '';
       const usernameChanged = username !== originalUsername;
 
-      // If username changed and user exists, update all their images
       if (usernameChanged && user) {
         await this.updateUserImagesWithNewUsername(user.uid, username);
       }
 
-      // Save user preferences
       await onSave({
         username,
         pushNotificationsEnabled: pushNotifications,
@@ -152,7 +174,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
   private updateUserImagesWithNewUsername = async (userId: string, newUsername: string) => {
     try {
-      // Use FirebaseService to update username in images
       await FirebaseService.updateUserImagesWithNewUsername(userId, newUsername);
     } catch (error) {
       console.error('Error updating images with new username:', error);
@@ -168,7 +189,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       isSubmitting,
       isCheckingUsername,
       error,
-      usernameError
+      usernameError,
+      isLoading
     } = this.state;
 
     if (!isOpen) return null;
@@ -178,70 +200,79 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         <div className="profile-content" onClick={e => e.stopPropagation()}>
           <h2>Profile Settings</h2>
 
-          {error && (
-            <div className="error-message">
-              {error}
+          {isLoading ? (
+            <div className="loading-indicator">
+              <div className="spinner"></div>
+              <p>Loading profile data...</p>
             </div>
+          ) : (
+            <>
+              {error && (
+                <div className="error-message">
+                  {error}
+                </div>
+              )}
+
+              <div className="profile-section">
+                <label htmlFor="username">Username</label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => this.handleUsernameChange(e.target.value)}
+                  placeholder="Enter username"
+                  className={usernameError ? 'error' : ''}
+                />
+                {isCheckingUsername && <div className="checking-message">Checking availability...</div>}
+                {usernameError && <div className="error-message">{usernameError}</div>}
+                <div className="help-text">
+                  Your username must be unique and will be visible to other users.
+                </div>
+              </div>
+
+              <div className="profile-section">
+                <label className="toggle-label">
+                  <span>Enable Push Notifications</span>
+                  <input
+                    type="checkbox"
+                    checked={pushNotifications}
+                    onChange={(e) => this.setState({
+                      pushNotifications: e.target.checked
+                    })}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div className="profile-actions">
+                <button
+                  className="profile-button primary"
+                  onClick={this.handleSave}
+                  disabled={isSubmitting || !!usernameError}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  className="profile-button"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="profile-section logout-section">
+                <button
+                  className="profile-button danger"
+                  onClick={async () => {
+                    await onSignOut();
+                    onClose();
+                  }}
+                >
+                  Log Out
+                </button>
+              </div>
+            </>
           )}
-
-          <div className="profile-section">
-            <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => this.handleUsernameChange(e.target.value)}
-              placeholder="Enter username"
-              className={usernameError ? 'error' : ''}
-            />
-            {isCheckingUsername && <div className="checking-message">Checking availability...</div>}
-            {usernameError && <div className="error-message">{usernameError}</div>}
-            <div className="help-text">
-              Your username must be unique and will be visible to other users.
-            </div>
-          </div>
-
-          <div className="profile-section">
-            <label className="toggle-label">
-              <span>Enable Push Notifications</span>
-              <input
-                type="checkbox"
-                checked={pushNotifications}
-                onChange={(e) => this.setState({
-                  pushNotifications: e.target.checked
-                })}
-              />
-              <span className="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div className="profile-actions">
-            <button
-              className="profile-button primary"
-              onClick={this.handleSave}
-              disabled={isSubmitting || !!usernameError}
-            >
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              className="profile-button"
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
-
-          <div className="profile-section logout-section">
-            <button
-              className="profile-button danger"
-              onClick={async () => {
-                await onSignOut();
-                onClose();
-              }}
-            >
-              Log Out
-            </button>
-          </div>
         </div>
       </div>
     );
