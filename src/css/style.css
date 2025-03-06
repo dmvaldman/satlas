@@ -1093,6 +1093,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   position: relative;
   width: 0;
   height: 0;
+  z-index: 1000;
 }
 
 .custom-location-marker::before {
