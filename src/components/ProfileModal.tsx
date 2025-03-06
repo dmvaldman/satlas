@@ -7,6 +7,8 @@ import {
   generateUniqueUsername,
   validateUsername,
 } from '../utils/userUtils';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -15,6 +17,8 @@ interface ProfileModalProps {
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
+  onUpdatePreferences?: (preferences: UserPreferences) => void;
+  showNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 interface ProfileModalState {
@@ -29,6 +33,9 @@ interface ProfileModalState {
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
   private static loadedUserIds = new Set<string>();
+  private inputRef = React.createRef<HTMLInputElement>();
+  private contentRef = React.createRef<HTMLDivElement>();
+  private keyboardListenersAdded = false;
 
   constructor(props: ProfileModalProps) {
     super(props);
@@ -48,28 +55,113 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
   componentDidMount() {
     this.initializeFromProps();
+
+    if (Capacitor.isNativePlatform() && !this.keyboardListenersAdded) {
+      this.setupKeyboardListeners();
+    }
+
+    // Add a safety timeout to prevent infinite loading
+    setTimeout(() => {
+      if (this.state.isLoading) {
+        console.log('[ProfileModal] Safety timeout triggered, forcing loading to complete');
+        this.setState({
+          isLoading: false,
+          error: this.state.error || 'Could not load profile data. Please try again.'
+        });
+      }
+    }, 5000); // 5 second timeout
   }
 
   componentDidUpdate(prevProps: ProfileModalProps) {
     if (prevProps.user !== this.props.user ||
         prevProps.preferences !== this.props.preferences) {
+
+      const gotNewPreferences =
+        this.props.preferences?.username &&
+        (!prevProps.preferences || !prevProps.preferences.username);
+
+      if (gotNewPreferences) {
+        console.log('[ProfileModal] Received new preferences, updating state');
+      }
+
       this.initializeFromProps();
     }
   }
 
+  componentWillUnmount() {
+    if (Capacitor.isNativePlatform() && this.keyboardListenersAdded) {
+      this.removeKeyboardListeners();
+    }
+  }
+
+  private setupKeyboardListeners() {
+    Keyboard.addListener('keyboardWillShow', this.handleKeyboardShow);
+    Keyboard.addListener('keyboardWillHide', this.handleKeyboardHide);
+    this.keyboardListenersAdded = true;
+  }
+
+  private removeKeyboardListeners() {
+    Keyboard.removeAllListeners();
+    this.keyboardListenersAdded = false;
+  }
+
+  private handleKeyboardShow = (info: { keyboardHeight: number }) => {
+    if (this.contentRef.current) {
+      this.contentRef.current.classList.add('keyboard-visible');
+
+      setTimeout(() => {
+        this.inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  };
+
+  private handleKeyboardHide = () => {
+    if (this.contentRef.current) {
+      this.contentRef.current.classList.remove('keyboard-visible');
+    }
+  };
+
   private initializeFromProps() {
     const { user, preferences } = this.props;
 
-    if (user && preferences) {
-      this.setState({
-        username: preferences.username || '',
-        pushNotifications: preferences.pushNotificationsEnabled || false,
-        isLoading: false
-      });
+    console.log('[ProfileModal] initializeFromProps:', {
+      user: user?.uid,
+      preferences,
+      isLoading: this.state.isLoading
+    });
 
-      ProfileModal.loadedUserIds.add(user.uid);
-    } else if (user && !preferences) {
-      this.setState({ isLoading: true });
+    if (user) {
+      // We have a user, check if we have preferences
+      if (preferences) {
+        // We have preferences, update state and stop loading
+        this.setState({
+          username: preferences.username || '',
+          pushNotifications: preferences.pushNotificationsEnabled || false,
+          isLoading: false
+        });
+
+        // Cache this user ID as loaded
+        ProfileModal.loadedUserIds.add(user.uid);
+
+        // If no username is set but we have a display name, generate one
+        if (!preferences.username && user.displayName) {
+          this.generateUniqueUsername();
+        }
+      } else {
+        // No preferences yet, but we'll use display name as a starting point
+        this.setState({
+          username: user.displayName || '',
+          isLoading: false // Stop loading even without preferences
+        });
+
+        // Try to generate a username from display name
+        if (user.displayName) {
+          this.generateUniqueUsername();
+        }
+      }
+    } else {
+      // No user, stop loading
+      this.setState({ isLoading: false });
     }
   }
 
@@ -123,17 +215,17 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     });
   }
 
-  private handleSave = async () => {
+  private handleSave = async (): Promise<boolean> => {
     const { onSave, onClose, preferences, user } = this.props;
     const { username, pushNotifications, usernameError } = this.state;
 
     if (usernameError) {
-      return;
+      return false;
     }
 
     if (!username || username.length < 3) {
       this.setState({ usernameError: 'Please enter a valid username (min 3 characters)' });
-      return;
+      return false;
     }
 
     this.setState({ isSubmitting: true, error: null });
@@ -145,7 +237,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
           usernameError: 'This username is already taken',
           isSubmitting: false
         });
-        return;
+        return false;
       }
 
       const originalUsername = preferences?.username || '';
@@ -162,13 +254,14 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       });
 
       onClose();
+      return true;
     } catch (error) {
       console.error('Error saving profile:', error);
       this.setState({
-        error: 'Failed to save preferences. Please try again.'
+        error: 'Failed to save preferences. Please try again.',
+        isSubmitting: false
       });
-    } finally {
-      this.setState({ isSubmitting: false });
+      return false;
     }
   };
 
@@ -178,6 +271,62 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     } catch (error) {
       console.error('Error updating images with new username:', error);
       throw error;
+    }
+  };
+
+  private saveInBackground = async (data: {
+    username: string;
+    pushNotifications: boolean;
+    preferences: UserPreferences | undefined;
+  }) => {
+    const { username, pushNotifications, preferences } = data;
+    const { user } = this.props;
+
+    try {
+      // Check if username is taken
+      const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
+      if (isTaken) {
+        this.showNotification('Username is already taken. Changes were not saved.', 'error');
+        return;
+      }
+
+      const originalUsername = preferences?.username || '';
+      const usernameChanged = username !== originalUsername;
+
+      // Update images with new username if needed
+      if (usernameChanged && user) {
+        await this.updateUserImagesWithNewUsername(user.uid, username);
+      }
+
+      // Create the updated preferences object
+      const updatedPreferences: UserPreferences = {
+        username,
+        pushNotificationsEnabled: pushNotifications,
+        lastVisit: Date.now()
+      };
+
+      // Save to Firebase
+      await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences);
+
+      // Important: Update the state in the parent component
+      if (this.props.onUpdatePreferences) {
+        this.props.onUpdatePreferences(updatedPreferences);
+      }
+
+      // Don't show success notification - only notify on failure
+    } catch (error) {
+      console.error('Error saving profile in background:', error);
+      this.showNotification('Failed to save profile settings. Please try again.', 'error');
+    }
+  };
+
+  private showNotification = (message: string, type: 'success' | 'error') => {
+    // Check if App has a showNotification method in props
+    if (this.props.showNotification) {
+      this.props.showNotification(message, type);
+    } else {
+      // Fallback to console
+      console.log(`[ProfileModal] ${type}: ${message}`);
     }
   };
 
@@ -195,9 +344,52 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     if (!isOpen) return null;
 
+    // Update the handleClose function to avoid event propagation issues
+    const handleClose = (e?: React.MouseEvent) => {
+      // Prevent event propagation
+      if (e) {
+        e.stopPropagation();
+      }
+
+      // First close the modal immediately
+      onClose();
+
+      // Don't try to save if there are validation errors or we're submitting
+      if (usernameError || isSubmitting || isLoading) {
+        return;
+      }
+
+      // Don't save if username is too short
+      if (!username || username.length < 3) {
+        return;
+      }
+
+      // Check if anything changed
+      const { preferences } = this.props;
+      const usernameChanged = username !== (preferences?.username || '');
+      const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
+
+      // Only save if something changed
+      if (usernameChanged || notificationsChanged) {
+        // Save in the background - modal is already closed
+        this.saveInBackground({
+          username,
+          pushNotifications,
+          preferences
+        });
+      }
+    };
+
     return (
-      <div className="modal-overlay active" onClick={onClose}>
-        <div className="profile-content" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal-overlay active"
+        onClick={(e) => handleClose(e)}
+      >
+        <div
+          className="profile-content"
+          onClick={e => e.stopPropagation()}
+          ref={this.contentRef}
+        >
           <h2>Profile Settings</h2>
 
           {isLoading ? (
@@ -218,6 +410,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 <input
                   type="text"
                   id="username"
+                  ref={this.inputRef}
                   value={username}
                   onChange={(e) => this.handleUsernameChange(e.target.value)}
                   placeholder="Enter username"
@@ -244,35 +437,20 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 </label>
               </div>
 
-              <div className="profile-actions">
-                <button
-                  className="profile-button primary"
-                  onClick={this.handleSave}
-                  disabled={isSubmitting || !!usernameError}
-                >
-                  {isSubmitting ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  className="profile-button"
-                  onClick={onClose}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="profile-section logout-section">
-                <button
-                  className="profile-button danger"
-                  onClick={async () => {
-                    await onSignOut();
-                    onClose();
-                  }}
-                >
-                  Log Out
-                </button>
-              </div>
             </>
           )}
+
+          <div className="profile-section logout-section">
+            <button
+              className="profile-button danger"
+              onClick={async () => {
+                await onSignOut();
+                onClose();
+              }}
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     );

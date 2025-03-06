@@ -329,6 +329,13 @@ body:has(.bottom-nav-space) .notification {
   border-radius: 8px;
   max-width: 500px;
   width: 90%;
+  transition: transform 0.3s ease;
+}
+
+.profile-content.keyboard-visible {
+  transform: translateY(-30%);
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .profile-section {
@@ -343,9 +350,10 @@ body:has(.bottom-nav-space) .notification {
 
 .profile-section input[type="text"] {
   width: 100%;
-  padding: 0.5rem;
+  padding: 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  margin-bottom: 8px;
 }
 
 .toggle-label {
@@ -1198,4 +1206,11 @@ body:has(.bottom-nav-space) {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Ensure the modal is scrollable on small screens */
+.profile-content {
+  max-height: 80vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* For iOS momentum scrolling */
 }
