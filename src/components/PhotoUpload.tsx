@@ -266,16 +266,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     const { isOpen, isUploading, onClose } = this.props;
     const { error } = this.state;
 
-    console.log('PhotoUpload render:', { isOpen, isUploading, error });
-
-    if (!isOpen) {
-      console.log('PhotoUpload not open, returning null');
-      return null;
-    }
+    if (!isOpen) return null;
 
     return (
-      <div className="modal-overlay active">
-        <div className="photo-options">
+      <div className="modal-overlay active" onClick={onClose}>
+        <div className="photo-options" onClick={e => e.stopPropagation()}>
           {error && (
             <div className="error-message">
               {error}

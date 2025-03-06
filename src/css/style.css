@@ -1094,6 +1094,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 0;
   height: 0;
   z-index: 1000;
+  pointer-events: none;
 }
 
 .custom-location-marker::before {

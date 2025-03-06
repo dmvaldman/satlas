@@ -174,12 +174,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (!isOpen) return null;
 
     return (
-      <div
-        className="modal-overlay active"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
+      <div className="modal-overlay active" onClick={onClose}>
         <div className="profile-content">
           <h2>Profile Settings</h2>
 
