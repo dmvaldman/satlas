@@ -56,16 +56,32 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   }
 
   private async getImageLocationFromBase64(base64Image: string): Promise<Coordinates | null> {
+    console.log('[PhotoUpload] Starting EXIF extraction from image');
+
     return new Promise((resolve) => {
       const img = new Image();
       img.src = `data:image/jpeg;base64,${base64Image}`;
+
       img.onload = () => {
         try {
+          console.log('[PhotoUpload] Image loaded, dimensions:', img.width, 'x', img.height);
+
           // @ts-ignore - EXIF is loaded globally (via a script tag in index.html)
           EXIF.getData(img, function() {
             // @ts-ignore
             const exifData = EXIF.getAllTags(this);
-            console.log('Raw EXIF data:', exifData);
+            console.log('[PhotoUpload] Raw EXIF data:', exifData);
+
+            // Debug GPS info specifically
+            console.log('[PhotoUpload] GPS data in EXIF:', {
+              hasGPSLatitude: !!exifData?.GPSLatitude,
+              hasGPSLongitude: !!exifData?.GPSLongitude,
+              latRef: exifData?.GPSLatitudeRef,
+              longRef: exifData?.GPSLongitudeRef,
+              latValues: exifData?.GPSLatitude,
+              longValues: exifData?.GPSLongitude
+            });
+
             if (exifData?.GPSLatitude && exifData?.GPSLongitude) {
               const latitude = convertDMSToDD(
                 exifData.GPSLatitude,
@@ -75,6 +91,9 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
                 exifData.GPSLongitude,
                 exifData.GPSLongitudeRef
               );
+
+              console.log('[PhotoUpload] Converted coordinates:', { latitude, longitude });
+
               if (
                 !isNaN(latitude) &&
                 !isNaN(longitude) &&
@@ -86,18 +105,23 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
                 resolve({ latitude, longitude });
                 return;
               } else {
-                console.warn('Invalid coordinates:', { latitude, longitude });
+                console.warn('[PhotoUpload] Invalid coordinates:', { latitude, longitude });
                 resolve(null);
               }
             } else {
-              console.log('No GPS data in EXIF');
+              console.log('[PhotoUpload] No GPS data in EXIF');
               resolve(null);
             }
           });
         } catch (error) {
-          console.error('Error reading EXIF:', error);
+          console.error('[PhotoUpload] Error reading EXIF:', error);
           resolve(null);
         }
+      };
+
+      img.onerror = (err) => {
+        console.error('[PhotoUpload] Error loading image:', err);
+        resolve(null);
       };
     });
   }
@@ -192,6 +216,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
   private handleTakePhoto = async () => {
     try {
+      console.log('[PhotoUpload] Starting camera capture');
+
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
@@ -199,15 +225,28 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         source: CameraSource.Camera
       });
 
+      console.log('[PhotoUpload] Photo captured, extracting data');
+
       if (!image.base64String) {
         throw new Error('No image data received');
       }
 
-      const location = await this.getImageLocationFromBase64(image.base64String);
+      // Try to get location from EXIF data first
+      let location = await this.getImageLocationFromBase64(image.base64String);
+
+      // If no location from EXIF, try to get current device location
+      if (!location) {
+        console.log('[PhotoUpload] No EXIF location, trying device location');
+        location = await this.getDeviceLocation();
+
+        if (location) {
+          console.log('[PhotoUpload] Using device location instead:', location);
+        }
+      }
 
       if (!location) {
-        this.showNotification('No location data in image', 'error');
-        this.setState({ error: 'Image must contain location data' });
+        this.showNotification('No location data found', 'error');
+        this.setState({ error: 'Image location could not be determined' });
         return;
       }
 
@@ -217,7 +256,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         location
       }, this.props.sit);
     } catch (error) {
-      console.error('Error taking photo:', error);
+      console.error('[PhotoUpload] Error taking photo:', error);
       this.setState({ error: 'Error taking photo' });
       this.showNotification('Error taking photo', 'error');
     }

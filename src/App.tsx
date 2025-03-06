@@ -16,7 +16,6 @@ import { LocationService } from './utils/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
-import { Geolocation } from '@capacitor/geolocation';
 
 interface AppState {
   // Auth state
@@ -164,6 +163,9 @@ class App extends React.Component<{}, AppState> {
 
     // Initialize map after component is mounted
     this.initializeMap();
+
+    // Set up location listener
+    this.locationService.addLocationListener(this.handleLocationUpdate);
   }
 
   componentWillUnmount() {
@@ -172,8 +174,9 @@ class App extends React.Component<{}, AppState> {
       this.state.map.remove();
     }
 
-    // Clean up location watch
-    this.stopLocationTracking();
+    // Clean up location tracking
+    this.locationService.removeLocationListener(this.handleLocationUpdate);
+    this.locationService.stopLocationTracking();
 
     // Clean up auth listener
     if (this.authUnsubscribe) {
@@ -225,7 +228,7 @@ class App extends React.Component<{}, AppState> {
           console.log('Map fully loaded');
 
           // Start tracking location
-          this.startLocationTracking();
+          this.locationService.startLocationTracking();
 
           // Load sits based on initial map bounds
           const mapBounds = map.getBounds();
@@ -703,48 +706,14 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  // Start tracking user location
-  private startLocationTracking = async () => {
-    try {
-      // Request permissions
-      const permissionStatus = await Geolocation.requestPermissions();
-      if (permissionStatus.location !== 'granted') {
-        console.warn('Location permission not granted');
-        return;
-      }
+  // Handle location updates from LocationService
+  private handleLocationUpdate = (location: { latitude: number; longitude: number }) => {
+    // Update state with new location
+    this.setState({ currentLocation: location });
 
-      // Start watching position
-      this.locationWatchId = await Geolocation.watchPosition(
-        { enableHighAccuracy: true },
-        (position) => {
-          if (!position) return;
-
-          const newLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-
-          console.log('Location updated:', newLocation);
-
-          // Update user marker position
-          if (this.userMarker) {
-            this.userMarker.setLngLat([newLocation.longitude, newLocation.latitude]);
-          }
-
-          // Update state
-          this.setState({ currentLocation: newLocation });
-        }
-      );
-    } catch (error) {
-      console.error('Error watching location:', error);
-    }
-  };
-
-  // Stop tracking user location
-  private stopLocationTracking = async () => {
-    if (this.locationWatchId) {
-      await Geolocation.clearWatch({ id: this.locationWatchId });
-      this.locationWatchId = null;
+    // If MapComponent ref exists, update the user marker
+    if (this.mapComponentRef.current) {
+      this.mapComponentRef.current.updateUserLocation(location);
     }
   };
 
