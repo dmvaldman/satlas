@@ -24,6 +24,7 @@ interface MapProps {
   onOpenProfileModal: () => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
   onOpenFullScreenCarousel: (images: Image[], initialIndex: number) => void;
+  onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
 }
 
 interface MapState {
@@ -36,6 +37,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   private popupManager: PopupManager;
   private clusterManager: ClusterManager;
   private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
+  private userMarker: mapboxgl.Marker | null = null;
 
   constructor(props: MapProps) {
     super(props);
@@ -72,7 +74,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   componentDidUpdate(prevProps: MapProps) {
-    const { map, sits, marks, favoriteCount, user } = this.props;
+    const { map, sits, marks, favoriteCount, user, currentLocation } = this.props;
 
     // If props marks or favoriteCount changed, update state
     if (prevProps.marks !== marks) {
@@ -101,6 +103,11 @@ class MapComponent extends React.Component<MapProps, MapState> {
     if (prevProps.map !== map && map) {
       this.setupMap(map);
     }
+
+    // If current location changed, update user marker
+    if (prevProps.currentLocation !== currentLocation && currentLocation && this.userMarker) {
+      this.userMarker.setLngLat([currentLocation.longitude, currentLocation.latitude]);
+    }
   }
 
   private setupMap(map: mapboxgl.Map) {
@@ -110,11 +117,66 @@ class MapComponent extends React.Component<MapProps, MapState> {
     // Setup cluster layer
     this.clusterManager.setupClusterLayer(map, this.props.sits);
 
-    // Listen for zoom changes to update markers
-    map.on('zoomend', this.updateVisibleMarkers);
+    // Setup user location marker
+    if (this.props.currentLocation) {
+      this.userMarker = new mapboxgl.Marker({
+        element: this.createLocationDot(),
+        anchor: 'center'
+      })
+      .setLngLat([
+        this.props.currentLocation.longitude,
+        this.props.currentLocation.latitude
+      ])
+      .addTo(map);
+    }
 
-    // Initial update of markers
+    // Initial marker setup
     this.updateVisibleMarkers();
+  }
+
+  // Helper method to create the location dot element
+  private createLocationDot(): HTMLElement {
+    // Create a simple container with the right class
+    const container = document.createElement('div');
+    container.className = 'custom-location-marker';
+    return container;
+  }
+
+  // Update user location marker
+  public updateUserLocation(location: { latitude: number; longitude: number }) {
+    const { map } = this.props;
+
+    if (!map) return;
+
+    // Create user marker if it doesn't exist
+    if (!this.userMarker) {
+      this.userMarker = new mapboxgl.Marker({
+        element: this.createLocationDot(),
+        anchor: 'center'
+      })
+      .setLngLat([location.longitude, location.latitude])
+      .addTo(map);
+    } else {
+      // Update existing marker
+      this.userMarker.setLngLat([location.longitude, location.latitude]);
+    }
+
+    // Notify parent component if callback exists
+    if (this.props.onLocationUpdate) {
+      this.props.onLocationUpdate(location);
+    }
+  }
+
+  // Center map on user location
+  public centerOnUserLocation() {
+    const { map, currentLocation } = this.props;
+
+    if (!map || !currentLocation) return;
+
+    map.flyTo({
+      center: [currentLocation.longitude, currentLocation.latitude],
+      zoom: 15
+    });
   }
 
   private handleMapMove = () => {

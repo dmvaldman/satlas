@@ -12,6 +12,8 @@ interface Location {
   longitude: number;
 }
 
+type LocationCallback = (location: Location) => void;
+
 const LAST_LOCATION_KEY = 'lastKnownLocation';
 const LOCATION_TIMEOUT = 5000; // 5 seconds
 const LOCATION_MAX_AGE = 1 * 24 * 60 * 60 * 1000; // 1 day
@@ -19,11 +21,81 @@ const DEFAULT_LOCATION = { latitude: 37.7749, longitude: -122.4194 }; // San Fra
 
 export class LocationService {
   private storage: Storage;
+  private locationWatchId: string | null = null;
+  private locationCallbacks: LocationCallback[] = [];
 
   constructor(storage: Storage = localStorage) {
     this.storage = storage;
   }
 
+  // Register a callback to receive location updates
+  public addLocationListener(callback: LocationCallback): void {
+    this.locationCallbacks.push(callback);
+  }
+
+  // Remove a previously registered callback
+  public removeLocationListener(callback: LocationCallback): void {
+    this.locationCallbacks = this.locationCallbacks.filter(cb => cb !== callback);
+  }
+
+  // Start watching location changes
+  public async startLocationTracking(): Promise<void> {
+    // Don't start if already tracking
+    if (this.locationWatchId) return;
+
+    try {
+      // Request permissions
+      const permissionStatus = await Geolocation.requestPermissions();
+      if (permissionStatus.location !== 'granted') {
+        console.warn('Location permission not granted');
+        return;
+      }
+
+      // Start watching position
+      this.locationWatchId = await Geolocation.watchPosition(
+        { enableHighAccuracy: true },
+        (position) => {
+          if (!position) return;
+
+          const newLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+
+          console.log('Location updated:', newLocation);
+
+          // Save the location
+          this.saveLastKnownLocation(newLocation);
+
+          // Notify all listeners
+          this.notifyLocationListeners(newLocation);
+        }
+      );
+    } catch (error) {
+      console.error('Error watching location:', error);
+    }
+  }
+
+  // Stop watching location changes
+  public async stopLocationTracking(): Promise<void> {
+    if (this.locationWatchId) {
+      await Geolocation.clearWatch({ id: this.locationWatchId });
+      this.locationWatchId = null;
+    }
+  }
+
+  // Notify all registered callbacks about location update
+  private notifyLocationListeners(location: Location): void {
+    this.locationCallbacks.forEach(callback => {
+      try {
+        callback(location);
+      } catch (error) {
+        console.error('Error in location listener:', error);
+      }
+    });
+  }
+
+  // Get current location (one-time)
   async getCurrentLocation(): Promise<Location> {
     try {
       // Check if we're on a native platform
@@ -46,32 +118,23 @@ export class LocationService {
         // Native implementation
         console.log('Getting location on native platform');
 
-        // Request permissions first
-        const permissionStatus = await Geolocation.requestPermissions();
-        console.log('Permission status:', permissionStatus);
+        try {
+          const position: Position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: LOCATION_TIMEOUT
+          });
 
-        if (permissionStatus.location === 'granted') {
-          try {
-            const position: Position = await Geolocation.getCurrentPosition({
-              enableHighAccuracy: true,
-              timeout: LOCATION_TIMEOUT
-            });
+          console.log('Got native position:', position);
 
-            console.log('Got native position:', position);
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
 
-            const location = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            };
-
-            this.saveLastKnownLocation(location);
-            return location;
-          } catch (error) {
-            console.error('Error getting native position:', error);
-            return this.getLocationFallback();
-          }
-        } else {
-          console.log('Location permission not granted, using fallback');
+          this.saveLastKnownLocation(location);
+          return location;
+        } catch (error) {
+          console.error('Error getting native position:', error);
           return this.getLocationFallback();
         }
       } else {
