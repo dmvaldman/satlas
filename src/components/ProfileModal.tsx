@@ -175,7 +175,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     return (
       <div className="modal-overlay active" onClick={onClose}>
-        <div className="profile-content">
+        <div className="profile-content" onClick={e => e.stopPropagation()}>
           <h2>Profile Settings</h2>
 
           {error && (
