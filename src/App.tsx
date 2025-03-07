@@ -470,31 +470,74 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleToggleMark = async (sitId: string, markType: MarkType) => {
-    const { user, marks } = this.state;
+  private handleToggleMark = async (sitId: string, type: MarkType) => {
+    const { sits, marks, favoriteCount, user } = this.state;
     if (!user) return;
 
-    try {
-      const currentMarks = marks.get(sitId) || new Set();
-      const result = await FirebaseService.toggleMark(user.uid, sitId, markType, currentMarks);
+    const sit = sits.get(sitId);
+    if (!sit) return;
 
-      // Update marks
-      const updatedMarks = new Map(marks);
-      updatedMarks.set(sitId, result.marks);
+    // Get current marks for this sit
+    const currentMarks = new Set(marks.get(sitId) || new Set<MarkType>());
+    const currentFavoriteCount = favoriteCount.get(sitId) || 0;
 
-      // Update favorite count if provided
-      let updatedFavoriteCounts = this.state.favoriteCount;
-      if (result.favoriteCount !== undefined) {
-        updatedFavoriteCounts = new Map(updatedFavoriteCounts);
-        updatedFavoriteCounts.set(sitId, result.favoriteCount);
+    // Create new marks set
+    const newMarks = new Set<MarkType>(currentMarks);
+    let newFavoriteCount = currentFavoriteCount;
+
+    // Toggle the mark
+    if (currentMarks.has(type)) {
+      newMarks.delete(type);
+      if (type === 'favorite') {
+        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
       }
+    } else {
+      // Clear all marks first
+      newMarks.clear();
+      // Then add the new mark
+      newMarks.add(type);
 
-      this.setState({
-        marks: updatedMarks,
-        favoriteCount: updatedFavoriteCounts
-      });
+      // If we're adding a favorite and removing something else, adjust the count
+      if (type === 'favorite') {
+        newFavoriteCount++;
+      } else if (currentMarks.has('favorite')) {
+        // If we're switching from favorite to another mark, decrement the favorite count
+        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
+      }
+    }
+
+    // Update state immediately for optimistic UI update
+    const updatedMarks = new Map(marks);
+    updatedMarks.set(sitId, newMarks);
+
+    const updatedFavoriteCount = new Map(favoriteCount);
+    updatedFavoriteCount.set(sitId, newFavoriteCount);
+
+    this.setState({
+      marks: updatedMarks,
+      favoriteCount: updatedFavoriteCount
+    });
+
+    // Make the actual API call
+    try {
+      await FirebaseService.toggleMark(user.uid, sitId, type);
+      // Server update successful, no need to update state again
     } catch (error) {
       console.error('Error toggling mark:', error);
+
+      // On error, revert to previous state
+      const revertedMarks = new Map(this.state.marks);
+      revertedMarks.set(sitId, currentMarks);
+
+      const revertedFavoriteCount = new Map(this.state.favoriteCount);
+      revertedFavoriteCount.set(sitId, currentFavoriteCount);
+
+      this.setState({
+        marks: revertedMarks,
+        favoriteCount: revertedFavoriteCount
+      });
+
+      this.showNotification('Failed to update. Please try again.', 'error');
     }
   };
 
