@@ -982,12 +982,12 @@ class App extends React.Component<{}, AppState> {
 
         {drawer.sit && (
           <BottomSheet
-            open={drawer.isOpen}
+            open={drawer.isOpen && !modals.photo.isOpen}
             onDismiss={this.closeDrawer}
             snapPoints={({ minHeight }) => [
-              minHeight,                // Minimum height (default)
-              Math.min(500, window.innerHeight * 0.6), // Medium height (60% of viewport or 500px, whichever is smaller)
-              Math.min(700, window.innerHeight * 0.8)  // Maximum height (80% of viewport or 700px, whichever is smaller)
+              minHeight,
+              Math.min(500, window.innerHeight * 0.6),
+              Math.min(700, window.innerHeight * 0.8)
             ]}
             expandOnContentDrag
             defaultSnap={({ minHeight }) => minHeight}
