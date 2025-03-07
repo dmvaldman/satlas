@@ -169,7 +169,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
             return;
           }
 
-          this.props.onClose();
           await this.props.onPhotoCapture({
             base64Data,
             location
@@ -197,7 +196,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           return;
         }
 
-        this.props.onClose();
         await this.props.onPhotoCapture({
           base64Data: image.base64String,
           location
@@ -254,7 +252,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         return;
       }
 
-      this.props.onClose();
       this.props.onPhotoCapture({
         base64Data: image.base64String,
         location
