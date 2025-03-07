@@ -16,6 +16,9 @@ import { LocationService } from './utils/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
+import PopupComponent from './components/Popup';
+import { BottomSheet } from 'react-spring-bottom-sheet'
+import 'react-spring-bottom-sheet/dist/style.css'
 
 interface AppState {
   // Auth state
@@ -62,6 +65,13 @@ interface AppState {
   } | null;
 
   userPreferences: UserPreferences;
+
+  // Add drawer state
+  drawer: {
+    isOpen: boolean;
+    sit: Sit | null;
+    images: Image[];
+  };
 }
 
 type PhotoResult = {
@@ -116,6 +126,13 @@ class App extends React.Component<{}, AppState> {
         username: '',
         pushNotificationsEnabled: false,
         lastVisit: 0
+      },
+
+      // Initialize drawer state
+      drawer: {
+        isOpen: false,
+        sit: null,
+        images: []
       },
     };
 
@@ -747,6 +764,37 @@ class App extends React.Component<{}, AppState> {
     this.setState({ userPreferences: preferences });
   };
 
+  // Add these methods to control the drawer
+  private openDrawer = async (sit: Sit) => {
+    // If the same sit is already open, close the drawer
+    if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id) {
+      this.closeDrawer();
+      return;
+    }
+
+    // Fetch images for the sit
+    const images = sit.imageCollectionId
+      ? await this.getImagesForSit(sit.imageCollectionId)
+      : [];
+
+    this.setState({
+      drawer: {
+        isOpen: true,
+        sit,
+        images
+      }
+    });
+  };
+
+  private closeDrawer = () => {
+    this.setState(prevState => ({
+      drawer: {
+        ...prevState.drawer,
+        isOpen: false
+      }
+    }));
+  };
+
   render() {
     const {
       user,
@@ -760,7 +808,8 @@ class App extends React.Component<{}, AppState> {
       modals,
       userPreferences,
       isMapLoading,
-      notification
+      notification,
+      drawer
     } = this.state;
 
     console.log('App render:', { isAuthenticated, user: user?.displayName });
@@ -822,6 +871,8 @@ class App extends React.Component<{}, AppState> {
             onOpenPhotoModal={this.togglePhotoUpload}
             onOpenProfileModal={this.toggleProfile}
             onOpenFullScreenCarousel={this.openFullScreenCarousel}
+            onOpenDrawer={this.openDrawer}
+            getCurrentSitId={() => this.state.drawer.sit?.id || null}
           />
         )}
 
@@ -884,6 +935,31 @@ class App extends React.Component<{}, AppState> {
               ×
             </button>
           </div>
+        )}
+
+        {drawer.sit && (
+          <BottomSheet
+            open={drawer.isOpen}
+            onDismiss={this.closeDrawer}
+            snapPoints={({ minHeight, maxHeight }) => [minHeight, maxHeight * 0.6, maxHeight]}
+            expandOnContentDrag
+          >
+            <PopupComponent
+              sit={drawer.sit}
+              images={drawer.images}
+              user={user}
+              marks={marks.get(drawer.sit.id) || new Set()}
+              favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
+              currentLocation={currentLocation}
+              onToggleMark={this.handleToggleMark}
+              onDeleteImage={this.handleDeleteImage}
+              onReplaceImage={this.handleReplaceImage}
+              onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
+              onOpenProfileModal={this.toggleProfile}
+              onImageClick={(index) => this.openFullScreenCarousel(drawer.images, index)}
+              onClose={this.closeDrawer}
+            />
+          </BottomSheet>
         )}
 
         {isAndroid && <div className="bottom-nav-space"></div>}
