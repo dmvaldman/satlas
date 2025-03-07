@@ -1,13 +1,24 @@
 /**
  * Formats a timestamp into a relative time string (e.g., "2 days ago")
- * @param timestamp Unix timestamp in milliseconds, Date object, or undefined
+ * @param timestamp Firestore Timestamp, Unix timestamp in milliseconds, Date object, or undefined
  * @returns Formatted relative time string
  */
-export function formatRelativeTime(timestamp: number | Date | undefined): string {
+export function formatRelativeTime(timestamp: any): string {
   if (!timestamp) return '';
 
-  // Convert Date object to timestamp if needed
-  const timeMs = timestamp instanceof Date ? timestamp.getTime() : timestamp;
+  let timeMs: number;
+
+  // Handle Firestore Timestamp object
+  if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp && 'nanoseconds' in timestamp) {
+    // Convert Firestore Timestamp to milliseconds
+    timeMs = timestamp.seconds * 1000;
+  } else if (timestamp instanceof Date) {
+    // Handle JavaScript Date object
+    timeMs = timestamp.getTime();
+  } else {
+    // Handle numeric timestamp (milliseconds)
+    timeMs = timestamp;
+  }
 
   const now = Date.now();
   const diffMs = now - timeMs;
