@@ -12,6 +12,8 @@ interface CarouselProps {
 interface CarouselState {
   activeIndex: number;
   showControls: boolean;
+  imageLoaded: boolean;
+  imageAspectRatio: number | null;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -19,7 +21,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     super(props);
     this.state = {
       activeIndex: 0,
-      showControls: false
+      showControls: false,
+      imageLoaded: false,
+      imageAspectRatio: null
     };
   }
 
@@ -30,9 +34,21 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   };
 
+  private handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = event.currentTarget;
+    const aspectRatio = img.naturalWidth / img.naturalHeight;
+
+    this.setState({
+      imageLoaded: true,
+      imageAspectRatio: aspectRatio
+    });
+  };
+
   next = () => {
     this.setState(prev => ({
-      activeIndex: (prev.activeIndex + 1) % this.props.images.length
+      activeIndex: (prev.activeIndex + 1) % this.props.images.length,
+      imageLoaded: false,
+      imageAspectRatio: null
     }));
   };
 
@@ -40,13 +56,15 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.setState(prev => ({
       activeIndex: prev.activeIndex === 0
         ? this.props.images.length - 1
-        : prev.activeIndex - 1
+        : prev.activeIndex - 1,
+      imageLoaded: false,
+      imageAspectRatio: null
     }));
   };
 
   render() {
     const { images, currentUserId, onImageAction, isDeleting, onImageClick } = this.props;
-    const { activeIndex, showControls: showControlsState } = this.state;
+    const { activeIndex, showControls: showControlsState, imageAspectRatio, imageLoaded } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
@@ -57,7 +75,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const hasMultipleImages = images.length > 1;
 
     return (
-      <div className="carousel">
+      <div className={`carousel ${hasMultipleImages ? '' : 'single-image'}`}>
         <div className="carousel-content">
           {hasMultipleImages && (
             <>
@@ -87,12 +105,21 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             onMouseLeave={() => this.setState({ showControls: false })}
             onClick={this.handleImageInteraction}
           >
+            {!imageLoaded && (
+              <div className="loading-indicator">
+                <div className="spinner"></div>
+              </div>
+            )}
             <img
               src={`${currentImage.photoURL}?size=med`}
               alt={`Image ${activeIndex + 1}`}
               className="carousel-image"
               onClick={() => onImageClick && onImageClick(activeIndex)}
-              style={{ cursor: 'pointer' }}
+              style={{
+                cursor: 'pointer',
+                opacity: imageLoaded ? 1 : 0
+              }}
+              onLoad={this.handleImageLoad}
             />
             {(showControlsState || ('ontouchstart' in window)) && (
               <div className="image-uploader">
@@ -129,7 +156,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                 <button
                   key={index}
                   className={`carousel-dot${index === activeIndex ? ' active' : ''}`}
-                  onClick={() => this.setState({ activeIndex: index })}
+                  onClick={() => this.setState({
+                    activeIndex: index,
+                    imageLoaded: false,
+                    imageAspectRatio: null
+                  })}
                   aria-label={`Go to image ${index + 1}`}
                 />
               ))}
