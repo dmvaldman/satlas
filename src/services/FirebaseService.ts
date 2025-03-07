@@ -6,12 +6,9 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithCredential,
   setPersistence,
   browserLocalPersistence,
-  browserSessionPersistence
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -807,6 +804,26 @@ export class FirebaseService {
       console.error(`Error toggling ${markType}:`, error);
       throw error;
     }
+  }
+
+  // Add this method to your FirebaseService class
+  static async replaceImage(
+    base64Data: string,
+    imageCollectionId: string,
+    imageId: string,
+    userId: string,
+    userName: string
+  ): Promise<void> {
+    // Delete the old image first
+    await this.deleteImage(imageId, userId);
+
+    // Then add a new photo (we can't reuse the ID with the current addPhotoToSit implementation)
+    await this.addPhotoToSit(
+      base64Data,
+      imageCollectionId,
+      userId,
+      userName
+    );
   }
 }
 
