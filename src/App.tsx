@@ -147,6 +147,9 @@ class App extends React.Component<{}, AppState> {
           isAuthenticated: true,
           authIsReady: true
         });
+
+        // Load user preferences when auth state changes
+        this.loadAndSetUserPreferences(user.uid);
       } else {
         this.setState({
           user: null,
@@ -165,6 +168,11 @@ class App extends React.Component<{}, AppState> {
       isAuthenticated: !!currentUser,
       authIsReady: true  // Always make UI available
     });
+
+    // Load user preferences if user is already authenticated
+    if (currentUser) {
+      this.loadAndSetUserPreferences(currentUser.uid);
+    }
 
     // Initialize map after component is mounted
     this.initializeMap();
@@ -399,15 +407,39 @@ class App extends React.Component<{}, AppState> {
   };
 
   private togglePhotoUpload = (sit?: Sit) => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        photo: {
-          isOpen: !prevState.modals.photo.isOpen,
-          data: sit || null
-        }
+    console.log('[App] togglePhotoUpload called with sit:', sit ? sit.id : 'null');
+
+    this.setState(prevState => {
+      // If we're opening the photo modal
+      if (!prevState.modals.photo.isOpen) {
+        console.log('[App] Opening photo modal, drawer state:',
+          prevState.drawer.isOpen ? `open with sit ${prevState.drawer.sit?.id}` : 'closed');
+
+        return {
+          modals: {
+            ...prevState.modals,
+            photo: {
+              isOpen: true,
+              data: sit || null
+            }
+          }
+        };
       }
-    }));
+      // If we're closing the photo modal
+      else {
+        console.log('[App] Closing photo modal');
+
+        return {
+          modals: {
+            ...prevState.modals,
+            photo: {
+              isOpen: false,
+              data: null
+            }
+          }
+        };
+      }
+    });
   };
 
   private toggleNearbySitModal = (sit?: Sit) => {
@@ -646,46 +678,68 @@ class App extends React.Component<{}, AppState> {
     const { user, userPreferences, drawer } = this.state;
     if (!user) return;
 
+    console.log('[App] handlePhotoUploadComplete called with existingSit:',
+      existingSit ? ('id' in existingSit ? `sit ${existingSit.id}` : `image ${existingSit.imageId}`) : 'new sit');
+
     try {
       // Case 1: Replacing an existing image
       if (existingSit && 'imageId' in existingSit) {
         const sitId = existingSit.sitId;
         const imageId = existingSit.imageId;
-        const sit = await FirebaseService.getSit(sitId);
-        if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
 
-        // Optimistically update the UI with base64 data
+        // Get the sit from Firebase only if we don't already have it
+        let sit;
         if (drawer.sit && drawer.sit.id === sitId) {
-          const tempImage: Image = {
-            id: imageId,
-            photoURL: '', // We'll ignore this and use base64Data
-            userId: user.uid,
-            userName: userPreferences.username,
-            collectionId: sit.imageCollectionId,
-            createdAt: new Date(),
-            base64Data: photoResult.base64Data
-          };
-
-          const updatedImages = drawer.images.map(img =>
-            img.id === imageId ? tempImage : img
-          );
-
-          this.setState(prevState => ({
-            drawer: {
-              ...prevState.drawer,
-              images: updatedImages
-            }
-          }));
+          sit = drawer.sit;
+        } else {
+          sit = await FirebaseService.getSit(sitId);
         }
 
-        // Upload to server in the background, but don't use the result
-        await FirebaseService.replaceImage(
+        if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
+
+        // Create a temporary image with the new data
+        const updatedImage: Image = {
+          id: imageId,
+          photoURL: '', // We'll ignore this and use base64Data
+          userId: user.uid,
+          userName: userPreferences.username,
+          collectionId: sit.imageCollectionId,
+          createdAt: new Date(),
+          base64Data: photoResult.base64Data
+        };
+
+        // Get current images or empty array
+        let currentImages = drawer.sit && drawer.sit.id === sitId ? [...drawer.images] : [];
+
+        // Replace the image in the array
+        const updatedImages = currentImages.map(img =>
+          img.id === imageId ? updatedImage : img
+        );
+
+        // Close the photo modal and immediately update the drawer with optimistic data
+        this.setState({
+          modals: {
+            ...this.state.modals,
+            photo: { isOpen: false, data: null }
+          },
+          drawer: {
+            isOpen: true,
+            sit,
+            images: updatedImages
+          }
+        });
+
+        // Upload to server in the background
+        FirebaseService.replaceImage(
           photoResult.base64Data,
           sit.imageCollectionId,
           imageId,
           user.uid,
           userPreferences.username
-        );
+        ).catch(error => {
+          console.error('Background upload failed:', error);
+          this.showNotification('Image upload failed in the background', 'error');
+        });
 
         return;
       }
@@ -709,23 +763,32 @@ class App extends React.Component<{}, AppState> {
           base64Data: photoResult.base64Data
         };
 
-        // Optimistically update UI if this sit is currently open in the drawer
-        if (drawer.sit && drawer.sit.id === sit.id) {
-          this.setState(prevState => ({
-            drawer: {
-              ...prevState.drawer,
-              images: [...prevState.drawer.images, tempImage]
-            }
-          }));
-        }
+        // Get current images or empty array
+        let currentImages = drawer.sit && drawer.sit.id === sit.id ? [...drawer.images] : [];
 
-        // Upload to server in the background, but don't use the result
-        await FirebaseService.addPhotoToSit(
+        // Close the photo modal and immediately update the drawer with optimistic data
+        this.setState({
+          modals: {
+            ...this.state.modals,
+            photo: { isOpen: false, data: null }
+          },
+          drawer: {
+            isOpen: true,
+            sit,
+            images: [...currentImages, tempImage]
+          }
+        });
+
+        // Upload to server in the background
+        FirebaseService.addPhotoToSit(
           photoResult.base64Data,
           sit.imageCollectionId,
           user.uid,
           userPreferences.username
-        );
+        ).catch(error => {
+          console.error('Background upload failed:', error);
+          this.showNotification('Image upload failed in the background', 'error');
+        });
 
         return;
       }
@@ -737,28 +800,75 @@ class App extends React.Component<{}, AppState> {
         // Create a new sit
         const initialSit = FirebaseService.createInitialSit(location, user.uid);
 
-        // Add to local state
-        this.setState(prevState => ({
-          sits: new Map(prevState.sits).set(initialSit.id, initialSit)
-        }));
+        // Create a temporary image
+        const tempImageId = `temp_${Date.now()}`;
+        const tempImage: Image = {
+          id: tempImageId,
+          photoURL: '', // We'll ignore this and use base64Data
+          userId: user.uid,
+          userName: userPreferences.username,
+          collectionId: initialSit.imageCollectionId || '',
+          createdAt: new Date(),
+          base64Data: photoResult.base64Data
+        };
 
-        // Create sit with photo using FirebaseService
-        const sit = await FirebaseService.createSitWithPhoto(
+        // Close the photo modal and immediately update the drawer with optimistic data
+        this.setState({
+          modals: {
+            ...this.state.modals,
+            photo: { isOpen: false, data: null }
+          },
+          drawer: {
+            isOpen: true,
+            sit: initialSit,
+            images: [tempImage]
+          },
+          sits: new Map(this.state.sits).set(initialSit.id, initialSit)
+        });
+
+        // Create sit with photo using FirebaseService in the background
+        FirebaseService.createSitWithPhoto(
           photoResult.base64Data,
           location,
           user.uid,
           userPreferences.username
-        );
+        ).then(sit => {
+          // Replace initial sit with complete sit
+          this.setState(prevState => {
+            const newSits = new Map(prevState.sits);
+            newSits.delete(initialSit.id);
+            newSits.set(sit.id, sit);
 
-        // Replace initial sit with complete sit
-        this.setState(prevState => {
-          const newSits = new Map(prevState.sits);
-          newSits.delete(initialSit.id);
-          newSits.set(sit.id, sit);
-          return { sits: newSits };
+            // Update drawer if it's showing the initial sit
+            if (prevState.drawer.sit?.id === initialSit.id) {
+              return {
+                sits: newSits,
+                drawer: {
+                  isOpen: true,
+                  sit,
+                  images: sit.imageCollectionId ?
+                    prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
+                    prevState.drawer.images
+                }
+              };
+            }
+
+            return { sits: newSits };
+          });
+        }).catch(error => {
+          console.error('Background upload failed:', error);
+          this.showNotification('Sit creation failed in the background', 'error');
         });
       }
     } catch (error) {
+      // Close the photo modal on error
+      this.setState({
+        modals: {
+          ...this.state.modals,
+          photo: { isOpen: false, data: null }
+        }
+      });
+
       console.error('Error uploading photo:', error);
       this.showNotification(error instanceof Error ? error.message : 'Failed to upload photo', 'error');
     }
@@ -845,8 +955,11 @@ class App extends React.Component<{}, AppState> {
 
   // Add these methods to control the drawer
   private openDrawer = async (sit: Sit) => {
-    // If the same sit is already open, close the drawer
-    if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id) {
+    console.log('[App] openDrawer called with sit:', sit.id);
+
+    // If the same sit is already open, don't close it when coming from photo upload
+    if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id &&
+        !this.state.modals.photo.isOpen && !this.state.modals.photo.data) {
       this.closeDrawer();
       return;
     }
@@ -871,7 +984,28 @@ class App extends React.Component<{}, AppState> {
         ...prevState.drawer,
         isOpen: false
       }
-    }));
+    }), () => {
+      console.log('[App] Drawer closed successfully');
+    });
+  };
+
+  // Helper method to load and set user preferences
+  private loadAndSetUserPreferences = async (userId: string) => {
+    try {
+      console.log('[App] Loading preferences for user:', userId);
+      const preferences = await this.loadUserPreferences(userId);
+      console.log('[App] User preferences loaded:', preferences);
+
+      // Also load user marks
+      const marks = await FirebaseService.loadUserMarks(userId);
+
+      this.setState({
+        userPreferences: preferences,
+        marks
+      });
+    } catch (error) {
+      console.error('[App] Error loading user preferences:', error);
+    }
   };
 
   render() {
