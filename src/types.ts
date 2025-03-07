@@ -6,8 +6,10 @@ export interface Image {
   userId: string;
   userName: string;
   collectionId: string;
-  createdAt: Date | any; // Using any for Firestore timestamp
-  base64Data?: string; // Add this for optimistic updates
+  createdAt: Date;
+  base64Data?: string;
+  width?: number;  // Image width in pixels
+  height?: number; // Image height in pixels
 }
 
 export interface Sit {
@@ -38,5 +40,14 @@ export interface UserPreferences {
 }
 
 export type MarkType = 'favorite' | 'wantToGo' | 'visited';
+
+export interface PhotoResult {
+  base64Data: string;
+  location: Coordinates;
+  dimensions?: {
+    width: number;
+    height: number;
+  };
+}
 
 export type { User }; // Use export type for re-exporting types

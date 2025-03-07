@@ -34,6 +34,10 @@ interface PhotoResult {
     latitude: number;
     longitude: number;
   };
+  dimensions?: {
+    width: number;
+    height: number;
+  };
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
@@ -137,6 +141,19 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     }
   }
 
+  private getImageDimensions = (base64Data: string): Promise<{width: number, height: number}> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({
+          width: img.width,
+          height: img.height
+        });
+      };
+      img.src = `data:image/jpeg;base64,${base64Data}`;
+    });
+  };
+
   private handleChooseFromGallery = async () => {
     try {
       if (Capacitor.getPlatform() === 'web') {
@@ -169,9 +186,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
             return;
           }
 
+          // Get image dimensions
+          const dimensions = await this.getImageDimensions(base64Data);
+
           await this.props.onPhotoCapture({
             base64Data,
-            location
+            location,
+            dimensions
           }, this.props.sit);
         };
 
@@ -196,9 +217,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           return;
         }
 
+        // Get image dimensions
+        const dimensions = await this.getImageDimensions(image.base64String);
+
         await this.props.onPhotoCapture({
           base64Data: image.base64String,
-          location
+          location,
+          dimensions
         }, this.props.sit);
       }
     } catch (error) {
@@ -252,9 +277,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         return;
       }
 
+      // Get image dimensions
+      const dimensions = await this.getImageDimensions(image.base64String);
+
       this.props.onPhotoCapture({
         base64Data: image.base64String,
-        location
+        location,
+        dimensions
       }, this.props.sit);
     } catch (error) {
       // Check if error is a cancellation

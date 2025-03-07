@@ -74,6 +74,10 @@ type PhotoResult = {
     latitude: number;
     longitude: number;
   };
+  dimensions?: {
+    width: number;
+    height: number;
+  };
 };
 
 class App extends React.Component<{}, AppState> {
@@ -700,12 +704,14 @@ class App extends React.Component<{}, AppState> {
         // Create a temporary image with the new data
         const updatedImage: Image = {
           id: imageId,
-          photoURL: '', // We'll ignore this and use base64Data
+          photoURL: '',
           userId: user.uid,
           userName: userPreferences.username,
           collectionId: sit.imageCollectionId,
           createdAt: new Date(),
-          base64Data: photoResult.base64Data
+          base64Data: photoResult.base64Data,
+          width: photoResult.dimensions?.width,
+          height: photoResult.dimensions?.height
         };
 
         // Get current images or empty array
@@ -755,12 +761,14 @@ class App extends React.Component<{}, AppState> {
         const tempImageId = `temp_${Date.now()}`;
         const tempImage: Image = {
           id: tempImageId,
-          photoURL: '', // We'll ignore this and use base64Data
+          photoURL: '',
           userId: user.uid,
           userName: userPreferences.username,
           collectionId: sit.imageCollectionId,
           createdAt: new Date(),
-          base64Data: photoResult.base64Data
+          base64Data: photoResult.base64Data,
+          width: photoResult.dimensions?.width,
+          height: photoResult.dimensions?.height
         };
 
         // Get current images or empty array
@@ -804,12 +812,14 @@ class App extends React.Component<{}, AppState> {
         const tempImageId = `temp_${Date.now()}`;
         const tempImage: Image = {
           id: tempImageId,
-          photoURL: '', // We'll ignore this and use base64Data
+          photoURL: '',
           userId: user.uid,
           userName: userPreferences.username,
           collectionId: initialSit.imageCollectionId || '',
           createdAt: new Date(),
-          base64Data: photoResult.base64Data
+          base64Data: photoResult.base64Data,
+          width: photoResult.dimensions?.width,
+          height: photoResult.dimensions?.height
         };
 
         // Close the photo modal and immediately update the drawer with optimistic data
