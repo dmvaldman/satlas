@@ -151,7 +151,7 @@ header {
 .photo-options {
   background: white;
   width: 100%;
-  border-radius: 16px 16px 0 0;
+  border-radius: 8px 8px 0 0;
   padding: 20px;
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
@@ -324,11 +324,14 @@ body:has(.bottom-nav-space) .notification {
 
 /* Add these styles to your existing CSS */
 .profile-content {
+  max-height: 80vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* For iOS momentum scrolling */
+
   background: white;
   padding: 2rem;
-  border-radius: 8px;
-  max-width: 500px;
-  width: 90%;
+  border-radius: 8px 8px 0 0;
+  width: 100%;
   transition: transform 0.3s ease;
 }
 
@@ -1101,7 +1104,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   position: relative;
   width: 0;
   height: 0;
-  z-index: 1000;
+  z-index: 100;
   pointer-events: none;
 }
 
@@ -1208,9 +1211,27 @@ body:has(.bottom-nav-space) {
   to { transform: rotate(360deg); }
 }
 
-/* Ensure the modal is scrollable on small screens */
-.profile-content {
-  max-height: 80vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* For iOS momentum scrolling */
+/* Update bottom sheet styling with more specific selectors */
+.react-spring-bottom-sheet {
+  --rsbs-bg: white;
+  --rsbs-handle-bg: #ddd;
+  --rsbs-ml: auto;
+  --rsbs-mr: auto;
+  --rsbs-overlay-rounded: 16px;
+  --rsbs-z-index: 1000;
+}
+
+/* Add these more specific styles */
+[data-rsbs-overlay] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+[data-rsbs-content] {
+  margin: 0 auto !important;
+}
+
+/* Add this to ensure the user marker has a lower z-index */
+.custom-location-marker {
+  z-index: 2;
 }

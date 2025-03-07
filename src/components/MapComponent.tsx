@@ -3,7 +3,6 @@ import mapboxgl from 'mapbox-gl';
 import { debounce } from '../utils/debounce';
 import { Sit, MarkType, User, Image } from '../types';
 import { MarkerManager } from './MarkerManager';
-import { PopupManager } from './PopupManager';
 import { ClusterManager } from './ClusterManager';
 
 mapboxgl.accessToken = process.env.MAPBOX_ACCESS_TOKEN || '';
@@ -25,6 +24,8 @@ interface MapProps {
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
   onOpenFullScreenCarousel: (images: Image[], initialIndex: number) => void;
   onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
+  onOpenDrawer: (sit: Sit) => void;
+  getCurrentSitId: () => string | null;
 }
 
 interface MapState {
@@ -34,10 +35,9 @@ interface MapState {
 
 class MapComponent extends React.Component<MapProps, MapState> {
   private markerManager: MarkerManager;
-  private popupManager: PopupManager;
   private clusterManager: ClusterManager;
-  private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
   private userMarker: mapboxgl.Marker | null = null;
+  private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
 
   constructor(props: MapProps) {
     super(props);
@@ -47,23 +47,10 @@ class MapComponent extends React.Component<MapProps, MapState> {
     };
 
     this.markerManager = new MarkerManager(this.handleMarkerClick);
-    this.popupManager = new PopupManager(
-      this.handleToggleMark,
-      props.onDeleteImage,
-      this.handleReplaceImage,
-      props.onOpenPhotoModal,
-      props.onOpenProfileModal,
-      props.getImagesForSit,
-      props.onOpenFullScreenCarousel
-    );
+
     this.clusterManager = new ClusterManager();
 
-    this.debouncedHandleMapMove = debounce(
-      (bounds: { north: number; south: number }) => {
-        this.props.onLoadNearbySits(bounds);
-      },
-      500 // Wait 500ms after the last move event before loading sits
-    );
+    this.debouncedHandleMapMove = debounce(this.props.onLoadNearbySits, 300);
   }
 
   componentDidMount() {
@@ -183,25 +170,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
     });
   };
 
-  private handleMarkerClick = async (sit: Sit) => {
-    const { map, user, currentLocation } = this.props;
-    const { marks, favoriteCount } = this.state;
-    if (!map) return;
-
-    // Check if clicked marker is the currently open one
-    if (this.popupManager.getCurrentSitId() === sit.id) {
-      this.popupManager.closePopup();
-      return;
-    }
-
-    await this.popupManager.showPopup(
-      map,
-      sit,
-      user,
-      marks.get(sit.id) || new Set(),
-      favoriteCount.get(sit.id) || 0,
-      currentLocation
-    );
+  private handleMarkerClick = (sit: Sit) => {
+    this.props.onOpenDrawer(sit);
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
@@ -255,15 +225,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const sit = this.props.sits.get(sitId);
     if (sit) {
       this.markerManager.updateMarker(sitId, sit, newMarks, this.props.user);
-
-      // Update the popup if it's for this sit
-      this.popupManager.updatePopup(
-        sit,
-        this.props.user,
-        newMarks,
-        newFavoriteCount,
-        this.props.currentLocation
-      );
     }
 
     // Make the actual API call
@@ -285,17 +246,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
         favoriteCount: revertedFavoriteCount
       });
 
-      // Also update the marker and popup with reverted state
+      // Also update the marker with reverted state
       if (sit) {
         this.markerManager.updateMarker(sitId, sit, currentMarks, this.props.user);
-
-        this.popupManager.updatePopup(
-          sit,
-          this.props.user,
-          currentMarks,
-          currentFavoriteCount,
-          this.props.currentLocation
-        );
       }
     }
   };
@@ -352,10 +305,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
         this.markerManager.showMarkers(map, unclusteredSits, marks, user);
       }
     }
-  };
-
-  public closePopup = () => {
-    this.popupManager.closePopup()
   };
 
   componentWillUnmount() {
