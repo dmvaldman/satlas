@@ -989,6 +989,11 @@ class App extends React.Component<{}, AppState> {
             ]}
             expandOnContentDrag
             defaultSnap={({ minHeight }) => minHeight}
+            header={
+              <div className="bottom-sheet-header">
+                <span className="header-emoji">🪑</span>
+              </div>
+            }
           >
             <PopupComponent
               sit={drawer.sit}
