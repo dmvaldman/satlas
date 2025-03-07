@@ -1272,3 +1272,23 @@ body:has(.bottom-nav-space) {
 [data-rsbs-backdrop] {
   z-index: 1000 !important;
 }
+
+/* Bottom sheet header styles */
+.bottom-sheet-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.header-emoji {
+  font-size: 24px;
+  margin: 0 auto;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}
