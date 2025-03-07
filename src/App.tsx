@@ -549,62 +549,82 @@ class App extends React.Component<{}, AppState> {
     if (!sit) throw new Error('Sit not found');
 
     try {
+      // Check if this is a temporary image (starts with 'temp_')
+      const isTemporaryImage = imageId.startsWith('temp_');
+
       // Optimistically update UI first
       if (drawer.sit && drawer.sit.id === sitId) {
-        // Filter out the deleted image from drawer.images
         const updatedImages = drawer.images.filter(img => img.id !== imageId);
-
         this.setState(prevState => ({
           drawer: {
             ...prevState.drawer,
             images: updatedImages
           }
         }));
-
-        // If all images are deleted, close the drawer
-        if (updatedImages.length === 0) {
-          this.closeDrawer();
-        }
       }
 
-      // Then make the API call
-      await FirebaseService.deleteImage(imageId, user.uid);
+      // If it's a temporary image, we don't need to delete it from the server
+      if (!isTemporaryImage) {
+        try {
+          // Try to delete from server
+          await FirebaseService.deleteImage(imageId, user.uid);
+        } catch (error) {
+          console.error('Error deleting image:', error);
 
-      // Check if the sit still exists in Firestore
-      const sitExists = await FirebaseService.getSit(sitId);
+          // If server deletion fails but it's a local image with base64Data,
+          // we can consider the deletion successful for the UI
+          const hasLocalBase64 = drawer.images.some(img =>
+            img.id === imageId && img.base64Data
+          );
 
-      if (!sitExists) {
-        // Sit was deleted, remove from local state
-        this.setState(prevState => {
-          const newSits = new Map(prevState.sits);
-          newSits.delete(sitId);
-          return { sits: newSits };
-        });
-
-
-      } else if (sit.imageCollectionId) {
-        // Sit still exists, just update the images
-        const updatedImages = await this.getImagesForSit(sit.imageCollectionId);
-
-        // Update drawer images if this sit is currently open
-        if (drawer.sit && drawer.sit.id === sitId) {
-          this.setState(prevState => ({
-            drawer: {
-              ...prevState.drawer,
-              images: updatedImages
+          if (!hasLocalBase64) {
+            // Only revert UI and show error if it's not a local image with base64
+            if (drawer.sit && drawer.sit.id === sitId) {
+              // Revert the UI change
+              const originalImages = await this.getImagesForSit(sit.imageCollectionId!);
+              this.setState(prevState => ({
+                drawer: {
+                  ...prevState.drawer,
+                  images: originalImages
+                }
+              }));
             }
-          }));
+            throw error;
+          }
         }
       }
     } catch (error) {
       console.error('Error deleting image:', error);
-      this.showNotification('Failed to delete image', 'error');
+      this.showNotification(error instanceof Error ? error.message : 'Failed to delete image', 'error');
       throw error;
     }
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
-    // Create replacement data object
+    // Check if this is a temporary image (starts with 'temp_')
+    const isTemporaryImage = imageId.startsWith('temp_');
+
+    if (isTemporaryImage) {
+      // For temporary images, it's simpler to just delete and add a new one
+      // First, remove the temporary image from the UI
+      const { drawer } = this.state;
+      if (drawer.sit && drawer.sit.id === sitId) {
+        const updatedImages = drawer.images.filter(img => img.id !== imageId);
+        this.setState(prevState => ({
+          drawer: {
+            ...prevState.drawer,
+            images: updatedImages
+          }
+        }));
+      }
+
+      // Then open the photo upload modal to add a new image
+      const sit = this.state.sits.get(sitId);
+      this.togglePhotoUpload(sit || undefined);
+      return;
+    }
+
+    // For regular images, proceed with normal replacement
     const replacementData = {
       sitId,
       imageId
@@ -632,35 +652,31 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  // Update handlePhotoUploadComplete for optimistic updates when replacing images
+  // For image replacement (simplified)
   private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => {
     const { user, userPreferences, drawer } = this.state;
     if (!user) return;
 
-    const location = photoResult.location;
-    if (!location) throw new Error('No location available');
-
-    // Handle replacement data case
-    if (existingSit && 'sitId' in existingSit && 'imageId' in existingSit) {
-      try {
+    try {
+      // Case 1: Replacing an existing image
+      if (existingSit && 'imageId' in existingSit) {
         const sitId = existingSit.sitId;
         const imageId = existingSit.imageId;
         const sit = await FirebaseService.getSit(sitId);
         if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
 
-        // Optimistically update the UI for image replacement
+        // Optimistically update the UI with base64 data
         if (drawer.sit && drawer.sit.id === sitId) {
-          // Create a temporary image with the new data
           const tempImage: Image = {
             id: imageId,
-            photoURL: URL.createObjectURL(this.base64ToBlob(photoResult.base64Data, 'image/jpeg')),
+            photoURL: '', // We'll ignore this and use base64Data
             userId: user.uid,
             userName: userPreferences.username,
             collectionId: sit.imageCollectionId,
-            createdAt: new Date()
+            createdAt: new Date(),
+            base64Data: photoResult.base64Data
           };
 
-          // Replace the image in the drawer
           const updatedImages = drawer.images.map(img =>
             img.id === imageId ? tempImage : img
           );
@@ -673,7 +689,7 @@ class App extends React.Component<{}, AppState> {
           }));
         }
 
-        // Now we have the full Sit object with a valid imageCollectionId
+        // Upload to server in the background, but don't use the result
         await FirebaseService.replaceImage(
           photoResult.base64Data,
           sit.imageCollectionId,
@@ -682,113 +698,82 @@ class App extends React.Component<{}, AppState> {
           userPreferences.username
         );
 
-        // Update with the actual image from the server
-        if (sit.imageCollectionId && drawer.sit && drawer.sit.id === sitId) {
-          const updatedImages = await this.getImagesForSit(sit.imageCollectionId);
+        return;
+      }
+      // Case 2: Adding to an existing sit
+      else if (existingSit && 'id' in existingSit) {
+        const sit = existingSit as Sit;
+
+        if (!sit.imageCollectionId) {
+          throw new Error('Sit has no image collection');
+        }
+
+        // Create a temporary image with a unique ID
+        const tempImageId = `temp_${Date.now()}`;
+        const tempImage: Image = {
+          id: tempImageId,
+          photoURL: '', // We'll ignore this and use base64Data
+          userId: user.uid,
+          userName: userPreferences.username,
+          collectionId: sit.imageCollectionId,
+          createdAt: new Date(),
+          base64Data: photoResult.base64Data
+        };
+
+        // Optimistically update UI if this sit is currently open in the drawer
+        if (drawer.sit && drawer.sit.id === sit.id) {
           this.setState(prevState => ({
             drawer: {
               ...prevState.drawer,
-              images: updatedImages
+              images: [...prevState.drawer.images, tempImage]
             }
           }));
         }
 
-        this.showNotification('Photo replaced successfully!', 'success');
-        return;
-      } catch (error) {
-        console.error('Error replacing photo:', error);
-        this.showNotification(error instanceof Error ? error.message : 'Failed to replace photo', 'error');
-        return;
-      }
-    }
-
-    // Handle existing Sit case
-    if (existingSit && 'imageCollectionId' in existingSit) {
-      // Check if the collection ID is defined
-      if (!existingSit.imageCollectionId) {
-        this.showNotification('Cannot add photo: no image collection found', 'error');
-        return;
-      }
-
-      // Check if the new photo's location is near the existing sit
-      if (getDistanceInFeet(location, existingSit.location) > 100) {
-        this.showNotification('Your photo location is too far from the existing sit. Please take a photo closer to the sit location.', 'error');
-        return;
-      }
-
-      try {
+        // Upload to server in the background, but don't use the result
         await FirebaseService.addPhotoToSit(
           photoResult.base64Data,
-          existingSit.imageCollectionId,
+          sit.imageCollectionId,
           user.uid,
           userPreferences.username
         );
-        return;
-      } catch (error) {
-        console.error('Error adding photo to sit:', error);
-        this.showNotification(error instanceof Error ? error.message : 'Failed to add photo', 'error');
+
         return;
       }
-    }
+      // Case 3: Creating a new sit
+      else {
+        const location = photoResult.location;
+        if (!location) throw new Error('No location available');
 
-    // Create a new sit if not adding to existing one
-    const initialSit = FirebaseService.createInitialSit(location, user.uid);
+        // Create a new sit
+        const initialSit = FirebaseService.createInitialSit(location, user.uid);
 
-    try {
-      // Add to local state
-      this.setState(prevState => ({
-        sits: new Map(prevState.sits).set(initialSit.id, initialSit)
-      }));
+        // Add to local state
+        this.setState(prevState => ({
+          sits: new Map(prevState.sits).set(initialSit.id, initialSit)
+        }));
 
-      // Create sit with photo using FirebaseService
-      const sit = await FirebaseService.createSitWithPhoto(
-        photoResult.base64Data,
-        location,
-        user.uid,
-        userPreferences.username
-      );
+        // Create sit with photo using FirebaseService
+        const sit = await FirebaseService.createSitWithPhoto(
+          photoResult.base64Data,
+          location,
+          user.uid,
+          userPreferences.username
+        );
 
-      // Replace initial sit with complete sit
-      this.setState(prevState => {
-        const newSits = new Map(prevState.sits);
-        newSits.delete(initialSit.id);
-        newSits.set(sit.id, sit);
-        return { sits: newSits };
-      });
-
-      this.showNotification('New sit created successfully!', 'success');
-    } catch (error) {
-      if (initialSit) {  // Only try to remove if it was created
+        // Replace initial sit with complete sit
         this.setState(prevState => {
           const newSits = new Map(prevState.sits);
-          newSits.delete(initialSit!.id);
+          newSits.delete(initialSit.id);
+          newSits.set(sit.id, sit);
           return { sits: newSits };
         });
       }
-      console.error('Error creating sit:', error);
-      this.showNotification('Failed to create new sit', 'error');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      this.showNotification(error instanceof Error ? error.message : 'Failed to upload photo', 'error');
     }
   };
-
-  // Helper method to convert base64 to Blob
-  private base64ToBlob(base64: string, type: string): Blob {
-    const byteCharacters = atob(base64);
-    const byteArrays = [];
-
-    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-      const slice = byteCharacters.slice(offset, offset + 512);
-
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-
-    return new Blob(byteArrays, { type });
-  }
 
   private findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
     const { sits } = this.state;
