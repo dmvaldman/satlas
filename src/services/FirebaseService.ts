@@ -763,32 +763,30 @@ export class FirebaseService {
    * @param userId User ID
    * @param sitId Sit ID
    * @param markType Mark type
-   * @param currentMarks Current marks
    * @returns Updated marks and favorite count
    */
   static async toggleMark(
     userId: string,
     sitId: string,
-    markType: MarkType,
-    currentMarks: Set<MarkType>
-  ): Promise<{ marks: Set<MarkType>; favoriteCount?: number }> {
+    markType: MarkType
+  ): Promise<void> {
     try {
-      const newMarks = new Set<MarkType>();
-
       // Document references for all mark types
       const favoriteRef = doc(db, 'favorites', `${userId}_${sitId}`);
       const visitedRef = doc(db, 'visited', `${userId}_${sitId}`);
       const wantToGoRef = doc(db, 'wantToGo', `${userId}_${sitId}`);
 
-      // If the mark is already set, remove it
-      if (currentMarks.has(markType)) {
-        // Get the appropriate document reference
-        const docRef = markType === 'favorite'
-          ? favoriteRef
-          : markType === 'visited'
-            ? visitedRef
-            : wantToGoRef;
+      // Check if the mark already exists
+      const docRef = markType === 'favorite'
+        ? favoriteRef
+        : markType === 'visited'
+          ? visitedRef
+          : wantToGoRef;
 
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        // If the mark exists, remove it
         await deleteDoc(docRef);
       } else {
         // Clear all existing marks first
@@ -799,40 +797,12 @@ export class FirebaseService {
         ]);
 
         // Add the new mark
-        newMarks.add(markType);
-
-        // Get the appropriate document reference and data
-        let docRef;
-        if (markType === 'favorite') {
-          docRef = favoriteRef;
-        } else if (markType === 'visited') {
-          docRef = visitedRef;
-        } else {
-          docRef = wantToGoRef;
-        }
-
-        // Set the new mark
         await setDoc(docRef, {
           userId,
           sitId,
           createdAt: new Date()
         });
       }
-
-      // If we're dealing with favorites, get the updated count
-      if (markType === 'favorite' || currentMarks.has('favorite')) {
-        const countQuery = query(
-          collection(db, 'favorites'),
-          where('sitId', '==', sitId)
-        );
-        const snapshot = await getDocs(countQuery);
-        return {
-          marks: newMarks,
-          favoriteCount: snapshot.size
-        };
-      }
-
-      return { marks: newMarks };
     } catch (error) {
       console.error(`Error toggling ${markType}:`, error);
       throw error;

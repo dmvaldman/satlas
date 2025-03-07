@@ -102,7 +102,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10;
   transition: transform 0.2s;
 }
 
@@ -1234,4 +1234,17 @@ body:has(.bottom-nav-space) {
 /* Add this to ensure the user marker has a lower z-index */
 .custom-location-marker {
   z-index: 2;
+}
+
+/* Add a semi-transparent overlay behind the bottom sheet */
+[data-rsbs-backdrop] {
+  z-index: 999 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Force higher z-index for bottom sheet with !important */
+[data-rsbs-root],
+[data-rsbs-overlay],
+[data-rsbs-backdrop] {
+  z-index: 1000 !important;
 }
