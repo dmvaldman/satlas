@@ -1,4 +1,3 @@
-import { FieldValue, Timestamp } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
 export interface Image {
@@ -18,7 +17,7 @@ export interface Sit {
     longitude: number;
   };
   imageCollectionId?: string;
-  createdAt?: FieldValue | Date;
+  createdAt?: Date;
   uploadedBy?: string;
 }
 

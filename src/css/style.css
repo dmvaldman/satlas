@@ -541,17 +541,17 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   position: absolute;
   bottom: 0px;
   right: 0px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.6);
   color: rgb(213, 212, 212);
-  padding: 6px 10px;
-  border-radius: 2px;
+  padding: 8px 12px;
+  border-radius: 4px 0 0 0;
   font-size: 14px;
   z-index: 10;
-  max-width: 70%;
+  max-width: 100%;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  display: block; /* Always show on mobile */
+  display: block;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
@@ -680,13 +680,16 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .mark-buttons {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-top: 8px;
+  margin-bottom: 8px;
+  justify-content: center; /* Center the buttons horizontally */
 }
 
 .mark-button {
   display: flex;
   align-items: center;
+  justify-content: center; /* Center content within button */
   gap: 4px;
   padding: 4px 8px;
   border: 1px solid #ccc;
@@ -696,6 +699,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   font-size: 14px;
   transition: all 0.2s;
   color: #666;
+  height: 40px;
+  flex: 1; /* Make all buttons take equal width */
+  min-width: 0; /* Allow buttons to shrink if needed */
+  max-width: 120px; /* Set a maximum width to prevent overly wide buttons */
 }
 
 .mark-button .mark-icon {
@@ -793,14 +800,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-
-/* Adjust carousel controls positioning */
-.carousel-nav {
-  z-index: 5;
-}
-
-
-
 
 .image-controls {
   top: 0;
@@ -915,7 +914,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 2;
+  z-index: 5;
   transition: opacity 0.2s;
   opacity: 0;
 }
@@ -948,16 +947,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   .image-uploader {
     opacity: 0.7;
   }
-}
-
-.maps-link {
-  display: block;
-  text-align: center;
-  color: #4285f4;
-  text-decoration: none;
-  font-size: 12px;
-  margin: 8px auto;
-  transition: background-color 0.2s;
 }
 
 .satlas-marker.favorite {
@@ -1011,120 +1000,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .mapboxgl-user-location-accuracy-circle {
   pointer-events: none !important;
-}
-
-/* Full-screen carousel styles */
-.fullscreen-carousel-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 3000;
-}
-
-.fullscreen-carousel {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.fullscreen-image-container {
-  position: relative;
-  max-width: 90%;
-  max-height: 80%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.fullscreen-image {
-  max-width: 100%;
-  max-height: 80vh;
-  object-fit: contain;
-}
-
-.fullscreen-close-button {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 3001;
-}
-
-.fullscreen-close-button svg {
-  width: 24px;
-  height: 24px;
-  fill: white;
-}
-
-.fullscreen-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  border: none;
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 3001;
-}
-
-.fullscreen-nav svg {
-  width: 30px;
-  height: 30px;
-  fill: white;
-}
-
-.fullscreen-nav.prev {
-  left: 20px;
-}
-
-.fullscreen-nav.next {
-  right: 20px;
-}
-
-.fullscreen-carousel-dots {
-  position: absolute;
-  bottom: 20px;
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.fullscreen-carousel-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ccc;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-  padding: 0;
-}
-
-.fullscreen-carousel-dot.active {
-  background: #31d53d;
 }
 
 .image-info {
@@ -1259,6 +1134,11 @@ body:has(.bottom-nav-space) {
   --rsbs-z-index: 1000;
 }
 
+[data-rsbs-header] {
+  box-shadow: none !important;
+  border-bottom: 1px solid #eee;
+}
+
 /* Add these more specific styles */
 [data-rsbs-overlay] {
   margin-left: auto !important;
@@ -1291,8 +1171,6 @@ body:has(.bottom-nav-space) {
 .bottom-sheet-header {
   display: flex;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
 }
 
 .header-emoji {
@@ -1318,4 +1196,22 @@ body:has(.bottom-nav-space) {
   justify-content: center;
   align-items: center;
   background-color: #f5f5f5;
+}
+
+/* Add styling for the sit uploader info */
+.sit-uploader-info {
+  color: #666;
+  margin: 8px 0;
+  text-align: left;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.maps-link {
+  display: block;
+  color: #4285f4;
+  text-decoration: none;
+  padding: 4px 8px;
+  margin: 8px 0;
+  transition: background-color 0.2s;
 }
