@@ -3,6 +3,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { Coordinates, Sit } from '../types';
 import { Capacitor } from '@capacitor/core';
+import ReactDOM from 'react-dom';
 
 // Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
 function convertDMSToDD(dms: number[], direction: string): number {
@@ -27,10 +28,6 @@ interface PhotoUploadProps {
   sit?: Sit | { sitId: string; imageId: string; };
 }
 
-interface PhotoUploadState {
-  error: string | null;
-}
-
 interface PhotoResult {
   base64Data: string;
   location?: {
@@ -39,7 +36,7 @@ interface PhotoResult {
   };
 }
 
-class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUploadState> {
+class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   constructor(props: PhotoUploadProps) {
     super(props);
     this.state = {
@@ -169,7 +166,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
           if (!location) {
             this.showNotification('No location data in image', 'error');
-            this.setState({ error: 'Image must contain location data' });
             return;
           }
 
@@ -210,7 +206,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       }
     } catch (error) {
       console.error('Error choosing photo:', error);
-      this.setState({ error: 'Error choosing photo' });
     }
   };
 
@@ -246,7 +241,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
       if (!location) {
         this.showNotification('No location data found', 'error');
-        this.setState({ error: 'Image location could not be determined' });
         return;
       }
 
@@ -257,7 +251,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       }, this.props.sit);
     } catch (error) {
       console.error('[PhotoUpload] Error taking photo:', error);
-      this.setState({ error: 'Error taking photo' });
       this.showNotification('Error taking photo', 'error');
     }
   };
@@ -268,15 +261,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
     if (!isOpen) return null;
 
-    return (
+    // Use React Portal to render at the document root
+    return ReactDOM.createPortal(
       <div className="modal-overlay active" onClick={onClose}>
         <div className="photo-options" onClick={e => e.stopPropagation()}>
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
-
           <button
             className="photo-option-button"
             onClick={this.handleTakePhoto}
@@ -308,7 +296,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
             Cancel
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 }
