@@ -941,8 +941,13 @@ class App extends React.Component<{}, AppState> {
           <BottomSheet
             open={drawer.isOpen}
             onDismiss={this.closeDrawer}
-            snapPoints={({ minHeight, maxHeight }) => [minHeight, maxHeight * 0.6, maxHeight]}
+            snapPoints={({ minHeight }) => [
+              minHeight,                // Minimum height (default)
+              Math.min(500, window.innerHeight * 0.6), // Medium height (60% of viewport or 500px, whichever is smaller)
+              Math.min(700, window.innerHeight * 0.8)  // Maximum height (80% of viewport or 700px, whichever is smaller)
+            ]}
             expandOnContentDrag
+            defaultSnap={({ minHeight }) => minHeight}
           >
             <PopupComponent
               sit={drawer.sit}
