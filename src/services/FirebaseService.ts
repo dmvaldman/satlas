@@ -480,17 +480,20 @@ export class FirebaseService {
 
   /**
    * Add a photo to an existing sit
-   * @param photoData Base64 photo data
+   * @param base64Data Base64 photo data
    * @param imageCollectionId Collection ID
    * @param userId User ID
    * @param userName User name
+   * @param dimensions Image dimensions
+   * @returns Created image
    */
   static async addPhotoToSit(
-    photoData: string,
+    base64Data: string,
     imageCollectionId: string,
     userId: string,
-    userName: string
-  ): Promise<void> {
+    userName: string,
+    dimensions?: { width: number, height: number }
+  ): Promise<Image> {
     try {
       // Upload photo
       const filename = `sit_${Date.now()}.jpg`;
@@ -498,14 +501,14 @@ export class FirebaseService {
 
       // Detect content type from base64 data
       let contentType = 'image/jpeg'; // Default
-      if (photoData.startsWith('data:')) {
-        const matches = photoData.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (base64Data.startsWith('data:')) {
+        const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
         if (matches && matches.length > 1) {
           contentType = matches[1];
         }
       }
 
-      const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
+      const base64WithoutPrefix = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       // Add metadata with detected content type
       const metadata = {
@@ -518,15 +521,26 @@ export class FirebaseService {
       // Use CDN URL
       const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
 
-      // Add to existing collection
-      await addDoc(collection(db, 'images'), {
+      // Create image document in Firestore
+      const imageDoc = await addDoc(collection(db, 'images'), {
+        userId,
+        userName,
+        collectionId: imageCollectionId,
+        createdAt: new Date(),
+        width: dimensions?.width || undefined,
+        height: dimensions?.height || undefined
+      });
+
+      return {
+        id: imageDoc.id,
         photoURL,
         userId,
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        deleted: false
-      });
+        width: dimensions?.width || undefined,
+        height: dimensions?.height || undefined
+      };
     } catch (error) {
       console.error('Error adding photo to sit:', error);
       throw error;
@@ -648,28 +662,30 @@ export class FirebaseService {
 
   /**
    * Get images for a sit
-   * @param imageCollectionId Collection ID
+   * @param collectionId Collection ID
    * @returns Array of images
    */
-  static async getImages(imageCollectionId: string): Promise<Image[]> {
+  static async getImages(collectionId: string): Promise<Image[]> {
     try {
-      console.log('Fetching images for collection:', imageCollectionId);
+      console.log('Fetching images for collection:', collectionId);
 
       const imagesRef = collection(db, 'images');
       const q = query(
         imagesRef,
-        where('collectionId', '==', imageCollectionId),
+        where('collectionId', '==', collectionId),
         where('deleted', '==', false)
       );
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        photoURL: doc.data().photoURL,
+        photoURL: doc.data().photoURL || '',
         userId: doc.data().userId,
         userName: doc.data().userName,
         collectionId: doc.data().collectionId,
-        createdAt: doc.data().createdAt
+        createdAt: doc.data().createdAt.toDate(),
+        width: doc.data().width || undefined,
+        height: doc.data().height || undefined
       }));
     } catch (error) {
       console.error('Error getting images:', error);
@@ -812,7 +828,8 @@ export class FirebaseService {
     imageCollectionId: string,
     imageId: string,
     userId: string,
-    userName: string
+    userName: string,
+    dimensions?: { width: number, height: number }
   ): Promise<void> {
     // Delete the old image first
     await this.deleteImage(imageId, userId);
@@ -822,7 +839,8 @@ export class FirebaseService {
       base64Data,
       imageCollectionId,
       userId,
-      userName
+      userName,
+      dimensions
     );
   }
 }
