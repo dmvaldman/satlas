@@ -32,12 +32,6 @@ export default function NearbyExistingSitModal({
           Upload Photo
         </button>
 
-        <button
-          className="photo-option-button cancel-button"
-          onClick={onClose}
-        >
-          Cancel
-        </button>
       </div>
     </div>
   );

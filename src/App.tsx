@@ -10,7 +10,6 @@ import ProfileModal from './components/ProfileModal';
 import { UserPreferences } from './types';
 import AddSitButton from './components/AddSitButton';
 import NearbyExistingSitModal from './components/NearbyExistingSitModal';
-import FullScreenCarousel from './components/FullScreenCarousel';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './utils/LocationService';
 import { auth } from './services/FirebaseService';
@@ -49,11 +48,6 @@ interface AppState {
     nearbySit: {
       isOpen: boolean;
       data: Sit | null;
-    };
-    fullScreenCarousel: {
-      isOpen: boolean;
-      images: Image[];
-      initialIndex: number;
     };
   };
 
@@ -111,12 +105,7 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false, data: null },
         profile: { isOpen: false, data: null },
-        nearbySit: { isOpen: false, data: null },
-        fullScreenCarousel: {
-          isOpen: false,
-          images: [],
-          initialIndex: 0
-        }
+        nearbySit: { isOpen: false, data: null }
       },
 
       // Notification state
@@ -825,31 +814,6 @@ class App extends React.Component<{}, AppState> {
     this.setState({ notification: null });
   };
 
-  private openFullScreenCarousel = (images: Image[], initialIndex: number) => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        fullScreenCarousel: {
-          isOpen: true,
-          images,
-          initialIndex
-        }
-      }
-    }));
-  };
-
-  private closeFullScreenCarousel = () => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        fullScreenCarousel: {
-          ...prevState.modals.fullScreenCarousel,
-          isOpen: false
-        }
-      }
-    }));
-  };
-
   private configureStatusBar = async () => {
     try {
       // Configure dark system bars (light icons on transparent background)
@@ -983,7 +947,6 @@ class App extends React.Component<{}, AppState> {
             getImagesForSit={this.getImagesForSit}
             onOpenPhotoModal={this.togglePhotoUpload}
             onOpenProfileModal={this.toggleProfile}
-            onOpenFullScreenCarousel={this.openFullScreenCarousel}
             onOpenDrawer={this.openDrawer}
             getCurrentSitId={() => this.state.drawer.sit?.id || null}
           />
@@ -1029,14 +992,6 @@ class App extends React.Component<{}, AppState> {
           onUploadToExisting={this.handleUploadToExisting}
         />
 
-        {modals.fullScreenCarousel.isOpen && (
-          <FullScreenCarousel
-            images={modals.fullScreenCarousel.images}
-            initialIndex={modals.fullScreenCarousel.initialIndex}
-            onClose={this.closeFullScreenCarousel}
-          />
-        )}
-
         {notification && (
           <div className={`notification ${notification.type}`}>
             <span className="notification-message">{notification.message}</span>
@@ -1079,7 +1034,6 @@ class App extends React.Component<{}, AppState> {
               onReplaceImage={this.handleReplaceImage}
               onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
               onOpenProfileModal={this.toggleProfile}
-              onImageClick={(index) => this.openFullScreenCarousel(drawer.images, index)}
               onClose={this.closeDrawer}
             />
           </BottomSheet>
