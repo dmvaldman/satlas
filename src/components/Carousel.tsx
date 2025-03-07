@@ -6,7 +6,6 @@ interface CarouselProps {
   currentUserId: string | null;
   isDeleting?: boolean;
   onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
-  onImageClick?: (index: number) => void;
 }
 
 interface CarouselState {
@@ -78,7 +77,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   }
 
   render() {
-    const { images, currentUserId, onImageAction, isDeleting, onImageClick } = this.props;
+    const { images, currentUserId, onImageAction, isDeleting } = this.props;
     const { activeIndex, showControls: showControlsState, imageAspectRatio, imageLoaded } = this.state;
 
     if (images.length === 0) {
@@ -140,7 +139,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               }
               alt={`Photo by ${currentImage.userName}`}
               className={`carousel-image ${imageAspectRatio && imageAspectRatio > 1 ? 'landscape' : 'portrait'}`}
-              onClick={() => onImageClick && onImageClick(activeIndex)}
               style={{
                 cursor: 'pointer',
                 opacity: imageLoaded ? 1 : 0

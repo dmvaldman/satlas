@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import { Sit, Image, MarkType } from '../types';
 import Carousel from './Carousel';
 import { getDistanceInFeet } from '../utils/geo';
+import { formatRelativeTime } from '../utils/dateUtils';
 
 interface PopupProps {
   sit: Sit;
@@ -17,7 +18,6 @@ interface PopupProps {
   onClose?: () => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
-  onImageClick?: (index: number) => void;
 }
 
 interface PopupState {
@@ -71,7 +71,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   };
 
   private renderCarousel() {
-    const { images, user, onImageClick } = this.props;
+    const { images, user } = this.props;
 
     return (
       <Carousel
@@ -79,7 +79,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         currentUserId={user?.uid || null}
         onImageAction={this.handleImageAction}
         isDeleting={this.state.isDeleting}
-        onImageClick={onImageClick}
       />
     );
   }
@@ -160,6 +159,9 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         className="maps-link"
       >
         open in maps
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '4px', verticalAlign: 'middle' }}>
+          <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+        </svg>
       </a>
     );
   }
@@ -231,6 +233,13 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
         {/* Only show mark buttons if the sit is fully created */}
         {sit.imageCollectionId && user && this.renderMarkButtons()}
+
+        {/* Display uploader information */}
+        {sit.uploadedBy && sit.createdAt && (
+          <div className="sit-uploader-info">
+            Sit uploaded {formatRelativeTime(sit.createdAt)}
+          </div>
+        )}
 
         {/* Only show favorite count for established sits */}
         {sit.imageCollectionId && this.renderFavoriteCount()}
