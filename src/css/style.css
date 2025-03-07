@@ -224,10 +224,6 @@ header {
   opacity: 0.8;
 }
 
-.notification-close:hover {
-  opacity: 1;
-}
-
 .notification.success {
   background-color: #4caf50;
 }
@@ -526,15 +522,24 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   gap: 8px;
 }
 
+/* Consolidate image uploader styling */
 .image-uploader {
   position: absolute;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  padding: 8px;
+  bottom: 0px;
+  right: 0px;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgb(213, 212, 212);
+  padding: 6px 10px;
+  border-radius: 2px;
+  font-size: 14px;
   z-index: 10;
+  max-width: 70%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  display: block; /* Always show on mobile */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Navigation buttons */
@@ -597,15 +602,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 5;
 }
 
-.image-uploader {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  padding: 8px;
-  font-size: 14px;
-}
+
 
 .image-controls {
   top: 0;
@@ -636,14 +633,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 20px;
   height: 20px;
   fill: white;
-}
-
-.image-control-button:hover svg {
-  fill: #31d53d;
-}
-
-.image-control-button.delete:hover svg {
-  fill: #ff3b30;
 }
 
 /* Prevent clicks on modal content from closing the modal */
@@ -796,21 +785,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 5;
 }
 
-/* Improve image uploader and controls positioning */
-.image-uploader, .image-controls {
-  position: absolute;
-  z-index: 5;
-}
 
-.image-uploader {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  padding: 8px;
-  font-size: 14px;
-}
+
 
 .image-controls {
   top: 0;
@@ -878,14 +854,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   fill: white;
 }
 
-.image-control-button:hover svg {
-  fill: #31d53d;
-}
-
-.image-control-button.delete:hover svg {
-  fill: #ff3b30;
-}
-
 .pending-upload {
   padding: 1rem;
   text-align: center;
@@ -938,10 +906,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   opacity: 0;
 }
 
-.carousel-content:hover .carousel-nav {
-  opacity: 1;
-}
-
 .carousel-nav svg {
   width: 24px;
   height: 24px;
@@ -963,16 +927,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   }
 }
 
-.image-uploader {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 14px;
-}
+
 
 /* For mobile, show with less opacity */
 @media (hover: none) {
@@ -989,11 +944,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   font-size: 12px;
   margin: 8px auto;
   transition: background-color 0.2s;
-}
-
-.maps-link:hover {
-  color: #3367d6;
-  text-decoration: underline;
 }
 
 .satlas-marker.favorite {

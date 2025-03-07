@@ -121,11 +121,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               }}
               onLoad={this.handleImageLoad}
             />
-            {(showControlsState || ('ontouchstart' in window)) && (
-              <div className="image-uploader">
-                {currentImage.userName}
-              </div>
-            )}
+            <div className="image-uploader">
+              {currentImage.userName}
+            </div>
             {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
               <div className="image-controls">
                 <button
