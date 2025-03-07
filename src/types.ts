@@ -8,6 +8,7 @@ export interface Image {
   userName: string;
   collectionId: string;
   createdAt: Date | any; // Using any for Firestore timestamp
+  base64Data?: string; // Add this for optimistic updates
 }
 
 export interface Sit {

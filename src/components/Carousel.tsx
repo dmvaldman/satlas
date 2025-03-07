@@ -134,15 +134,21 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               </div>
             )}
             <img
-              src={`${currentImage.photoURL}?size=med`}
-              alt={`Image ${safeActiveIndex + 1}`}
+              src={currentImage.base64Data ?
+                `data:image/jpeg;base64,${currentImage.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                `${currentImage.photoURL}?size=med`
+              }
+              alt={`Photo by ${currentImage.userName}`}
               className="carousel-image"
-              onClick={() => onImageClick && onImageClick(safeActiveIndex)}
+              onClick={() => onImageClick && onImageClick(activeIndex)}
               style={{
                 cursor: 'pointer',
                 opacity: imageLoaded ? 1 : 0
               }}
               onLoad={this.handleImageLoad}
+              onError={(e) => {
+                console.error(`Error loading image: ${currentImage.photoURL}`);
+              }}
             />
             <div className="image-uploader">
               {currentImage.userName}
