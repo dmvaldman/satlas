@@ -139,7 +139,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                 `${currentImage.photoURL}?size=med`
               }
               alt={`Photo by ${currentImage.userName}`}
-              className="carousel-image"
+              className={`carousel-image ${imageAspectRatio && imageAspectRatio > 1 ? 'landscape' : 'portrait'}`}
               onClick={() => onImageClick && onImageClick(activeIndex)}
               style={{
                 cursor: 'pointer',
