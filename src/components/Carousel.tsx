@@ -62,6 +62,21 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }));
   };
 
+  componentDidUpdate(prevProps: CarouselProps) {
+    // If images array changed (e.g., after deletion)
+    if (prevProps.images.length !== this.props.images.length) {
+      // Check if current activeIndex is still valid
+      if (this.state.activeIndex >= this.props.images.length) {
+        // Reset to last valid index
+        this.setState({
+          activeIndex: Math.max(0, this.props.images.length - 1),
+          imageLoaded: false,
+          imageAspectRatio: null
+        });
+      }
+    }
+  }
+
   render() {
     const { images, currentUserId, onImageAction, isDeleting, onImageClick } = this.props;
     const { activeIndex, showControls: showControlsState, imageAspectRatio, imageLoaded } = this.state;
@@ -70,7 +85,15 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       return <div className="no-images">No images available</div>;
     }
 
-    const currentImage = images[activeIndex];
+    // Make sure activeIndex is within bounds
+    const safeActiveIndex = Math.min(activeIndex, images.length - 1);
+    const currentImage = images[safeActiveIndex];
+
+    // Safety check before accessing properties
+    if (!currentImage) {
+      return <div className="no-images">Image not available</div>;
+    }
+
     const canShowControls = currentUserId && currentImage.userId === currentUserId;
     const hasMultipleImages = images.length > 1;
 
@@ -112,9 +135,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             )}
             <img
               src={`${currentImage.photoURL}?size=med`}
-              alt={`Image ${activeIndex + 1}`}
+              alt={`Image ${safeActiveIndex + 1}`}
               className="carousel-image"
-              onClick={() => onImageClick && onImageClick(activeIndex)}
+              onClick={() => onImageClick && onImageClick(safeActiveIndex)}
               style={{
                 cursor: 'pointer',
                 opacity: imageLoaded ? 1 : 0
@@ -153,7 +176,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               {images.map((_, index) => (
                 <button
                   key={index}
-                  className={`carousel-dot${index === activeIndex ? ' active' : ''}`}
+                  className={`carousel-dot${index === safeActiveIndex ? ' active' : ''}`}
                   onClick={() => this.setState({
                     activeIndex: index,
                     imageLoaded: false,

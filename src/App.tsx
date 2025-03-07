@@ -655,7 +655,6 @@ class App extends React.Component<{}, AppState> {
           user.uid,
           userPreferences.username
         );
-        this.showNotification('Photo added successfully!', 'success');
         return;
       } catch (error) {
         console.error('Error adding photo to sit:', error);
