@@ -855,8 +855,6 @@ class App extends React.Component<{}, AppState> {
       drawer
     } = this.state;
 
-    console.log('App render:', { isAuthenticated, user: user?.displayName });
-
     const isAndroid = Capacitor.getPlatform() === 'android';
 
     // Still show loading, but include the map container

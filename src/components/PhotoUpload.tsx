@@ -39,9 +39,6 @@ interface PhotoResult {
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   constructor(props: PhotoUploadProps) {
     super(props);
-    this.state = {
-      error: null
-    };
   }
 
   private showNotification(message: string, type: 'success' | 'error') {
@@ -150,7 +147,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
         input.onchange = async (e) => {
           const file = (e.target as HTMLInputElement).files?.[0];
-          if (!file) return;
+          if (!file) {
+            console.log('Photo selection cancelled');
+            return; // User cancelled, just return
+          }
 
           // Convert to base64
           const base64Data = await new Promise<string>((resolve) => {
@@ -194,7 +194,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
         if (!location) {
           this.showNotification('No location data in image', 'error');
-          this.setState({ error: 'Image must contain location data' });
           return;
         }
 
@@ -205,7 +204,18 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         }, this.props.sit);
       }
     } catch (error) {
+      // Check if error is a cancellation
+      if (error instanceof Error &&
+          (error.message.includes('cancel') ||
+           error.message.includes('cancelled') ||
+           error.message.includes('denied'))) {
+        console.log('Photo selection cancelled');
+        return; // User cancelled, just return
+      }
+
+      // This is a real error, not a cancellation
       console.error('Error choosing photo:', error);
+      this.showNotification('Error accessing photos', 'error');
     }
   };
 
@@ -250,14 +260,23 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         location
       }, this.props.sit);
     } catch (error) {
+      // Check if error is a cancellation
+      if (error instanceof Error &&
+          (error.message.includes('cancel') ||
+           error.message.includes('cancelled') ||
+           error.message.includes('denied'))) {
+        console.log('[PhotoUpload] Camera capture cancelled');
+        return; // User cancelled, just return
+      }
+
+      // This is a real error, not a cancellation
       console.error('[PhotoUpload] Error taking photo:', error);
-      this.showNotification('Error taking photo', 'error');
+      this.showNotification('Error accessing camera', 'error');
     }
   };
 
   render() {
     const { isOpen, isUploading, onClose } = this.props;
-    const { error } = this.state;
 
     if (!isOpen) return null;
 
