@@ -15,7 +15,6 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* Remove body padding */
 }
 
 header {
@@ -23,7 +22,6 @@ header {
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 2;
-  /* Fix header spacing */
   height: 64px;
   padding-top: var(--safe-area-top);
   display: flex;
@@ -155,10 +153,6 @@ header {
   overflow-y: auto;
 }
 
-.modal-overlay.active .photo-options {
-  transform: translateY(0);
-}
-
 .photo-option-button {
   width: 100%;
   padding: 16px;
@@ -237,20 +231,8 @@ body:has(.bottom-nav-space) .notification {
   bottom: calc(20px + 48px + var(--safe-area-bottom));
 }
 
-@keyframes slideUp {
-  from {
-    transform: translate(-50%, 100%);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
-}
-
 .satlas-marker.pending {
   background-color: rgba(49, 213, 61, 0.5); /* Lighter shade of the original color */
-  /* animation: pulse 1.5s infinite; */
 }
 
 .satlas-popup-loading {
@@ -430,7 +412,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background-color: #007AFF;  /* Blue for own sits */
 }
 
-
 .favorite-count {
   font-size: 0.9em;
   color: #666;
@@ -475,8 +456,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
 }
 
-/* Clean up carousel styles - remove duplicates and organize */
-
 /* Carousel container */
 .carousel {
   position: relative;
@@ -493,14 +472,16 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   border-radius: 8px;
 }
 
-/* Make image container flexible */
-.carousel-img-container {
-  position: relative;
+/* Update loading indicator positioning in carousel */
+.carousel-img-container .loading-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
-  align-items: center; /* Vertically center images */
-  justify-content: center; /* Horizontally center images */
+  justify-content: center;
+  align-items: center;
 }
 
 /* Allow image to maintain aspect ratio */
@@ -516,16 +497,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   cursor: pointer;
 }
 
-/* Remove these specific styles as they might be causing issues */
-.carousel-image.landscape,
-.carousel-image.portrait {
-  /* No specific styles needed - let object-fit: contain handle it */
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-}
-
 /* Position controls absolutely */
 .image-controls {
   position: absolute;
@@ -534,26 +505,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 10;
   display: flex;
   gap: 8px;
-}
-
-/* Consolidate image uploader styling */
-.image-uploader {
-  position: absolute;
-  bottom: 0px;
-  right: 0px;
-  background: rgba(0, 0, 0, 0.6);
-  color: rgb(213, 212, 212);
-  padding: 8px 12px;
-  border-radius: 4px 0 0 0;
-  font-size: 14px;
-  z-index: 10;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  display: block;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Navigation buttons */
@@ -610,25 +561,24 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background: #31d53d;
 }
 
-/* Image controls and uploader info */
-.image-uploader, .image-controls {
+/* Consolidate image uploader styling */
+.image-uploader {
   position: absolute;
-  z-index: 5;
-}
-
-
-
-.image-controls {
-  top: 0;
-  right: 0;
-  display: flex;
-  padding: 8px;
-}
-
-/* Single image view */
-.single-image .carousel-img-container {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  bottom: 0px;
+  right: 0px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgb(213, 212, 212);
+  padding: 8px 12px;
+  border-radius: 4px 0 0 0;
+  font-size: 14px;
+  z-index: 10;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  display: block;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* Control buttons */
@@ -657,25 +607,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .satlas-marker.uploading {
   opacity: 0.7;
-  /* animation: pulse 1.5s infinite; */
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-.satlas-marker.new {
-  opacity: 0.7;
-  background-color: rgba(49, 213, 61, 0.5) !important;  /* Override any other colors when new */
-  animation: fade 1.5s infinite;
-}
-
-@keyframes fade {
-  0% { opacity: 0.7; }
-  50% { opacity: 0.3; }
-  100% { opacity: 0.7; }
 }
 
 .mark-buttons {
@@ -795,29 +726,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   color: #ff3b30;
 }
 
-/* Add styles for single image view (no carousel controls) */
-.single-image .carousel-img-container {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.image-controls {
-  top: 0;
-  right: 0;
-  display: flex;
-  padding: 8px;
-}
-
-/* For mobile, show controls without transparency when active */
-@media (hover: none) {
-  .image-controls {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 5px;
-    border-radius: 4px;
-  }
-}
-
 /* Dots are now separate from the image container */
 .carousel-dots {
   display: flex;
@@ -879,6 +787,14 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   text-align: center;
 }
 
+.image-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+}
+
 /* New wrapper for the carousel image and its overlay controls */
 .carousel-img-wrapper {
   position: relative;
@@ -891,14 +807,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: block;
   margin: 0 auto;   /* Center the image horizontally */
   object-fit: cover; /* Ensure the image covers the container without distortion */
-}
-
-.image-controls {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
 }
 
 .carousel-nav {
@@ -931,22 +839,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .carousel-nav.next {
   right: 10px;
-}
-
-/* For mobile, always show nav buttons with less opacity */
-@media (hover: none) {
-  .carousel-nav {
-    opacity: 0.7;
-  }
-}
-
-
-
-/* For mobile, show with less opacity */
-@media (hover: none) {
-  .image-uploader {
-    opacity: 0.7;
-  }
 }
 
 .satlas-marker.favorite {
@@ -1124,6 +1016,18 @@ body:has(.bottom-nav-space) {
   to { transform: rotate(360deg); }
 }
 
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+
 /* Update bottom sheet styling with more specific selectors */
 .react-spring-bottom-sheet {
   --rsbs-bg: white;
@@ -1148,12 +1052,6 @@ body:has(.bottom-nav-space) {
 [data-rsbs-content] {
   margin: 0 auto !important;
 }
-
-/* Add this to ensure the user marker has a lower z-index */
-.custom-location-marker {
-  z-index: 2;
-}
-
 /* Add a semi-transparent overlay behind the bottom sheet */
 [data-rsbs-backdrop] {
   z-index: 999 !important;
@@ -1167,6 +1065,12 @@ body:has(.bottom-nav-space) {
   z-index: 1000 !important;
 }
 
+/* Add this to ensure the user marker has a lower z-index */
+.custom-location-marker {
+  z-index: 2;
+}
+
+
 /* Bottom sheet header styles */
 .bottom-sheet-header {
   display: flex;
@@ -1176,26 +1080,6 @@ body:has(.bottom-nav-space) {
 .header-emoji {
   font-size: 24px;
   margin: 0 auto;
-}
-
-.header-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
-}
-
-/* Update loading indicator positioning in carousel */
-.carousel-img-container .loading-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #f5f5f5;
 }
 
 /* Add styling for the sit uploader info */
@@ -1214,4 +1098,22 @@ body:has(.bottom-nav-space) {
   padding: 4px 8px;
   margin: 8px 0;
   transition: background-color 0.2s;
+}
+
+/* For mobile, show controls without transparency when active */
+@media (hover: none) {
+  .image-controls {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border-radius: 4px;
+  }
+
+  .image-uploader {
+    opacity: 0.7;
+  }
+
+  .carousel-nav {
+    opacity: 0.7;
+  }
 }
