@@ -1158,7 +1158,7 @@ class App extends React.Component<{}, AppState> {
               Math.min(500, window.innerHeight * 0.6),
               Math.min(700, window.innerHeight * 0.8)
             ]}
-            expandOnContentDrag
+            expandOnContentDrag={false}
             defaultSnap={({ minHeight }) => minHeight}
             header={
               <div className="bottom-sheet-header">
