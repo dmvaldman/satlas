@@ -10,4 +10,5 @@ scripts/assets/
 android/
 ios/
 tsconfig.tsbuildinfo
+.cursorrules
 
