@@ -481,15 +481,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
 }
 
-.loading-indicator {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
 /* Allow image to maintain aspect ratio */
 .carousel-image {
   max-width: 100%;
@@ -988,13 +979,14 @@ body:has(.bottom-nav-space) {
   bottom: var(--safe-area-bottom) !important;
 }
 
-/* Add loading spinner */
 .loading-indicator {
+  position: absolute;
+  width: 100%;
+  height: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 20px;
+  align-items: center;
+  flex-direction: column;
 }
 
 .spinner {
@@ -1002,9 +994,8 @@ body:has(.bottom-nav-space) {
   height: 40px;
   border: 4px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border-top-color: #31d53d;
+  border-top-color: black;
   animation: spin 1s ease-in-out infinite;
-  margin-bottom: 10px;
 }
 
 @keyframes spin {
@@ -1021,7 +1012,6 @@ body:has(.bottom-nav-space) {
     opacity: 1;
   }
 }
-
 
 /* Update bottom sheet styling with more specific selectors */
 .react-spring-bottom-sheet {

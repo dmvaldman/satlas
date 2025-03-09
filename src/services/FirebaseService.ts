@@ -311,7 +311,7 @@ export class FirebaseService {
    * @param bounds Map bounds
    * @returns Map of sits
    */
-  static async loadNearbySits(bounds: { north: number; south: number }): Promise<Map<string, Sit>> {
+  static async loadSits(bounds: { north: number; south: number }): Promise<Map<string, Sit>> {
     try {
       const sitsRef = collection(db, 'sits');
       const q = query(
