@@ -15,14 +15,13 @@ interface MapProps {
   user: User | null;
   isLoading: boolean;
   currentLocation: { latitude: number; longitude: number } | null;
-  onLoadNearbySits: (bounds: { north: number; south: number }) => void;
+  onLoadSits: (bounds: { north: number; south: number }) => void;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
-  onOpenFullScreenCarousel: (images: Image[], initialIndex: number) => void;
   onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
   onOpenDrawer: (sit: Sit) => void;
   getCurrentSitId: () => string | null;
@@ -50,7 +49,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     this.clusterManager = new ClusterManager();
 
-    this.debouncedHandleMapMove = debounce(this.props.onLoadNearbySits, 300);
+    this.debouncedHandleMapMove = debounce(this.props.onLoadSits, 300);
   }
 
   componentDidMount() {
@@ -119,7 +118,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   // Helper method to create the location dot element
   private createLocationDot(): HTMLElement {
     const container = document.createElement('div');
-    container.className = 'custom-location-marker';
+    container.className = 'location-marker';
     return container;
   }
 

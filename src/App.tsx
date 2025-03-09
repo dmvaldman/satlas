@@ -153,7 +153,7 @@ class App extends React.Component<{}, AppState> {
         });
 
         // Load user preferences when auth state changes
-        this.loadAndSetUserPreferences(user.uid);
+        this.loadUserData(user.uid);
       } else {
         this.setState({
           user: null,
@@ -175,7 +175,7 @@ class App extends React.Component<{}, AppState> {
 
     // Load user preferences if user is already authenticated
     if (currentUser) {
-      this.loadAndSetUserPreferences(currentUser.uid);
+      this.loadUserData(currentUser.uid);
     }
 
     // Initialize map after component is mounted
@@ -242,7 +242,7 @@ class App extends React.Component<{}, AppState> {
           // Load sits based on initial map bounds
           const mapBounds = map.getBounds();
           if (mapBounds) {
-            this.handleLoadNearbySits({
+            this.handleLoadSits({
               north: mapBounds.getNorth(),
               south: mapBounds.getSouth()
             });
@@ -255,7 +255,7 @@ class App extends React.Component<{}, AppState> {
         map.on('moveend', () => {
           const bounds = map.getBounds();
           if (bounds) {
-            this.handleLoadNearbySits({
+            this.handleLoadSits({
               north: bounds.getNorth(),
               south: bounds.getSouth()
             });
@@ -267,14 +267,6 @@ class App extends React.Component<{}, AppState> {
         this.initializeMapWithDefaultLocation();
       });
   };
-
-  // Helper method to create the location dot element
-  private createLocationDot(): HTMLElement {
-    // Create a simple container with the right class
-    const container = document.createElement('div');
-    container.className = 'custom-location-marker';
-    return container;
-  }
 
   // Separate method for fallback initialization
   private initializeMapWithDefaultLocation = () => {
@@ -300,7 +292,7 @@ class App extends React.Component<{}, AppState> {
     map.on('load', () => {
       const mapBounds = map.getBounds();
       if (mapBounds) {
-        this.handleLoadNearbySits({
+        this.handleLoadSits({
           north: mapBounds.getNorth(),
           south: mapBounds.getSouth()
         });
@@ -312,25 +304,17 @@ class App extends React.Component<{}, AppState> {
     try {
       const marksMap = await FirebaseService.loadUserMarks(userId);
       const favoriteCounts = await FirebaseService.loadFavoriteCounts();
+      const userData = await FirebaseService.loadUserPreferences(userId);
+
       this.setState({
         marks: marksMap,
-        favoriteCount: favoriteCounts
+        favoriteCount: favoriteCounts,
+        userPreferences: userData
       });
     } catch (error) {
-      console.error('Error loading user marks:', error);
+      console.error('Error loading user data:', error);
     }
   }
-
-  private loadUserPreferences = async (userId: string): Promise<UserPreferences> => {
-    try {
-      const userData = await FirebaseService.loadUserPreferences(userId);
-      this.setState({ userPreferences: userData });
-      return userData;
-    } catch (error) {
-      console.error('Error loading user preferences:', error);
-      throw error;
-    }
-  };
 
   // Auth methods
   private handleSignIn = async () => {
@@ -351,7 +335,7 @@ class App extends React.Component<{}, AppState> {
 
           // Load user preferences after state is updated
           try {
-            const preferences = await this.loadUserPreferences(currentUser.uid);
+            const preferences = await this.loadUserData(currentUser.uid);
             console.log('[App] User preferences loaded after sign-in:', preferences);
           } catch (error) {
             console.error('[App] Error loading preferences after sign-in:', error);
@@ -472,9 +456,9 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleLoadNearbySits = async (bounds: { north: number; south: number }) => {
+  private handleLoadSits = async (bounds: { north: number; south: number }) => {
     try {
-      const newSits = await FirebaseService.loadNearbySits(bounds);
+      const newSits = await FirebaseService.loadSits(bounds);
 
       // Only update state if there are actual changes
       let hasChanges = false;
@@ -896,7 +880,7 @@ class App extends React.Component<{}, AppState> {
 
     // If not found in current sits, check database using FirebaseService
     try {
-      const allSits = await FirebaseService.loadNearbySits({
+      const allSits = await FirebaseService.loadSits({
         north: coordinates.latitude + 0.001, // Roughly 100 meters
         south: coordinates.latitude - 0.001
       });
@@ -999,25 +983,6 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  // Helper method to load and set user preferences
-  private loadAndSetUserPreferences = async (userId: string) => {
-    try {
-      console.log('[App] Loading preferences for user:', userId);
-      const preferences = await this.loadUserPreferences(userId);
-      console.log('[App] User preferences loaded:', preferences);
-
-      // Also load user marks
-      const marks = await FirebaseService.loadUserMarks(userId);
-
-      this.setState({
-        userPreferences: preferences,
-        marks
-      });
-    } catch (error) {
-      console.error('[App] Error loading user preferences:', error);
-    }
-  };
-
   render() {
     const {
       user,
@@ -1084,7 +1049,7 @@ class App extends React.Component<{}, AppState> {
             currentLocation={currentLocation}
             user={user}
             isLoading={isMapLoading}
-            onLoadNearbySits={this.handleLoadNearbySits}
+            onLoadSits={this.handleLoadSits}
             onToggleMark={this.handleToggleMark}
             onDeleteImage={this.handleDeleteImage}
             onReplaceImage={this.handleReplaceImage}
