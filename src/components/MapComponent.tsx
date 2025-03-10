@@ -16,15 +16,8 @@ interface MapProps {
   isLoading: boolean;
   currentLocation: { latitude: number; longitude: number } | null;
   onLoadSits: (bounds: { north: number; south: number }) => void;
-  onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
-  onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
-  onReplaceImage: (sitId: string, imageId: string) => void;
-  onOpenPhotoModal: (sit: Sit) => void;
-  onOpenProfileModal: () => void;
-  getImagesForSit: (imageCollectionId: string) => Promise<Image[]>;
   onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
-  onOpenDrawer: (sit: Sit) => void;
-  getCurrentSitId: () => string | null;
+  onOpenPopup: (sit: Sit) => void;
 }
 
 interface MapState {
@@ -170,86 +163,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private handleMarkerClick = (sit: Sit) => {
-    this.props.onOpenDrawer(sit);
-  };
-
-  private handleReplaceImage = (sitId: string, imageId: string) => {
-    this.props.onOpenPhotoModal(this.props.sits.get(sitId)!);
-  };
-
-  private handleToggleMark = async (sitId: string, type: MarkType) => {
-    // Get current state
-    const { marks, favoriteCount } = this.state;
-
-    // Get current marks for this sit
-    const currentMarks = new Set(marks.get(sitId) || new Set<MarkType>());
-    const currentFavoriteCount = favoriteCount.get(sitId) || 0;
-
-    // Create new marks set - start with an empty set to match MarksManager behavior
-    const newMarks = new Set<MarkType>();
-    let newFavoriteCount = currentFavoriteCount;
-
-    // If the mark was already active, we're removing it
-    if (currentMarks.has(type)) {
-      // Just leave newMarks empty
-      if (type === 'favorite') {
-        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
-      }
-    } else {
-      // Add only the new mark type (clearing others)
-      newMarks.add(type);
-
-      // Update favorite count if needed
-      if (type === 'favorite') {
-        newFavoriteCount++;
-      } else if (currentMarks.has('favorite')) {
-        // If we're switching from favorite to another type, decrement favorite count
-        newFavoriteCount = Math.max(0, currentFavoriteCount - 1);
-      }
-    }
-
-    // Update state immediately
-    const updatedMarks = new Map(marks);
-    updatedMarks.set(sitId, newMarks);
-
-    const updatedFavoriteCount = new Map(favoriteCount);
-    updatedFavoriteCount.set(sitId, newFavoriteCount);
-
-    this.setState({
-      marks: updatedMarks,
-      favoriteCount: updatedFavoriteCount
-    });
-
-    // Update the marker styling directly
-    const sit = this.props.sits.get(sitId);
-    if (sit) {
-      this.markerManager.updateMarker(sitId, sit, newMarks, this.props.user);
-    }
-
-    // Make the actual API call
-    try {
-      await this.props.onToggleMark(sitId, type);
-      // Server update successful, state will be updated via props in componentDidUpdate
-    } catch (error) {
-      console.error('Error toggling mark:', error);
-
-      // On error, revert to previous state
-      const revertedMarks = new Map(this.state.marks);
-      revertedMarks.set(sitId, currentMarks);
-
-      const revertedFavoriteCount = new Map(this.state.favoriteCount);
-      revertedFavoriteCount.set(sitId, currentFavoriteCount);
-
-      this.setState({
-        marks: revertedMarks,
-        favoriteCount: revertedFavoriteCount
-      });
-
-      // Also update the marker with reverted state
-      if (sit) {
-        this.markerManager.updateMarker(sitId, sit, currentMarks, this.props.user);
-      }
-    }
+    this.props.onOpenPopup(sit);
   };
 
   private updateVisibleMarkers = () => {

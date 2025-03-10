@@ -948,7 +948,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Add these methods to control the drawer
-  private openDrawer = async (sit: Sit) => {
+  private openPopup = async (sit: Sit) => {
     console.log('[App] openDrawer called with sit:', sit.id);
 
     // If the same sit is already open, don't close it when coming from photo upload
@@ -1050,14 +1050,7 @@ class App extends React.Component<{}, AppState> {
             user={user}
             isLoading={isMapLoading}
             onLoadSits={this.handleLoadSits}
-            onToggleMark={this.handleToggleMark}
-            onDeleteImage={this.handleDeleteImage}
-            onReplaceImage={this.handleReplaceImage}
-            getImagesForSit={this.getImagesForSit}
-            onOpenPhotoModal={this.togglePhotoUpload}
-            onOpenProfileModal={this.toggleProfile}
-            onOpenDrawer={this.openDrawer}
-            getCurrentSitId={() => this.state.drawer.sit?.id || null}
+            onOpenPopup={this.openPopup}
           />
         )}
 
