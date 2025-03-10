@@ -11,20 +11,281 @@ interface CarouselProps {
 interface CarouselState {
   activeIndex: number;
   showControls: boolean;
-  imageLoaded: boolean;
-  imageAspectRatio: number | null;
+  translateX: number;
+  startX: number | null;
+  isDragging: boolean;
+  containerWidth: number;
+  totalWidth: number;
+  loadedImages: Set<number>;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
+  private carouselRef = React.createRef<HTMLDivElement>();
+  private containerRef = React.createRef<HTMLDivElement>();
+  private imageRefs: React.RefObject<HTMLImageElement>[] = [];
+  private resizeObserver: ResizeObserver | null = null;
+
   constructor(props: CarouselProps) {
     super(props);
+
+    // Initialize image refs
+    this.props.images.forEach(() => {
+      this.imageRefs.push(React.createRef<HTMLImageElement>());
+    });
+
     this.state = {
       activeIndex: 0,
       showControls: false,
-      imageLoaded: false,
-      imageAspectRatio: null
+      translateX: 0,
+      startX: null,
+      isDragging: false,
+      containerWidth: 0,
+      totalWidth: 0,
+      loadedImages: new Set<number>([0]) // Initially load the first image
     };
   }
+
+  componentDidMount() {
+    // Add event listeners for touch and mouse events
+    if (this.containerRef.current) {
+      this.containerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: false });
+      this.containerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
+      this.containerRef.current.addEventListener('touchend', this.handleDragEnd);
+      this.containerRef.current.addEventListener('mousedown', this.handleDragStart);
+      window.addEventListener('mousemove', this.handleDragMove);
+      window.addEventListener('mouseup', this.handleDragEnd);
+    }
+
+    // Set up resize observer to handle container size changes
+    this.resizeObserver = new ResizeObserver(this.handleResize);
+    if (this.containerRef.current) {
+      this.resizeObserver.observe(this.containerRef.current);
+    }
+
+    // Initial calculation of container width
+    this.calculateDimensions();
+
+    // Preload the first few images
+    this.preloadInitialImages();
+  }
+
+  componentWillUnmount() {
+    // Clean up event listeners
+    if (this.containerRef.current) {
+      this.containerRef.current.removeEventListener('touchstart', this.handleDragStart);
+      this.containerRef.current.removeEventListener('touchmove', this.handleDragMove);
+      this.containerRef.current.removeEventListener('touchend', this.handleDragEnd);
+      this.containerRef.current.removeEventListener('mousedown', this.handleDragStart);
+      window.removeEventListener('mousemove', this.handleDragMove);
+      window.removeEventListener('mouseup', this.handleDragEnd);
+    }
+
+    // Clean up resize observer
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+  }
+
+  componentDidUpdate(prevProps: CarouselProps) {
+    // If images array changed (e.g., after deletion)
+    if (prevProps.images.length !== this.props.images.length) {
+      // Reset image refs
+      this.imageRefs = [];
+      this.props.images.forEach(() => {
+        this.imageRefs.push(React.createRef<HTMLImageElement>());
+      });
+
+      // Check if current activeIndex is still valid
+      if (this.state.activeIndex >= this.props.images.length) {
+        // Reset to last valid index
+        this.setState({
+          activeIndex: Math.max(0, this.props.images.length - 1),
+          translateX: 0,
+          loadedImages: new Set<number>([0])
+        });
+      } else {
+        // Recalculate dimensions
+        this.calculateDimensions();
+      }
+    }
+  }
+
+  private calculateDimensions = () => {
+    if (!this.containerRef.current) return;
+
+    const containerWidth = this.containerRef.current.clientWidth;
+
+    // For single images, set totalWidth equal to containerWidth to prevent dragging
+    if (this.props.images.length <= 1) {
+      this.setState({
+        containerWidth,
+        totalWidth: containerWidth,
+        translateX: 0 // Reset position for single image
+      });
+      return;
+    }
+
+    let totalWidth = 0;
+
+    // Calculate total width of all images with padding
+    this.imageRefs.forEach((ref, index) => {
+      if (ref.current) {
+        const imageWidth = ref.current.clientWidth;
+        totalWidth += imageWidth + (index < this.props.images.length - 1 ? 16 : 0); // 16px padding between images
+      }
+    });
+
+    // If total width is less than container width, no dragging should be possible
+    if (totalWidth <= containerWidth) {
+      totalWidth = containerWidth;
+    }
+
+    this.setState({ containerWidth, totalWidth });
+  };
+
+  private handleResize = () => {
+    this.calculateDimensions();
+
+    // Reset position when resizing
+    this.setState({ translateX: 0 });
+  };
+
+  private handleDragStart = (e: MouseEvent | TouchEvent) => {
+    // Explicitly prevent dragging for single images
+    if (this.props.images.length <= 1) {
+      return;
+    }
+
+    // Don't prevent default for touchstart to allow scrolling if needed
+    if (!('touches' in e)) {
+      e.preventDefault();
+    }
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+
+    this.setState({
+      startX: clientX,
+      isDragging: true
+    });
+  };
+
+  private handleDragMove = (e: MouseEvent | TouchEvent) => {
+    // Explicitly prevent dragging for single images
+    if (this.props.images.length <= 1) {
+      return;
+    }
+
+    if (!this.state.isDragging || this.state.startX === null) return;
+
+    // Always prevent default during drag to prevent page scrolling
+    e.preventDefault();
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const deltaX = clientX - this.state.startX;
+
+    // Calculate new translateX with boundaries
+    let newTranslateX = this.state.translateX + deltaX;
+
+    if (newTranslateX > 0) {
+      newTranslateX = 0;
+    }
+
+    // Don't allow dragging past the end
+    const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+    if (newTranslateX < maxTranslateX && maxTranslateX < 0) {
+      newTranslateX = maxTranslateX;
+    }
+
+    this.setState({
+      translateX: newTranslateX,
+      startX: clientX
+    });
+
+    // Determine which images should be loaded based on visibility
+    this.updateVisibleImages(newTranslateX);
+  };
+
+  private preloadInitialImages = () => {
+    // Preload the first image and the next one if available
+    const initialLoadSet = new Set<number>([0]);
+
+    // If there's more than one image, preload the second one too
+    if (this.props.images.length > 1) {
+      initialLoadSet.add(1);
+    }
+
+    this.setState({ loadedImages: initialLoadSet });
+  };
+
+  private updateVisibleImages = (translateX: number) => {
+    if (!this.containerRef.current) return;
+
+    const containerWidth = this.containerRef.current.clientWidth;
+    const visibleStart = -translateX;
+    const visibleEnd = visibleStart + containerWidth;
+
+    // Buffer zone - load images that are just outside the visible area
+    const buffer = containerWidth * 1.5; // Increased buffer for smoother experience
+
+    let currentPosition = 0;
+    const newLoadedImages = new Set(this.state.loadedImages);
+
+    this.imageRefs.forEach((ref, index) => {
+      if (ref.current) {
+        const imageWidth = ref.current.clientWidth;
+        const imageEnd = currentPosition + imageWidth;
+
+        // If image is visible or within buffer zone, mark it for loading
+        if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
+            (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer)) {
+          newLoadedImages.add(index);
+        }
+
+        currentPosition += imageWidth + 16; // 16px padding between images
+      } else {
+        // If ref is not available yet, estimate position based on container width
+        const estimatedWidth = this.state.containerWidth * 0.8; // Assume image takes 80% of container
+        const estimatedEnd = currentPosition + estimatedWidth;
+
+        // If estimated position is visible, mark for loading
+        if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
+            (estimatedEnd >= visibleStart - buffer && estimatedEnd <= visibleEnd + buffer)) {
+          newLoadedImages.add(index);
+        }
+
+        currentPosition += estimatedWidth + 16; // 16px padding between images
+      }
+    });
+
+    if (newLoadedImages.size !== this.state.loadedImages.size) {
+      this.setState({ loadedImages: newLoadedImages });
+    }
+  };
+
+  private handleDragEnd = () => {
+    // Snap back to boundaries with animation
+    if (this.state.translateX > 0) {
+      this.setState({
+        translateX: 0,
+        isDragging: false
+      });
+    } else {
+      const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+      if (this.state.translateX < maxTranslateX && maxTranslateX < 0) {
+        this.setState({
+          translateX: maxTranslateX,
+          isDragging: false
+        });
+      } else {
+        this.setState({ isDragging: false });
+      }
+    }
+  };
+
+  private handleImageLoad = (index: number) => {
+    // Recalculate dimensions after image loads
+    this.calculateDimensions();
+  };
 
   private handleImageInteraction = () => {
     // For mobile, toggle controls on tap
@@ -33,164 +294,84 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   };
 
-  private handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = event.currentTarget;
-    const aspectRatio = img.naturalWidth / img.naturalHeight;
-
-    this.setState({
-      imageLoaded: true,
-      imageAspectRatio: aspectRatio
-    });
-  };
-
-  next = () => {
-    this.setState(prev => ({
-      activeIndex: (prev.activeIndex + 1) % this.props.images.length,
-      imageLoaded: false,
-      imageAspectRatio: null
-    }));
-  };
-
-  prev = () => {
-    this.setState(prev => ({
-      activeIndex: prev.activeIndex === 0
-        ? this.props.images.length - 1
-        : prev.activeIndex - 1,
-      imageLoaded: false,
-      imageAspectRatio: null
-    }));
-  };
-
-  componentDidUpdate(prevProps: CarouselProps) {
-    // If images array changed (e.g., after deletion)
-    if (prevProps.images.length !== this.props.images.length) {
-      // Check if current activeIndex is still valid
-      if (this.state.activeIndex >= this.props.images.length) {
-        // Reset to last valid index
-        this.setState({
-          activeIndex: Math.max(0, this.props.images.length - 1),
-          imageLoaded: false,
-          imageAspectRatio: null
-        });
-      }
-    }
-  }
-
   render() {
     const { images, currentUserId, onImageAction, isDeleting } = this.props;
-    const { activeIndex, showControls: showControlsState, imageAspectRatio, imageLoaded } = this.state;
+    const { showControls: showControlsState, translateX, loadedImages, isDragging } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
     }
 
-    // Make sure activeIndex is within bounds
-    const safeActiveIndex = Math.min(activeIndex, images.length - 1);
-    const currentImage = images[safeActiveIndex];
-
-    // Safety check before accessing properties
-    if (!currentImage) {
-      return <div className="no-images">Image not available</div>;
-    }
-
-    const canShowControls = currentUserId && currentImage.userId === currentUserId;
-    const hasMultipleImages = images.length > 1;
+    const isSingleImage = images.length === 1;
 
     return (
-      <div className={`carousel ${hasMultipleImages ? '' : 'single-image'}`}>
-        <div className="carousel-content">
-          {hasMultipleImages && (
-            <>
-              <button
-                className="carousel-nav prev"
-                onClick={this.prev}
-                aria-label="Previous image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-                </svg>
-              </button>
-              <button
-                className="carousel-nav next"
-                onClick={this.next}
-                aria-label="Next image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                </svg>
-              </button>
-            </>
-          )}
+      <div className="carousel" ref={this.carouselRef}>
+        <div className="carousel-content" ref={this.containerRef}>
           <div
-            className="carousel-img-container"
-            onMouseEnter={() => this.setState({ showControls: true })}
-            onMouseLeave={() => this.setState({ showControls: false })}
-            onClick={this.handleImageInteraction}
+            className={`carousel-track ${isDragging ? 'dragging' : ''} ${isSingleImage ? 'single-image' : ''}`}
+            style={{ transform: `translateX(${translateX}px)` }}
           >
-            {!imageLoaded && (
-              <div className="loading-indicator">
-                <div className="spinner"></div>
-              </div>
-            )}
-            <img
-              src={currentImage.base64Data ?
-                `data:image/jpeg;base64,${currentImage.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                `${currentImage.photoURL}?size=med`
-              }
-              alt={`Photo by ${currentImage.userName}`}
-              className={`carousel-image ${imageAspectRatio && imageAspectRatio > 1 ? 'landscape' : 'portrait'}`}
-              style={{
-                cursor: 'pointer',
-                opacity: imageLoaded ? 1 : 0
-              }}
-              onLoad={this.handleImageLoad}
-              onError={(e) => {
-                console.error(`Error loading image: ${currentImage.photoURL}`);
-              }}
-            />
-            <div className="image-uploader">
-              {currentImage.userName}
-            </div>
-            {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
-              <div className="image-controls">
-                <button
-                  className="image-control-button"
-                  onClick={() => onImageAction('replace', currentImage.id)}
-                  disabled={isDeleting}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                  </svg>
-                </button>
-                <button
-                  className="image-control-button delete"
-                  onClick={() => onImageAction('delete', currentImage.id)}
-                  disabled={isDeleting}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                  </svg>
-                </button>
-              </div>
-            )}
+            {images.map((image, index) => {
+              const shouldLoad = loadedImages.has(index);
+              const canShowControls = currentUserId && image.userId === currentUserId;
+
+              return (
+                <div key={image.id} className="carousel-item">
+                  <div
+                    className="carousel-img-container"
+                    onClick={this.handleImageInteraction}
+                  >
+                    {shouldLoad ? (
+                      <img
+                        ref={this.imageRefs[index]}
+                        src={image.base64Data ?
+                          `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                          `${image.photoURL}?size=med`
+                        }
+                        alt={`Photo by ${image.userName}`}
+                        className="carousel-image"
+                        onLoad={() => this.handleImageLoad(index)}
+                        onError={(e) => {
+                          console.error(`Error loading image: ${image.photoURL}`);
+                        }}
+                      />
+                    ) : (
+                      <div className="loading-indicator">
+                        <div className="spinner"></div>
+                      </div>
+                    )}
+
+                    <div className="image-uploader">
+                      {image.userName}
+                    </div>
+
+                    {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
+                      <div className="image-controls">
+                        <button
+                          className="image-control-button"
+                          onClick={() => onImageAction('replace', image.id)}
+                          disabled={isDeleting}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                          </svg>
+                        </button>
+                        <button
+                          className="image-control-button delete"
+                          onClick={() => onImageAction('delete', image.id)}
+                          disabled={isDeleting}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {/* Only show dots if there are multiple images */}
-          {hasMultipleImages && (
-            <div className="carousel-dots">
-              {images.map((_, index) => (
-                <button
-                  key={index}
-                  className={`carousel-dot${index === safeActiveIndex ? ' active' : ''}`}
-                  onClick={() => this.setState({
-                    activeIndex: index,
-                    imageLoaded: false,
-                    imageAspectRatio: null
-                  })}
-                  aria-label={`Go to image ${index + 1}`}
-                />
-              ))}
-            </div>
-          )}
         </div>
       </div>
     );

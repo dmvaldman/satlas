@@ -466,14 +466,55 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .carousel-content {
   position: relative;
   width: 100%;
-  height: 400px; /* Fixed height container */
+  height: 300px; /* Fixed height container */
   overflow: hidden;
   background-color: #f5f5f5;
   border-radius: 8px;
+  touch-action: none; /* Prevent browser handling of touch events */
+}
+
+.carousel-track {
+  height: 100%;
+  will-change: transform; /* Optimize for animations */
+  display: flex;
+  padding: 0;
+  transition: transform 0.3s ease;
+}
+
+.carousel-track.dragging {
+  transition: none;
+}
+
+/* Center single image */
+.carousel-track.single-image {
+  justify-content: center;
+  pointer-events: none; /* Disable pointer events to prevent any dragging */
+}
+
+/* Re-enable pointer events for elements inside the track that need interaction */
+.carousel-track.single-image .carousel-img-container {
+  pointer-events: auto;
+}
+
+.carousel-track.single-image .image-controls {
+  pointer-events: auto;
+}
+
+.carousel-item {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.carousel-item:not(:last-child) {
+  margin-right: 16px;
 }
 
 .carousel-img-container {
-  position: absolute;
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -490,6 +531,21 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transition: opacity 0.3s ease;
   cursor: pointer;
   object-fit: contain; /* This ensures the entire image is visible */
+  height: 100%;
+  width: auto;
+}
+
+/* Loading indicator */
+.loading-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(245, 245, 245, 0.7);
 }
 
 /* Position controls absolutely */
@@ -531,29 +587,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 24px;
   height: 24px;
   fill: white;
-}
-
-/* Dots navigation */
-.carousel-dots {
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-  gap: 8px;
-}
-
-.carousel-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #ccc;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-  padding: 0;
-}
-
-.carousel-dot.active {
-  background: #31d53d;
 }
 
 /* Consolidate image uploader styling */
@@ -891,7 +924,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 /* Add this to your CSS file */
-.custom-location-marker {
+.location-marker {
   position: relative;
   width: 0;
   height: 0;
@@ -899,7 +932,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   pointer-events: none;
 }
 
-.custom-location-marker::before {
+.location-marker::before {
   content: '';
   position: absolute;
   width: 30px;
@@ -912,7 +945,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   pointer-events: none;
 }
 
-.custom-location-marker::after {
+.location-marker::after {
   content: '';
   position: absolute;
   width: 15px;
@@ -1100,5 +1133,18 @@ body:has(.bottom-nav-space) {
 
   .carousel-nav {
     opacity: 0.7;
+  }
+
+  .carousel-content {
+    touch-action: none;
+  }
+
+  .carousel-track {
+    display: flex;
+    align-items: center;
+  }
+
+  .carousel-item {
+    flex: 0 0 auto;
   }
 }
