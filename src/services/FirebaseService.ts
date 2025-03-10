@@ -619,19 +619,11 @@ export class FirebaseService {
         }
       }
 
-      // Mark image as deleted in Firestore
-      await setDoc(doc(db, 'images', imageId), {
-        deleted: true,
-        deletedAt: new Date(),
-        deletedBy: userId
-      }, { merge: true });
-
       // Check if this was the last image in the collection
       const imagesRef = collection(db, 'images');
       const q = query(
         imagesRef,
-        where('collectionId', '==', collectionId),
-        where('deleted', '==', false)
+        where('collectionId', '==', collectionId)
       );
 
       const remainingImages = await getDocs(q);
@@ -672,8 +664,7 @@ export class FirebaseService {
       const imagesRef = collection(db, 'images');
       const q = query(
         imagesRef,
-        where('collectionId', '==', collectionId),
-        where('deleted', '==', false)
+        where('collectionId', '==', collectionId)
       );
 
       const snapshot = await getDocs(q);
