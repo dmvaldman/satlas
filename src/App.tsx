@@ -825,7 +825,8 @@ class App extends React.Component<{}, AppState> {
           photoResult.base64Data,
           location,
           user.uid,
-          userPreferences.username
+          userPreferences.username,
+          photoResult.dimensions
         ).then(sit => {
           // Replace initial sit with complete sit
           this.setState(prevState => {
@@ -847,7 +848,10 @@ class App extends React.Component<{}, AppState> {
               };
             }
 
-            return { sits: newSits };
+            return {
+              sits: newSits,
+              drawer: prevState.drawer // Preserve the existing drawer state
+            };
           });
         }).catch(error => {
           console.error('Background upload failed:', error);
@@ -1134,7 +1138,7 @@ class App extends React.Component<{}, AppState> {
               onToggleMark={this.handleToggleMark}
               onDeleteImage={this.handleDeleteImage}
               onReplaceImage={this.handleReplaceImage}
-              onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
+              onOpenPhotoModal={() => drawer.sit ? this.togglePhotoUpload(drawer.sit) : undefined}
               onOpenProfileModal={this.toggleProfile}
               onClose={this.closeDrawer}
             />

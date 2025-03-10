@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { join } from 'path';
 import dotenv from 'dotenv';
+import sizeOf from 'buffer-image-size';
 
 // Load environment variables
 dotenv.config();
@@ -175,6 +176,10 @@ async function bulkUploadImages(directoryPath, userId, userName) {
       // Read the file
       const fileBuffer = fs.readFileSync(filePath);
 
+      // Get image dimensions
+      const dimensions = sizeOf(fileBuffer);
+      console.log(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
+
       // Generate a unique filename with timestamp
       const uniqueFilename = `${Date.now()}_${filename}`;
 
@@ -193,7 +198,8 @@ async function bulkUploadImages(directoryPath, userId, userName) {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        deleted: false
+        width: dimensions.width,
+        height: dimensions.height
       });
 
       // Create sit
