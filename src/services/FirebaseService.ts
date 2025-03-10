@@ -424,13 +424,15 @@ export class FirebaseService {
    * @param location Location coordinates
    * @param userId User ID
    * @param userName User name
+   * @param dimensions Image dimensions
    * @returns Created sit
    */
   static async createSitWithPhoto(
     photoData: string,
     location: Coordinates,
     userId: string,
-    userName: string
+    userName: string,
+    dimensions?: { width: number, height: number }
   ): Promise<Sit> {
     try {
       // Upload photo
@@ -467,6 +469,8 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
+        width: dimensions?.width,
+        height: dimensions?.height,
         deleted: false
       });
 
