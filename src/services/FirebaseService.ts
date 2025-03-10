@@ -470,8 +470,7 @@ export class FirebaseService {
         collectionId: imageCollectionId,
         createdAt: new Date(),
         width: dimensions?.width,
-        height: dimensions?.height,
-        deleted: false
+        height: dimensions?.height
       });
 
       // Create the sit
@@ -622,6 +621,11 @@ export class FirebaseService {
           console.error('Error deleting image file:', error);
         }
       }
+
+      // Delete the image document from Firestore
+      const imageRef = doc(db, 'images', imageId);
+      await deleteDoc(imageRef);
+      console.log(`Deleted image document: ${imageId}`);
 
       // Check if this was the last image in the collection
       const imagesRef = collection(db, 'images');
