@@ -41,7 +41,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       isDragging: false,
       containerWidth: 0,
       totalWidth: 0,
-      loadedImages: new Set<number>([0]) // Initially load the first image
+      loadedImages: new Set<number>()
     };
   }
 
@@ -66,7 +66,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.calculateDimensions();
 
     // Preload the first few images
-    this.preloadInitialImages();
+    this.updateVisibleImages(this.state.translateX);
   }
 
   componentWillUnmount() {
@@ -205,18 +205,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.updateVisibleImages(newTranslateX);
   };
 
-  private preloadInitialImages = () => {
-    // Preload the first image and the next one if available
-    const initialLoadSet = new Set<number>([0]);
-
-    // If there's more than one image, preload the second one too
-    if (this.props.images.length > 1) {
-      initialLoadSet.add(1);
-    }
-
-    this.setState({ loadedImages: initialLoadSet });
-  };
-
   private updateVisibleImages = (translateX: number) => {
     if (!this.containerRef.current) return;
 
@@ -231,6 +219,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const newLoadedImages = new Set(this.state.loadedImages);
 
     this.imageRefs.forEach((ref, index) => {
+      const image = this.props.images[index];
+
       if (ref.current) {
         const imageWidth = ref.current.clientWidth;
         const imageEnd = currentPosition + imageWidth;
@@ -243,21 +233,36 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
         currentPosition += imageWidth + 16; // 16px padding between images
       } else {
-        // If ref is not available yet, estimate position based on container width
-        const estimatedWidth = this.state.containerWidth * 0.8; // Assume image takes 80% of container
-        const estimatedEnd = currentPosition + estimatedWidth;
+        // If ref is not available yet, use image dimensions to estimate size if available
+        let width;
+
+          // Calculate width based on container height and aspect ratio
+        const containerHeight = this.containerRef.current?.clientHeight || 300; // Default to 300px if null
+        const aspectRatio = image.width / image.height;
+
+        // If image is wider than tall, it will be constrained by height
+        if (aspectRatio > 1) {
+          width = containerHeight * aspectRatio;
+        } else {
+          // If image is taller than wide, it will likely take up most of the container width
+          width = containerWidth * 0.8;
+        }
+
+        const end = currentPosition + width;
 
         // If estimated position is visible, mark for loading
         if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
-            (estimatedEnd >= visibleStart - buffer && estimatedEnd <= visibleEnd + buffer)) {
+            (end >= visibleStart - buffer && end <= visibleEnd + buffer)) {
           newLoadedImages.add(index);
         }
 
-        currentPosition += estimatedWidth + 16; // 16px padding between images
+        currentPosition += width + 16; // 16px padding between images
       }
     });
 
-    if (newLoadedImages.size !== this.state.loadedImages.size) {
+    // Only update state if the loaded images set has changed
+    if (newLoadedImages.size !== this.state.loadedImages.size ||
+        ![...newLoadedImages].every(index => this.state.loadedImages.has(index))) {
       this.setState({ loadedImages: newLoadedImages });
     }
   };
@@ -283,8 +288,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   private handleImageLoad = (index: number) => {
-    // Recalculate dimensions after image loads
-    this.calculateDimensions();
+    // Mark this image as loaded
+    this.setState(prevState => {
+      const newLoadedImages = new Set(prevState.loadedImages);
+      newLoadedImages.add(index);
+      return { loadedImages: newLoadedImages };
+    });
   };
 
   private handleImageInteraction = () => {
@@ -321,28 +330,31 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     className="carousel-img-container"
                     onClick={this.handleImageInteraction}
                   >
-                    {shouldLoad ? (
-                      <img
-                        ref={this.imageRefs[index]}
-                        src={image.base64Data ?
-                          `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                          `${image.photoURL}?size=med`
-                        }
-                        alt={`Photo by ${image.userName}`}
-                        className="carousel-image"
-                        onLoad={() => this.handleImageLoad(index)}
-                        onError={(e) => {
-                          console.error(`Error loading image: ${image.photoURL}`);
-                        }}
-                      />
-                    ) : (
-                      <div className="loading-indicator">
+                    <div className="aspect-ratio-container">
+                      {shouldLoad ? (
+                        <img
+                          ref={this.imageRefs[index]}
+                          src={image.base64Data ?
+                            `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                            `${image.photoURL}?size=med`
+                          }
+                          alt={`Photo by ${image.userName}`}
+                          className="carousel-image"
+                          onLoad={() => this.handleImageLoad(index)}
+                          onError={(e) => {
+                            console.error(`Error loading image: ${image.photoURL}`);
+                          }}
+                        />
+                      ) : null}
+
+                      {/* Always render the spinner, but hide it when the image is loaded */}
+                      <div className={`placeholder-loader ${shouldLoad && loadedImages.has(index) ? 'hidden' : ''}`}>
                         <div className="spinner"></div>
                       </div>
-                    )}
 
-                    <div className="image-uploader">
-                      {image.userName}
+                      <div className="image-uploader">
+                        {image.userName}
+                      </div>
                     </div>
 
                     {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
