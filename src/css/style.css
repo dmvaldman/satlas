@@ -360,6 +360,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transition: transform 0.3s ease;
   touch-action: pan-y;
   will-change: transform; /* Optimize for animations */
+  align-items: center; /* Center items vertically */
 }
 
 .carousel-track.dragging {
@@ -373,25 +374,37 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* Carousel item */
 .carousel-item {
-  flex: 0 0 100%;
+  /* Allow items to size based on content */
+  flex: 0 0 auto;
   height: 100%;
   padding-right: 16px;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.carousel-item:not(:last-child) {
-  margin-right: 0;
+/* Portrait images should take up less horizontal space */
+.carousel-item.portrait {
+  /* Allow portrait images to take their natural width */
+  min-width: 0;
+}
+
+/* Landscape images can take more space */
+.carousel-item.landscape {
+  /* Landscape images can be wider */
+  min-width: 0;
 }
 
 /* Container for the image */
 .carousel-img-container {
   position: relative;
-  width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: #f5f5f5;
+  width: auto; /* Allow width to be determined by content */
 }
 
 /* Aspect ratio container */
@@ -402,6 +415,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   max-height: 300px;
   overflow: hidden;
   background-color: #f5f5f5;
+  width: auto; /* Allow width to be determined by content */
+  max-width: 100%; /* Ensure it doesn't overflow its container */
 }
 
 /* Image styling */
@@ -445,7 +460,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 /* Allow image to maintain aspect ratio */
 .carousel-image {
   max-width: 100%;
-  max-height: 100%;
+  max-height: 280px; /* Slightly less than container height to account for padding */
   display: block;
   margin: 0 auto;
   transition: opacity 0.3s ease;
@@ -1030,11 +1045,6 @@ body:has(.bottom-nav-space) {
 
   .carousel-nav {
     opacity: 0.7;
-  }
-
-  /* These styles are already defined above, no need to duplicate */
-  .carousel-item {
-    width: 100%;
   }
 }
 
