@@ -235,7 +235,7 @@ async function bulkUploadImages(directoryPath, userId, userName) {
 // Example usage
 const userId = 'bEorC36iZYZGWKydUqFo6VZ7RSn2'; // Replace with your user ID
 const userName = 'Dave'; // Replace with your name
-const imagesDir = './satlas_images'; // Directory containing images
+const imagesDir = 'scripts/assets/satlas_images'; // Directory containing images
 
 bulkUploadImages(imagesDir, userId, userName)
   .then(results => {
