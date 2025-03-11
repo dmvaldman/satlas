@@ -28,16 +28,50 @@ header {
   align-items: center;
 }
 
-#profile-icon {
+/* Update auth styles */
+#auth-container {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.auth-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.auth-button:hover {
+  background: #eeeeee;
+}
+
+.auth-button svg {
+  width: 20px;
+  height: 20px;
+  fill: #666;
+}
+
+#profile-container {
   width: 40px;
   height: 40px;
   border-radius: 50%;
   overflow: hidden;
-  margin-left: auto;
   cursor: pointer;
+  border: 2px solid #31d53d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#profile-icon img {
+#profile-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -48,7 +82,6 @@ header {
   position: relative;
   width: 100%;
   min-height: 0; /* Important for flex container */
-  /* Fix map height */
   height: calc(100vh - 64px - var(--safe-area-bottom)) !important;
 }
 
@@ -112,9 +145,8 @@ header {
   transform: scale(0.95);
 }
 
-/* Base modal styles shared between both types */
-.modal-overlay,
-.modal-overlay-center {
+/* Base modal styles */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -128,180 +160,28 @@ header {
   padding-bottom: var(--safe-area-bottom);
   /* Ensure modals don't cover system navigation */
   bottom: var(--safe-area-bottom) !important;
-}
-
-/* Bottom-aligned modal (photo upload) */
-.modal-overlay {
   align-items: flex-end;
-  transform: translateY(100%);
 }
 
-/* Add this rule to reset the transform when the modal is active */
-.modal-overlay.active {
-  transform: translateY(0);
-  transition: transform 0.3s ease-out;
-}
-
-.photo-options {
+/* Base modal content styles */
+.modal-content {
   background: white;
   width: 100%;
   border-radius: 8px 8px 0 0;
   padding: 20px;
-  transition: transform 0.3s ease-out;
   cursor: default;
   padding-bottom: calc(20px + var(--safe-area-bottom));
   max-height: calc(80vh - 48px - var(--safe-area-bottom));
   overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-out;
+  will-change: transform;
+  z-index: 1; /* Ensure it's above the overlay */
 }
 
-.photo-option-button {
-  width: 100%;
-  padding: 16px;
-  margin: 8px 0;
-  border: none;
-  background: #f5f5f5;
-  border-radius: 8px;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.photo-option-button svg {
-  width: 24px;
-  height: 24px;
-  fill: #31d53d;
-}
-
-.cancel-button {
-  background: white;
-  color: #ff3b30;
-  font-weight: bold;
-}
-
-/* Update notification styles */
-.notification {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 16px;
-  border-radius: 8px;
-  color: white;
-  font-size: 14px;
-  z-index: 2000;
-  max-width: 90%;
-  width: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: slideUp 0.3s ease-out;
-}
-
-.notification-message {
-  margin-right: 12px;
-}
-
-.notification-close {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  opacity: 0.8;
-}
-
-.notification.success {
-  background-color: #4caf50;
-}
-
-.notification.error {
-  background-color: #f44336;
-}
-
-/* Android adjustments */
-body:has(.bottom-nav-space) .notification {
-  bottom: calc(20px + 48px + var(--safe-area-bottom));
-}
-
-.satlas-marker.pending {
-  background-color: rgba(49, 213, 61, 0.5); /* Lighter shade of the original color */
-}
-
-.satlas-popup-loading {
-  padding: 20px;
-  text-align: center;
-}
-
-.satlas-popup-loading p {
-  margin: 0;
-  color: #666;
-}
-
-/* Update auth styles */
-#auth-container {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-}
-
-.auth-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 20px;
-  background: #f5f5f5;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-  transition: background-color 0.2s;
-}
-
-.auth-button:hover {
-  background: #eeeeee;
-}
-
-.auth-button svg {
-  width: 20px;
-  height: 20px;
-  fill: #666;
-}
-
-#profile-container {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid #31d53d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#profile-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Add these styles to your existing CSS */
-.profile-content {
-  max-height: 80vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* For iOS momentum scrolling */
-
-  background: white;
-  padding: 2rem;
-  border-radius: 8px 8px 0 0;
-  width: 100%;
-  transition: transform 0.3s ease;
+/* Add this rule to reset the transform when the modal is active */
+.modal-content.active {
+  transform: translateY(0);
 }
 
 .profile-content.keyboard-visible {
@@ -357,6 +237,7 @@ body:has(.bottom-nav-space) .notification {
   transition: 0.4s;
 }
 
+/* Hidden but toggle slider affects it. Common pattern. */
 input[type="checkbox"] {
   display: none;
 }
@@ -1010,7 +891,7 @@ body:has(.bottom-nav-space) {
   }
 
   /* Modal positioning */
-  .modal-overlay, .modal-overlay-center {
+  .modal-overlay {
     bottom: calc(48px + var(--safe-area-bottom)) !important;
   }
 
@@ -1033,7 +914,7 @@ body:has(.bottom-nav-space) {
 }
 
 /* Non-Android adjustments (apply to all platforms) */
-.modal-overlay, .modal-overlay-center {
+.modal-overlay {
   padding-bottom: var(--safe-area-bottom);
   bottom: var(--safe-area-bottom) !important;
 }
@@ -1152,4 +1033,78 @@ body:has(.bottom-nav-space) {
   .carousel-item {
     width: 100%;
   }
+}
+
+.photo-option-button {
+  width: 100%;
+  padding: 16px;
+  margin: 8px 0;
+  border: none;
+  background: #f5f5f5;
+  border-radius: 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.photo-option-button svg {
+  width: 24px;
+  height: 24px;
+  fill: #31d53d;
+}
+
+.cancel-button {
+  background: white;
+  color: #ff3b30;
+  font-weight: bold;
+}
+
+/* Update notification styles */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  z-index: 2000;
+  max-width: 90%;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease-out;
+}
+
+.notification-message {
+  margin-right: 12px;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.notification.success {
+  background-color: #4caf50;
+}
+
+.notification.error {
+  background-color: #f44336;
+}
+
+/* Android adjustments */
+body:has(.bottom-nav-space) .notification {
+  bottom: calc(20px + 48px + var(--safe-area-bottom));
 }
