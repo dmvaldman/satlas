@@ -74,7 +74,7 @@ type PhotoResult = {
     latitude: number;
     longitude: number;
   };
-  dimensions?: {
+  dimensions: {
     width: number;
     height: number;
   };
@@ -694,8 +694,8 @@ class App extends React.Component<{}, AppState> {
           collectionId: sit.imageCollectionId,
           createdAt: new Date(),
           base64Data: photoResult.base64Data,
-          width: photoResult.dimensions?.width,
-          height: photoResult.dimensions?.height
+          width: photoResult.dimensions.width,
+          height: photoResult.dimensions.height
         };
 
         // Get current images or empty array
@@ -751,8 +751,8 @@ class App extends React.Component<{}, AppState> {
           collectionId: sit.imageCollectionId,
           createdAt: new Date(),
           base64Data: photoResult.base64Data,
-          width: photoResult.dimensions?.width,
-          height: photoResult.dimensions?.height
+          width: photoResult.dimensions.width,
+          height: photoResult.dimensions.height
         };
 
         // Get current images or empty array
@@ -776,7 +776,8 @@ class App extends React.Component<{}, AppState> {
           photoResult.base64Data,
           sit.imageCollectionId,
           user.uid,
-          userPreferences.username
+          userPreferences.username,
+          photoResult.dimensions
         ).catch(error => {
           console.error('Background upload failed:', error);
           this.showNotification('Image upload failed in the background', 'error');
@@ -802,8 +803,8 @@ class App extends React.Component<{}, AppState> {
           collectionId: initialSit.imageCollectionId || '',
           createdAt: new Date(),
           base64Data: photoResult.base64Data,
-          width: photoResult.dimensions?.width,
-          height: photoResult.dimensions?.height
+          width: photoResult.dimensions.width,
+          height: photoResult.dimensions.height
         };
 
         // Close the photo modal and immediately update the drawer with optimistic data

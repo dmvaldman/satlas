@@ -44,7 +44,7 @@ export type MarkType = 'favorite' | 'wantToGo' | 'visited';
 export interface PhotoResult {
   base64Data: string;
   location: Coordinates;
-  dimensions?: {
+  dimensions: {
     width: number;
     height: number;
   };

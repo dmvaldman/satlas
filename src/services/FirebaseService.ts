@@ -432,7 +432,7 @@ export class FirebaseService {
     location: Coordinates,
     userId: string,
     userName: string,
-    dimensions?: { width: number, height: number }
+    dimensions: { width: number, height: number }
   ): Promise<Sit> {
     try {
       // Upload photo
@@ -469,8 +469,8 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions?.width,
-        height: dimensions?.height
+        width: dimensions.width,
+        height: dimensions.height
       });
 
       // Create the sit
@@ -495,7 +495,7 @@ export class FirebaseService {
     imageCollectionId: string,
     userId: string,
     userName: string,
-    dimensions?: { width: number, height: number }
+    dimensions: { width: number, height: number }
   ): Promise<Image> {
     try {
       // Upload photo
@@ -526,12 +526,13 @@ export class FirebaseService {
 
       // Create image document in Firestore
       const imageDoc = await addDoc(collection(db, 'images'), {
+        photoURL,
         userId,
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions?.width || undefined,
-        height: dimensions?.height || undefined
+        width: dimensions.width,
+        height: dimensions.height
       });
 
       return {
@@ -541,8 +542,8 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions?.width || undefined,
-        height: dimensions?.height || undefined
+        width: dimensions.width,
+        height: dimensions.height
       };
     } catch (error) {
       console.error('Error adding photo to sit:', error);
@@ -828,7 +829,7 @@ export class FirebaseService {
     imageId: string,
     userId: string,
     userName: string,
-    dimensions?: { width: number, height: number }
+    dimensions: { width: number, height: number }
   ): Promise<void> {
     // Delete the old image first
     await this.deleteImage(imageId, userId);
