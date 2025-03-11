@@ -342,7 +342,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                           className="carousel-image"
                           onLoad={() => this.handleImageLoad(index)}
                           onError={(e) => {
-                            console.error(`Error loading image: ${image.photoURL}`);
+                            console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
                           }}
                         />
                       ) : null}

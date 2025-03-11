@@ -133,11 +133,13 @@ header {
 /* Bottom-aligned modal (photo upload) */
 .modal-overlay {
   align-items: flex-end;
+  transform: translateY(100%);
 }
 
-/* Center-aligned modal (nearby sit) */
-.modal-overlay-center {
-  align-items: center;
+/* Add this rule to reset the transform when the modal is active */
+.modal-overlay.active {
+  transform: translateY(0);
+  transition: transform 0.3s ease-out;
 }
 
 .photo-options {
@@ -145,7 +147,6 @@ header {
   width: 100%;
   border-radius: 8px 8px 0 0;
   padding: 20px;
-  transform: translateY(100%);
   transition: transform 0.3s ease-out;
   cursor: default;
   padding-bottom: calc(20px + var(--safe-area-bottom));
@@ -165,10 +166,6 @@ header {
   align-items: center;
   gap: 12px;
   cursor: pointer;
-}
-
-.photo-option-button:hover {
-  background: #eeeeee;
 }
 
 .photo-option-button svg {
@@ -1009,7 +1006,7 @@ body:has(.bottom-nav-space) {
 
   /* Floating action button */
   .fab {
-    bottom: calc(2rem + 48px + var(--safe-area-bottom)) !important;
+    bottom: calc(48px + 2rem) !important; /* Position above the Android navigation bar */
   }
 
   /* Modal positioning */
