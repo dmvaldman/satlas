@@ -462,14 +462,22 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                         />
                       ) : null}
 
-                      {/* Always render the spinner, but hide it when the image is loaded */}
-                      <div className={`placeholder-loader ${shouldLoad && loadedImages.has(index) ? 'hidden' : ''}`}>
+                      {/* Set placeholder with aspect ratio from image dimensions */}
+                      <div
+                        className={`placeholder-loader ${shouldLoad && loadedImages.has(index) ? 'hidden' : ''}`}
+                        style={{
+                          '--aspect-ratio': aspectRatio
+                        } as React.CSSProperties}
+                      >
                         <div className="spinner"></div>
                       </div>
 
-                      <div className="image-uploader">
-                        {image.userName}
-                      </div>
+                      {/* Only show the uploader info after the image has loaded */}
+                      {shouldLoad && loadedImages.has(index) && (
+                        <div className="image-uploader">
+                          {image.userName}
+                        </div>
+                      )}
                     </div>
 
                     {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (

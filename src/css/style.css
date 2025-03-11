@@ -403,7 +403,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f5f5f5;
   width: auto; /* Allow width to be determined by content */
 }
 
@@ -426,20 +425,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   max-height: 300px; /* Match the carousel height */
   width: auto;
   height: auto;
+  z-index: 1;
 }
 
-/* Loading indicator inside aspect ratio container */
 .placeholder-loader {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  height: 300px;
   background-color: #f5f5f5;
-  z-index: 2; /* Ensure it's above the image while loading */
+  width: calc(300px * var(--aspect-ratio));
+  max-width: 100%;
+  z-index: 2;
 }
 
 /* Hide the loader when the image is loaded */
