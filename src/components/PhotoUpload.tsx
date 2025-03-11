@@ -228,16 +228,12 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       }
     } catch (error) {
       // Check if error is a cancellation
-      if (error instanceof Error &&
-          (error.message.includes('cancel') ||
-           error.message.includes('cancelled') ||
-           error.message.includes('denied'))) {
-        console.log('Photo selection cancelled');
-        return; // User cancelled, just return
+      if (error instanceof Error) {
+        console.log('[PhotoUpload] Gallery selection cancelled');
+        return;
       }
 
-      // This is a real error, not a cancellation
-      console.error('Error choosing photo:', error);
+      console.error('[PhotoUpload] Error choosing photo:', error);
       this.showNotification('Error accessing photos', 'error');
     }
   };
@@ -287,15 +283,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       }, this.props.sit);
     } catch (error) {
       // Check if error is a cancellation
-      if (error instanceof Error &&
-          (error.message.includes('cancel') ||
-           error.message.includes('cancelled') ||
-           error.message.includes('denied'))) {
+      if (error instanceof Error) {
         console.log('[PhotoUpload] Camera capture cancelled');
-        return; // User cancelled, just return
+        return;
       }
 
-      // This is a real error, not a cancellation
       console.error('[PhotoUpload] Error taking photo:', error);
       this.showNotification('Error accessing camera', 'error');
     }
