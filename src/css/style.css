@@ -460,25 +460,25 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .carousel {
   position: relative;
   width: 100%;
-  margin-bottom: 16px;
+  height: 300px; /* Set a reasonable fixed height */
+  overflow: hidden;
 }
 
+/* Carousel content - the visible viewport */
 .carousel-content {
   position: relative;
   width: 100%;
-  height: 300px; /* Fixed height container */
+  height: 100%;
   overflow: hidden;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-  touch-action: none; /* Prevent browser handling of touch events */
 }
 
+/* Carousel track - the sliding container for all items */
 .carousel-track {
-  height: 100%;
-  will-change: transform; /* Optimize for animations */
   display: flex;
-  padding: 0;
+  height: 100%;
   transition: transform 0.3s ease;
+  touch-action: pan-y;
+  will-change: transform; /* Optimize for animations */
 }
 
 .carousel-track.dragging {
@@ -488,31 +488,21 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 /* Center single image */
 .carousel-track.single-image {
   justify-content: center;
-  pointer-events: none; /* Disable pointer events to prevent any dragging */
 }
 
-/* Re-enable pointer events for elements inside the track that need interaction */
-.carousel-track.single-image .carousel-img-container {
-  pointer-events: auto;
-}
-
-.carousel-track.single-image .image-controls {
-  pointer-events: auto;
-}
-
+/* Carousel item */
 .carousel-item {
+  flex: 0 0 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  position: relative;
+  padding-right: 16px;
+  box-sizing: border-box;
 }
 
 .carousel-item:not(:last-child) {
-  margin-right: 16px;
+  margin-right: 0;
 }
 
+/* Container for the image */
 .carousel-img-container {
   position: relative;
   width: 100%;
@@ -520,6 +510,55 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #f5f5f5;
+}
+
+/* Aspect ratio container */
+.aspect-ratio-container {
+  position: relative; /* Ensure positioned elements inside use this as reference */
+  display: inline-block; /* Use inline-block to make container size to content */
+  height: auto;
+  max-height: 300px;
+  overflow: hidden;
+  background-color: #f5f5f5;
+}
+
+/* Image styling */
+.aspect-ratio-container img {
+  display: block; /* Remove any extra space below the image */
+  max-width: 100%;
+  max-height: 300px; /* Match the carousel height */
+  width: auto;
+  height: auto;
+}
+
+/* Loading indicator inside aspect ratio container */
+.placeholder-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f5f5;
+  z-index: 2; /* Ensure it's above the image while loading */
+}
+
+/* Hide the loader when the image is loaded */
+.placeholder-loader.hidden {
+  display: none;
+}
+
+/* Spinner animation for loading states */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: black;
+  animation: spin 1s ease-in-out infinite;
 }
 
 /* Allow image to maintain aspect ratio */
@@ -530,22 +569,9 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   margin: 0 auto;
   transition: opacity 0.3s ease;
   cursor: pointer;
-  object-fit: contain; /* This ensures the entire image is visible */
-  height: 100%;
-  width: auto;
-}
-
-/* Loading indicator */
-.loading-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(245, 245, 245, 0.7);
+  object-fit: contain;
+  position: relative;
+  z-index: 1; /* Ensure it's below the spinner while loading, above when loaded */
 }
 
 /* Position controls absolutely */
@@ -556,6 +582,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 10;
   display: flex;
   gap: 8px;
+  opacity: 0.7;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 /* Navigation buttons */
@@ -589,41 +617,42 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   fill: white;
 }
 
-/* Consolidate image uploader styling */
+/* Image uploader info */
 .image-uploader {
   position: absolute;
-  bottom: 0px;
-  right: 0px;
+  bottom: 0;
+  right: 0;
   background: rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   color: rgb(213, 212, 212);
   padding: 8px 12px;
   border-radius: 4px 0 0 0;
   font-size: 14px;
-  z-index: 10;
   max-width: 100%;
-  text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
   display: block;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  opacity: 0.7;
 }
 
-/* Control buttons */
+/* Image controls */
 .image-control-button {
-  padding: 4px;
-  background: none;
+  background-color: rgba(0, 0, 0, 0.5);
   border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   cursor: pointer;
-  margin-left: 4px;
+  padding: 0;
 }
 
 .image-control-button svg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   fill: white;
 }
 
@@ -1020,15 +1049,7 @@ body:has(.bottom-nav-space) {
   justify-content: center;
   align-items: center;
   flex-direction: column;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border-top-color: black;
-  animation: spin 1s ease-in-out infinite;
+  background-color: rgba(245, 245, 245, 0.7);
 }
 
 @keyframes spin {
@@ -1118,33 +1139,20 @@ body:has(.bottom-nav-space) {
   transition: background-color 0.2s;
 }
 
-/* For mobile, show controls without transparency when active */
+/* Media query for touch devices */
 @media (hover: none) {
   .image-controls {
     opacity: 1;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 5px;
-    border-radius: 4px;
-  }
-
-  .image-uploader {
-    opacity: 0.7;
+    transform: translateY(0);
+    transition: none;
   }
 
   .carousel-nav {
     opacity: 0.7;
   }
 
-  .carousel-content {
-    touch-action: none;
-  }
-
-  .carousel-track {
-    display: flex;
-    align-items: center;
-  }
-
+  /* These styles are already defined above, no need to duplicate */
   .carousel-item {
-    flex: 0 0 auto;
+    width: 100%;
   }
 }
