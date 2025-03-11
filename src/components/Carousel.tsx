@@ -25,6 +25,27 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private imageRefs: React.RefObject<HTMLImageElement>[] = [];
   private resizeObserver: ResizeObserver | null = null;
 
+  // This static method ensures that when the component receives new props,
+  // it properly resets its state
+  static getDerivedStateFromProps(nextProps: CarouselProps, prevState: CarouselState) {
+    // If this is a new set of images (based on length), reset the state
+    if (nextProps.images.length > 0 && prevState.loadedImages.size === 0) {
+      console.log('getDerivedStateFromProps: Initializing with new images');
+
+      // Initialize with the first image loaded
+      const initialLoadedImages = new Set<number>();
+      initialLoadedImages.add(0);
+
+      return {
+        activeIndex: 0,
+        translateX: 0,
+        loadedImages: initialLoadedImages
+      };
+    }
+
+    return null; // No state update needed
+  }
+
   constructor(props: CarouselProps) {
     super(props);
 
@@ -46,30 +67,53 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   }
 
   componentDidMount() {
-    // Add event listeners for touch and mouse events
-    if (this.containerRef.current) {
-      this.containerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: false });
-      this.containerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
-      this.containerRef.current.addEventListener('touchend', this.handleDragEnd);
-      this.containerRef.current.addEventListener('mousedown', this.handleDragStart);
-      window.addEventListener('mousemove', this.handleDragMove);
-      window.addEventListener('mouseup', this.handleDragEnd);
-    }
+    console.log('Carousel mounted with images:', this.props.images.length);
 
-    // Set up resize observer to handle container size changes
-    this.resizeObserver = new ResizeObserver(this.handleResize);
-    if (this.containerRef.current) {
-      this.resizeObserver.observe(this.containerRef.current);
-    }
+    // Reset state to ensure we always start from the beginning
+    this.setState({
+      translateX: 0,
+      activeIndex: 0,
+      loadedImages: new Set<number>()
+    }, () => {
+      // Add event listeners for touch and mouse events
+      if (this.containerRef.current) {
+        this.containerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: false });
+        this.containerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
+        this.containerRef.current.addEventListener('touchend', this.handleDragEnd);
+        this.containerRef.current.addEventListener('mousedown', this.handleDragStart);
+        window.addEventListener('mousemove', this.handleDragMove);
+        window.addEventListener('mouseup', this.handleDragEnd);
+      }
 
-    // Initial calculation of container width
-    this.calculateDimensions();
+      // Set up resize observer to handle container size changes
+      this.resizeObserver = new ResizeObserver(this.handleResize);
+      if (this.containerRef.current) {
+        this.resizeObserver.observe(this.containerRef.current);
+      }
 
-    // Preload the first few images
-    this.updateVisibleImages(this.state.translateX);
+      // Initial calculation of container width
+      this.calculateDimensions();
+
+      // Ensure the first few images are loaded immediately
+      const initialLoadedImages = new Set<number>();
+      // Load first 3 images by default (or all if less than 3)
+      for (let i = 0; i < Math.min(3, this.props.images.length); i++) {
+        initialLoadedImages.add(i);
+      }
+
+      console.log('Initial loaded images:', [...initialLoadedImages]);
+
+      this.setState({ loadedImages: initialLoadedImages }, () => {
+        // After setting initial loaded images, update visible images based on position
+        this.updateVisibleImages(0); // Always use 0 to ensure we start at the beginning
+        console.log('After updateVisibleImages, loaded images:', [...this.state.loadedImages]);
+      });
+    });
   }
 
   componentWillUnmount() {
+    console.log('Carousel unmounting');
+
     // Clean up event listeners
     if (this.containerRef.current) {
       this.containerRef.current.removeEventListener('touchstart', this.handleDragStart);
@@ -86,27 +130,40 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   }
 
-  componentDidUpdate(prevProps: CarouselProps) {
-    // If images array changed (e.g., after deletion)
-    if (prevProps.images.length !== this.props.images.length) {
+  componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
+    // If images array changed (e.g., after deletion or when a new sit is loaded)
+    if (prevProps.images !== this.props.images) {
+      console.log('Images array changed, resetting carousel');
+
       // Reset image refs
       this.imageRefs = [];
       this.props.images.forEach(() => {
         this.imageRefs.push(React.createRef<HTMLImageElement>());
       });
 
-      // Check if current activeIndex is still valid
-      if (this.state.activeIndex >= this.props.images.length) {
-        // Reset to last valid index
-        this.setState({
-          activeIndex: Math.max(0, this.props.images.length - 1),
-          translateX: 0,
-          loadedImages: new Set<number>([0])
-        });
-      } else {
-        // Recalculate dimensions
+      // Reset state completely
+      this.setState({
+        activeIndex: 0,
+        translateX: 0,
+        loadedImages: new Set<number>([0]), // Start with first image loaded
+        isDragging: false,
+        startX: null
+      }, () => {
+        // Recalculate dimensions after state reset
         this.calculateDimensions();
-      }
+
+        // Update visible images
+        this.updateVisibleImages(0);
+      });
+    }
+    // Log dimension changes for debugging
+    else if (prevState.totalWidth !== this.state.totalWidth ||
+        prevState.containerWidth !== this.state.containerWidth) {
+      console.log('Dimensions updated:', {
+        totalWidth: this.state.totalWidth,
+        containerWidth: this.state.containerWidth,
+        maxTranslateX: -(this.state.totalWidth - this.state.containerWidth)
+      });
     }
   }
 
@@ -114,6 +171,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
+    const maxHeight = 300; // Maximum height constraint for all images
 
     // For single images, set totalWidth equal to containerWidth to prevent dragging
     if (this.props.images.length <= 1) {
@@ -127,18 +185,26 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     let totalWidth = 0;
 
-    // Calculate total width of all images with padding
-    this.imageRefs.forEach((ref, index) => {
-      if (ref.current) {
-        const imageWidth = ref.current.clientWidth;
-        totalWidth += imageWidth + (index < this.props.images.length - 1 ? 16 : 0); // 16px padding between images
+    // Calculate total width of all images with padding using metadata
+    this.props.images.forEach((image, index) => {
+      if (image.width && image.height) {
+        const aspectRatio = image.width / image.height;
+        // All images are constrained by height, so width = height * aspectRatio
+        const estimatedWidth = maxHeight * aspectRatio;
+        totalWidth += estimatedWidth + (index < this.props.images.length - 1 ? 16 : 0);
+      } else {
+        // Fallback if dimensions are not available - assume square image
+        totalWidth += maxHeight + (index < this.props.images.length - 1 ? 16 : 0);
       }
     });
 
-    // If total width is less than container width, no dragging should be possible
+    // If total content width is less than container width, we don't need to allow dragging
+    // Just set totalWidth to match containerWidth exactly
     if (totalWidth <= containerWidth) {
       totalWidth = containerWidth;
     }
+
+    console.log('Calculated dimensions:', { containerWidth, totalWidth });
 
     this.setState({ containerWidth, totalWidth });
   };
@@ -186,13 +252,16 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     // Calculate new translateX with boundaries
     let newTranslateX = this.state.translateX + deltaX;
 
+    // Don't allow dragging past the start
     if (newTranslateX > 0) {
       newTranslateX = 0;
     }
 
     // Don't allow dragging past the end
     const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
-    if (newTranslateX < maxTranslateX && maxTranslateX < 0) {
+
+    // Only apply max boundary if there's actually content that extends beyond the container
+    if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
       newTranslateX = maxTranslateX;
     }
 
@@ -209,56 +278,69 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
+    const maxHeight = 300; // Maximum height constraint for all images
     const visibleStart = -translateX;
     const visibleEnd = visibleStart + containerWidth;
 
+    console.log('updateVisibleImages called with:', {
+      translateX,
+      visibleStart,
+      visibleEnd,
+      containerWidth
+    });
+
     // Buffer zone - load images that are just outside the visible area
-    const buffer = containerWidth * 1.5; // Increased buffer for smoother experience
+    // Increase buffer to ensure adjacent images are loaded
+    const buffer = containerWidth * 2; // Increased buffer for smoother experience
 
     let currentPosition = 0;
     const newLoadedImages = new Set(this.state.loadedImages);
 
-    this.imageRefs.forEach((ref, index) => {
-      const image = this.props.images[index];
+    // Always ensure the first image is loaded
+    if (this.props.images.length > 0) {
+      newLoadedImages.add(0);
+    }
 
-      if (ref.current) {
-        const imageWidth = ref.current.clientWidth;
-        const imageEnd = currentPosition + imageWidth;
-
-        // If image is visible or within buffer zone, mark it for loading
-        if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
-            (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer)) {
-          newLoadedImages.add(index);
-        }
-
-        currentPosition += imageWidth + 16; // 16px padding between images
-      } else {
-        // If ref is not available yet, use image dimensions to estimate size if available
-        let width;
-
-          // Calculate width based on container height and aspect ratio
-        const containerHeight = this.containerRef.current?.clientHeight || 300; // Default to 300px if null
+    this.props.images.forEach((image, index) => {
+      // Calculate image width based on metadata
+      let imageWidth;
+      if (image.width && image.height) {
         const aspectRatio = image.width / image.height;
-
-        // If image is wider than tall, it will be constrained by height
-        if (aspectRatio > 1) {
-          width = containerHeight * aspectRatio;
-        } else {
-          // If image is taller than wide, it will likely take up most of the container width
-          width = containerWidth * 0.8;
-        }
-
-        const end = currentPosition + width;
-
-        // If estimated position is visible, mark for loading
-        if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
-            (end >= visibleStart - buffer && end <= visibleEnd + buffer)) {
-          newLoadedImages.add(index);
-        }
-
-        currentPosition += width + 16; // 16px padding between images
+        imageWidth = maxHeight * aspectRatio;
+      } else {
+        // Fallback if dimensions are not available - assume square image
+        imageWidth = maxHeight;
       }
+
+      const imageEnd = currentPosition + imageWidth;
+
+      // Debug image positions
+      if (index < 3) { // Only log first few images to avoid console spam
+        console.log(`Image ${index} position:`, {
+          start: currentPosition,
+          end: imageEnd,
+          width: imageWidth,
+          isPortrait: image.width && image.height ? (image.width / image.height < 1) : false,
+          isVisible: (
+            (currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
+            (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer) ||
+            (currentPosition <= visibleEnd && imageEnd >= visibleStart)
+          )
+        });
+      }
+
+      // If image is visible or within buffer zone, mark it for loading
+      if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
+          (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer) ||
+          // If any part of the image is in the visible area
+          (currentPosition <= visibleEnd && imageEnd >= visibleStart)) {
+        newLoadedImages.add(index);
+      }
+
+      currentPosition += imageWidth + 16; // 16px padding between images
     });
+
+    console.log('Images to load:', [...newLoadedImages]);
 
     // Only update state if the loaded images set has changed
     if (newLoadedImages.size !== this.state.loadedImages.size ||
@@ -268,26 +350,37 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   private handleDragEnd = () => {
-    // Snap back to boundaries with animation
-    if (this.state.translateX > 0) {
-      this.setState({
-        translateX: 0,
-        isDragging: false
-      });
-    } else {
-      const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
-      if (this.state.translateX < maxTranslateX && maxTranslateX < 0) {
-        this.setState({
-          translateX: maxTranslateX,
-          isDragging: false
-        });
-      } else {
-        this.setState({ isDragging: false });
-      }
+    if (!this.state.isDragging) return;
+
+    // Just ensure we're within boundaries
+    let finalTranslateX = this.state.translateX;
+
+    // Don't allow dragging past the start
+    if (finalTranslateX > 0) {
+      finalTranslateX = 0;
     }
+
+    // Don't allow dragging past the end
+    const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+
+    // Only apply max boundary if there's actually content that extends beyond the container
+    if (this.state.totalWidth > this.state.containerWidth && finalTranslateX < maxTranslateX) {
+      finalTranslateX = maxTranslateX;
+    }
+
+    // Apply the final position with animation
+    this.setState({
+      translateX: finalTranslateX,
+      isDragging: false
+    });
+
+    // Update visible images based on final position
+    this.updateVisibleImages(finalTranslateX);
   };
 
   private handleImageLoad = (index: number) => {
+    console.log(`Image ${index} loaded`);
+
     // Mark this image as loaded
     this.setState(prevState => {
       const newLoadedImages = new Set(prevState.loadedImages);
@@ -313,6 +406,21 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     const isSingleImage = images.length === 1;
 
+    // Debug which images are being loaded in render
+    console.log('Rendering carousel with loaded images:', [...loadedImages]);
+
+    // If no images are loaded yet, show loading state
+    if (loadedImages.size === 0 && images.length > 0) {
+      console.log('No images loaded yet, showing loading state');
+      return (
+        <div className="carousel loading">
+          <div className="placeholder-loader">
+            <div className="spinner"></div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="carousel" ref={this.carouselRef}>
         <div className="carousel-content" ref={this.containerRef}>
@@ -324,8 +432,15 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               const shouldLoad = loadedImages.has(index);
               const canShowControls = currentUserId && image.userId === currentUserId;
 
+              // Calculate aspect ratio for styling
+              const aspectRatio = image.width && image.height ? image.width / image.height : 1;
+              const isPortrait = aspectRatio < 1;
+
               return (
-                <div key={image.id} className="carousel-item">
+                <div
+                  key={image.id}
+                  className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'}`}
+                >
                   <div
                     className="carousel-img-container"
                     onClick={this.handleImageInteraction}
