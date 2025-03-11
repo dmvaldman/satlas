@@ -1025,7 +1025,7 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div className="app">
-        <header className="app-header">
+        <header id="app-header">
           <AuthComponent
             user={user}
             isAuthenticated={isAuthenticated}
