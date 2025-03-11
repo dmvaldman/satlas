@@ -8,8 +8,8 @@ export interface Image {
   collectionId: string;
   createdAt: Date;
   base64Data?: string;
-  width?: number;  // Image width in pixels
-  height?: number; // Image height in pixels
+  width: number;  // Image width in pixels
+  height: number; // Image height in pixels
 }
 
 export interface Sit {
