@@ -69,21 +69,33 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
           error: this.state.error || 'Could not load profile data. Please try again.'
         });
       }
-    }, 5000); // 5 second timeout
+    }, 5000);
+
+    // Initialize animation
+    if (this.contentRef.current) {
+      // Trigger reflow
+      void this.contentRef.current.offsetHeight;
+      this.contentRef.current.classList.add('active');
+    }
   }
 
   componentDidUpdate(prevProps: ProfileModalProps) {
+    if (!prevProps.isOpen && this.props.isOpen) {
+      // Modal is opening
+      if (this.contentRef.current) {
+        // Trigger reflow
+        void this.contentRef.current.offsetHeight;
+        this.contentRef.current.classList.add('active');
+      }
+    } else if (prevProps.isOpen && !this.props.isOpen) {
+      // Modal is closing
+      if (this.contentRef.current) {
+        this.contentRef.current.classList.remove('active');
+      }
+    }
+
     if (prevProps.user !== this.props.user ||
         prevProps.preferences !== this.props.preferences) {
-
-      const gotNewPreferences =
-        this.props.preferences?.username &&
-        (!prevProps.preferences || !prevProps.preferences.username);
-
-      if (gotNewPreferences) {
-        console.log('[ProfileModal] Received new preferences, updating state');
-      }
-
       this.initializeFromProps();
     }
   }
@@ -382,11 +394,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     return (
       <div
-        className="modal-overlay active"
+        className="modal-overlay"
         onClick={(e) => handleClose(e)}
       >
         <div
-          className="profile-content"
+          className="modal-content profile-content"
           onClick={e => e.stopPropagation()}
           ref={this.contentRef}
         >

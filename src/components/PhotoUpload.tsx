@@ -34,15 +34,42 @@ interface PhotoResult {
     latitude: number;
     longitude: number;
   };
-  dimensions?: {
+  dimensions: {
     width: number;
     height: number;
   };
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
+  private modalRef = React.createRef<HTMLDivElement>();
+
   constructor(props: PhotoUploadProps) {
     super(props);
+  }
+
+  componentDidMount() {
+    // Force a reflow before adding the active class
+    if (this.modalRef.current) {
+      // Trigger reflow
+      void this.modalRef.current.offsetHeight;
+      this.modalRef.current.classList.add('active');
+    }
+  }
+
+  componentDidUpdate(prevProps: PhotoUploadProps) {
+    if (!prevProps.isOpen && this.props.isOpen) {
+      // Modal is opening
+      if (this.modalRef.current) {
+        // Trigger reflow
+        void this.modalRef.current.offsetHeight;
+        this.modalRef.current.classList.add('active');
+      }
+    } else if (prevProps.isOpen && !this.props.isOpen) {
+      // Modal is closing
+      if (this.modalRef.current) {
+        this.modalRef.current.classList.remove('active');
+      }
+    }
   }
 
   private showNotification(message: string, type: 'success' | 'error') {
@@ -142,15 +169,32 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   }
 
   private getImageDimensions = (base64Data: string): Promise<{width: number, height: number}> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
+
       img.onload = () => {
-        resolve({
-          width: img.width,
-          height: img.height
-        });
+        // Ensure dimensions are valid (greater than zero)
+        if (img.width > 0 && img.height > 0) {
+          resolve({
+            width: img.width,
+            height: img.height
+          });
+        } else {
+          // Reject with error if dimensions are invalid
+          reject(new Error('Invalid image dimensions: width or height is zero'));
+        }
       };
-      img.src = `data:image/jpeg;base64,${base64Data}`;
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image for dimension calculation'));
+      };
+
+      // Ensure base64 data has the correct prefix
+      if (!base64Data.startsWith('data:')) {
+        img.src = `data:image/jpeg;base64,${base64Data}`;
+      } else {
+        img.src = base64Data;
+      }
     });
   };
 
@@ -163,37 +207,47 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         input.accept = 'image/*';
 
         input.onchange = async (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (!file) {
-            console.log('Photo selection cancelled');
-            return; // User cancelled, just return
+          try {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) {
+              console.log('Photo selection cancelled');
+              return; // User cancelled, just return
+            }
+
+            // Convert to base64
+            const base64Data = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const base64 = (e.target?.result as string).split(',')[1];
+                resolve(base64);
+              };
+              reader.readAsDataURL(file);
+            });
+
+            const location = await this.getImageLocationFromBase64(base64Data);
+
+            if (!location) {
+              this.showNotification('No location data in image', 'error');
+              return;
+            }
+
+            // Get image dimensions
+            try {
+              const dimensions = await this.getImageDimensions(base64Data);
+
+              await this.props.onPhotoCapture({
+                base64Data,
+                location,
+                dimensions
+              }, this.props.sit);
+            } catch (dimensionError) {
+              console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
+              this.showNotification('Invalid image dimensions', 'error');
+            }
+          } catch (error) {
+            console.error('[PhotoUpload] Error processing selected image:', error);
+            this.showNotification('Error processing image', 'error');
           }
-
-          // Convert to base64
-          const base64Data = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const base64 = (e.target?.result as string).split(',')[1];
-              resolve(base64);
-            };
-            reader.readAsDataURL(file);
-          });
-
-          const location = await this.getImageLocationFromBase64(base64Data);
-
-          if (!location) {
-            this.showNotification('No location data in image', 'error');
-            return;
-          }
-
-          // Get image dimensions
-          const dimensions = await this.getImageDimensions(base64Data);
-
-          await this.props.onPhotoCapture({
-            base64Data,
-            location,
-            dimensions
-          }, this.props.sit);
         };
 
         input.click();
@@ -218,19 +272,29 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         }
 
         // Get image dimensions
-        const dimensions = await this.getImageDimensions(image.base64String);
+        try {
+          const dimensions = await this.getImageDimensions(image.base64String);
 
-        await this.props.onPhotoCapture({
-          base64Data: image.base64String,
-          location,
-          dimensions
-        }, this.props.sit);
+          await this.props.onPhotoCapture({
+            base64Data: image.base64String,
+            location,
+            dimensions
+          }, this.props.sit);
+        } catch (dimensionError) {
+          console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
+          this.showNotification('Invalid image dimensions', 'error');
+        }
       }
     } catch (error) {
-      // Check if error is a cancellation
+      // Check if error is a cancellation or user denied permission
       if (error instanceof Error) {
-        console.log('[PhotoUpload] Gallery selection cancelled');
-        return;
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('cancel') ||
+            errorMessage.includes('denied') ||
+            errorMessage.includes('permission')) {
+          console.log('[PhotoUpload] Gallery selection cancelled or permission denied');
+          return;
+        }
       }
 
       console.error('[PhotoUpload] Error choosing photo:', error);
@@ -274,18 +338,28 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       }
 
       // Get image dimensions
-      const dimensions = await this.getImageDimensions(image.base64String);
+      try {
+        const dimensions = await this.getImageDimensions(image.base64String);
 
-      this.props.onPhotoCapture({
-        base64Data: image.base64String,
-        location,
-        dimensions
-      }, this.props.sit);
+        this.props.onPhotoCapture({
+          base64Data: image.base64String,
+          location,
+          dimensions
+        }, this.props.sit);
+      } catch (dimensionError) {
+        console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
+        this.showNotification('Invalid image dimensions', 'error');
+      }
     } catch (error) {
       // Check if error is a cancellation
       if (error instanceof Error) {
-        console.log('[PhotoUpload] Camera capture cancelled');
-        return;
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('cancel') ||
+            errorMessage.includes('denied') ||
+            errorMessage.includes('permission')) {
+          console.log('[PhotoUpload] Camera capture cancelled or permission denied');
+          return;
+        }
       }
 
       console.error('[PhotoUpload] Error taking photo:', error);
@@ -300,8 +374,15 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
     // Use React Portal to render at the document root
     return ReactDOM.createPortal(
-      <div className="modal-overlay active" onClick={onClose}>
-        <div className="photo-options" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal-overlay"
+        onClick={onClose}
+      >
+        <div
+          ref={this.modalRef}
+          className="modal-content photo-options"
+          onClick={e => e.stopPropagation()}
+        >
           <button
             className="photo-option-button"
             onClick={this.handleTakePhoto}

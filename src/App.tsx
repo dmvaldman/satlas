@@ -725,10 +725,11 @@ class App extends React.Component<{}, AppState> {
           sit.imageCollectionId,
           imageId,
           user.uid,
-          userPreferences.username
+          userPreferences.username,
+          photoResult.dimensions
         ).catch(error => {
           console.error('Background upload failed:', error);
-          this.showNotification('Image upload failed in the background', 'error');
+          this.showNotification('Failed to upload image', 'error');
         });
 
         return;
@@ -1059,6 +1060,7 @@ class App extends React.Component<{}, AppState> {
           />
         )}
 
+        {/* Only render PhotoUploadComponent when needed */}
         {modals.photo.isOpen && (
           <PhotoUploadComponent
             isOpen={modals.photo.isOpen}
