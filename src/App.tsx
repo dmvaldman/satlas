@@ -955,12 +955,11 @@ class App extends React.Component<{}, AppState> {
 
   // Add these methods to control the drawer
   private openPopup = async (sit: Sit) => {
-    console.log('[App] openDrawer called with sit:', sit.id);
+    console.log('[App] openPopup called with sit:', sit.id);
 
-    // If the same sit is already open, don't close it when coming from photo upload
-    if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id &&
-        !this.state.modals.photo.isOpen && !this.state.modals.photo.data) {
-      this.closeDrawer();
+    // If the same sit is already open, just return without doing anything
+    if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id) {
+      // Do nothing when clicking the same marker that's already open
       return;
     }
 
@@ -1115,37 +1114,22 @@ class App extends React.Component<{}, AppState> {
         )}
 
         {drawer.sit && (
-          <BottomSheet
-            open={drawer.isOpen && !modals.photo.isOpen}
-            onDismiss={this.closeDrawer}
-            snapPoints={({ minHeight }) => [
-              minHeight,
-              Math.min(500, window.innerHeight * 0.6),
-              Math.min(700, window.innerHeight * 0.8)
-            ]}
-            expandOnContentDrag={false}
-            defaultSnap={({ minHeight }) => minHeight}
-            header={
-              <div className="bottom-sheet-header">
-                <span className="header-emoji">🪑</span>
-              </div>
-            }
-          >
-            <PopupComponent
-              sit={drawer.sit}
-              images={drawer.images}
-              user={user}
-              marks={marks.get(drawer.sit.id) || new Set()}
-              favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
-              currentLocation={currentLocation}
-              onToggleMark={this.handleToggleMark}
-              onDeleteImage={this.handleDeleteImage}
-              onReplaceImage={this.handleReplaceImage}
-              onOpenPhotoModal={() => drawer.sit ? this.togglePhotoUpload(drawer.sit) : undefined}
-              onOpenProfileModal={this.toggleProfile}
-              onClose={this.closeDrawer}
-            />
-          </BottomSheet>
+          <PopupComponent
+            isOpen={drawer.isOpen}
+            photoModalIsOpen={modals.photo.isOpen}
+            sit={drawer.sit}
+            images={drawer.images}
+            user={user}
+            marks={marks.get(drawer.sit.id) || new Set()}
+            favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
+            currentLocation={currentLocation}
+            onClose={this.closeDrawer}
+            onToggleMark={this.handleToggleMark}
+            onDeleteImage={this.handleDeleteImage}
+            onReplaceImage={this.handleReplaceImage}
+            onOpenPhotoModal={() => drawer.sit ? this.togglePhotoUpload(drawer.sit) : undefined}
+            onOpenProfileModal={this.toggleProfile}
+          />
         )}
 
         {isAndroid && <div className="bottom-nav-space"></div>}
