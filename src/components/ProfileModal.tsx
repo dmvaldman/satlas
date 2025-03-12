@@ -25,7 +25,6 @@ interface ProfileModalState {
   username: string;
   pushNotifications: boolean;
   isSubmitting: boolean;
-  isCheckingUsername: boolean;
   error: string | null;
   usernameError: string | null;
   isLoading: boolean;
@@ -46,7 +45,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username: '',
       pushNotifications: false,
       isSubmitting: false,
-      isCheckingUsername: false,
       error: null,
       usernameError: null,
       isLoading: !isDataCached && !!props.user
@@ -214,7 +212,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       return;
     }
 
-    this.setState({ isCheckingUsername: true });
     const isTaken = await isUsernameTaken(
       username,
       this.props.user?.uid,
@@ -222,7 +219,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     );
 
     this.setState({
-      isCheckingUsername: false,
       usernameError: isTaken ? 'This username is already taken' : null
     });
   }
@@ -348,7 +344,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username,
       pushNotifications,
       isSubmitting,
-      isCheckingUsername,
       error,
       usernameError,
       isLoading
@@ -428,11 +423,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   placeholder="Enter username"
                   className={usernameError ? 'error' : ''}
                 />
-                {isCheckingUsername && <div className="checking-message">Checking availability...</div>}
                 {usernameError && <div className="error-message">{usernameError}</div>}
-                <div className="help-text">
-                  Your username must be unique and will be visible to other users.
-                </div>
               </div>
 
               <div className="profile-section">

@@ -15,6 +15,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: 'Helvetica Neue', sans-serif;
 }
 
 #app-header {
@@ -223,7 +224,6 @@ body {
   display: inline-block;
   width: 50px;
   height: 24px;
-  background-color: #ccc;
   border-radius: 12px;
   transition: 0.4s;
 }
@@ -475,13 +475,12 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 /* Position controls absolutely */
 .image-controls {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   z-index: 10;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   opacity: 0.7;
-  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 /* Navigation buttons */
@@ -726,14 +725,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   text-align: center;
 }
 
-.image-controls {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-}
-
 /* New wrapper for the carousel image and its overlay controls */
 .carousel-img-wrapper {
   position: relative;
@@ -782,47 +773,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .satlas-marker.want-to-go {
   background-color: #9c27b0;
-}
-
-/* Cluster styles */
-.cluster-marker {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #31d53d;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: white;
-  font-weight: bold;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-.cluster-marker-count {
-  font-size: 14px;
-}
-
-/* Adjust cluster colors based on size */
-.cluster-marker.small {
-  background-color: #51bbd6;
-}
-
-.cluster-marker.medium {
-  background-color: #f1f075;
-}
-
-.cluster-marker.large {
-  background-color: #f28cb1;
-}
-
-.mapboxgl-user-location {
-  z-index: 100;
-  pointer-events: none !important;
-}
-
-.mapboxgl-user-location-accuracy-circle {
-  pointer-events: none !important;
 }
 
 .image-info {
@@ -881,41 +831,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   height: calc(48px + var(--safe-area-bottom));
   background-color: #000000;
   z-index: 1000;
-}
-
-/* Android UI adjustments */
-body:has(.bottom-nav-space) {
-  /* Map container adjustment */
-  #map-container {
-    height: calc(100vh - 64px - 48px - var(--safe-area-bottom)) !important;
-  }
-
-  /* Floating action button */
-  .fab {
-    bottom: calc(48px + 2rem) !important; /* Position above the Android navigation bar */
-  }
-
-  /* Modal positioning */
-  .modal-overlay {
-    bottom: calc(48px + var(--safe-area-bottom)) !important;
-  }
-
-  /* Content containers */
-  .photo-options {
-    max-height: calc(80vh - 48px - var(--safe-area-bottom));
-    padding-bottom: calc(20px + var(--safe-area-bottom));
-  }
-
-  /* Profile modal */
-  .profile-modal {
-    max-height: calc(90vh - 48px - var(--safe-area-bottom));
-    margin-bottom: calc(48px + var(--safe-area-bottom));
-  }
-
-  /* Notifications */
-  .notification {
-    bottom: calc(20px + 48px + var(--safe-area-bottom));
-  }
 }
 
 /* Non-Android adjustments (apply to all platforms) */
@@ -987,12 +902,6 @@ body:has(.bottom-nav-space) {
   z-index: 1000 !important;
 }
 
-/* Add this to ensure the user marker has a lower z-index */
-.custom-location-marker {
-  z-index: 2;
-}
-
-
 /* Bottom sheet header styles */
 .bottom-sheet-header {
   display: flex;
@@ -1020,19 +929,6 @@ body:has(.bottom-nav-space) {
   padding: 4px 8px;
   margin: 8px 0;
   transition: background-color 0.2s;
-}
-
-/* Media query for touch devices */
-@media (hover: none) {
-  .image-controls {
-    opacity: 1;
-    transform: translateY(0);
-    transition: none;
-  }
-
-  .carousel-nav {
-    opacity: 0.7;
-  }
 }
 
 .photo-option-button {
@@ -1104,7 +1000,37 @@ body:has(.bottom-nav-space) {
   background-color: #f44336;
 }
 
-/* Android adjustments */
-body:has(.bottom-nav-space) .notification {
-  bottom: calc(20px + 48px + var(--safe-area-bottom));
+/* Android UI adjustments */
+body:has(.bottom-nav-space) {
+  /* Map container adjustment */
+  #map-container {
+    height: calc(100vh - 64px - 48px - var(--safe-area-bottom)) !important;
+  }
+
+  /* Floating action button */
+  .fab {
+    bottom: calc(48px + 2rem) !important; /* Position above the Android navigation bar */
+  }
+
+  /* Modal positioning */
+  .modal-overlay {
+    bottom: calc(48px + var(--safe-area-bottom)) !important;
+  }
+
+  /* Content containers */
+  .photo-options {
+    max-height: calc(80vh - 48px - var(--safe-area-bottom));
+    padding-bottom: calc(20px + var(--safe-area-bottom));
+  }
+
+  /* Profile modal */
+  .profile-modal {
+    max-height: calc(90vh - 48px - var(--safe-area-bottom));
+    margin-bottom: calc(48px + var(--safe-area-bottom));
+  }
+
+  /* Notifications */
+  .notification {
+    bottom: calc(20px + 48px + var(--safe-area-bottom));
+  }
 }
