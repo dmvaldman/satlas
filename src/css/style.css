@@ -534,26 +534,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   opacity: 0.7;
 }
 
-/* Image controls */
-.image-control-button {
-  background-color: rgba(0, 0, 0, 0.5);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  padding: 0;
-}
-
-.image-control-button svg {
-  width: 24px;
-  height: 24px;
-  fill: white;
-}
-
 /* Prevent clicks on modal content from closing the modal */
 .photo-options *,
 .profile-options * {
@@ -704,13 +684,18 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background: #31d53d;
 }
 
+/* Image controls */
 .image-control-button {
-  padding: 4px;
-  background: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   cursor: pointer;
+  padding: 0;
 }
 
 .image-control-button:hover {
