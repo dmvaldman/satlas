@@ -17,6 +17,7 @@ interface CarouselState {
   containerWidth: number;
   totalWidth: number;
   loadedImages: Set<number>;
+  imagesInLoadingProcess: Set<number>;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -39,7 +40,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       return {
         activeIndex: 0,
         translateX: 0,
-        loadedImages: initialLoadedImages
+        loadedImages: initialLoadedImages,
+        imagesInLoadingProcess: new Set<number>()
       };
     }
 
@@ -62,7 +64,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       isDragging: false,
       containerWidth: 0,
       totalWidth: 0,
-      loadedImages: new Set<number>()
+      loadedImages: new Set<number>(),
+      imagesInLoadingProcess: new Set<number>()
     };
   }
 
@@ -381,11 +384,26 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private handleImageLoad = (index: number) => {
     console.log(`Image ${index} loaded`);
 
-    // Mark this image as loaded
+    // Add to loading process first
+    this.setState(prevState => {
+      const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
+      newImagesInLoadingProcess.add(index);
+      return { imagesInLoadingProcess: newImagesInLoadingProcess };
+    });
+
+    // Then mark as fully loaded after delay
     this.setState(prevState => {
       const newLoadedImages = new Set(prevState.loadedImages);
       newLoadedImages.add(index);
-      return { loadedImages: newLoadedImages };
+
+      // Remove from loading process
+      const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
+      newImagesInLoadingProcess.delete(index);
+
+      return {
+        loadedImages: newLoadedImages,
+        imagesInLoadingProcess: newImagesInLoadingProcess
+      };
     });
   };
 
@@ -398,7 +416,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   render() {
     const { images, currentUserId, onImageAction, isDeleting } = this.props;
-    const { showControls: showControlsState, translateX, loadedImages, isDragging } = this.state;
+    const { showControls: showControlsState, translateX, loadedImages, isDragging, imagesInLoadingProcess } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
@@ -408,6 +426,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Debug which images are being loaded in render
     console.log('Rendering carousel with loaded images:', [...loadedImages]);
+    console.log('Images in loading process:', [...imagesInLoadingProcess]);
 
     // If no images are loaded yet, show loading state
     if (loadedImages.size === 0 && images.length > 0) {
@@ -430,7 +449,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
           >
             {images.map((image, index) => {
               const shouldLoad = loadedImages.has(index);
+              const isCurrentlyLoading = imagesInLoadingProcess.has(index);
               const canShowControls = currentUserId && image.userId === currentUserId;
+
+              console.log('Is hidden', shouldLoad && !isCurrentlyLoading);
 
               // Calculate aspect ratio for styling
               const aspectRatio = image.width && image.height ? image.width / image.height : 1;
@@ -464,7 +486,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
                       {/* Set placeholder with aspect ratio from image dimensions */}
                       <div
-                        className={`placeholder-loader ${shouldLoad && loadedImages.has(index) ? 'hidden' : ''}`}
+                        className={`placeholder-loader ${shouldLoad && !isCurrentlyLoading ? 'hidden' : ''}`}
                         style={{
                           '--aspect-ratio': aspectRatio
                         } as React.CSSProperties}
@@ -473,7 +495,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       </div>
 
                       {/* Only show the uploader info after the image has loaded */}
-                      {shouldLoad && loadedImages.has(index) && (
+                      {shouldLoad && (
                         <div className="image-uploader">
                           {image.userName}
                         </div>

@@ -429,7 +429,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .placeholder-loader {
-  position: relative;
+  position: absolute;
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -438,11 +439,14 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: calc(300px * var(--aspect-ratio));
   max-width: 100%;
   z-index: 2;
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 /* Hide the loader when the image is loaded */
 .placeholder-loader.hidden {
-  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 /* Spinner animation for loading states */
