@@ -4,18 +4,22 @@ import { Sit, Image, MarkType } from '../types';
 import Carousel from './Carousel';
 import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
+import { BottomSheet } from 'react-spring-bottom-sheet';
+import 'react-spring-bottom-sheet/dist/style.css';
 
 interface PopupProps {
+  isOpen: boolean;
+  photoModalIsOpen: boolean;
   sit: Sit;
   images: Image[];
   user: User | null;
   marks: Set<MarkType>;
   favoriteCount: number;
   currentLocation: { latitude: number; longitude: number } | null;
+  onClose: () => void;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
-  onClose?: () => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
 }
@@ -23,7 +27,6 @@ interface PopupProps {
 interface PopupState {
   activeImageIndex: number;
   isDeleting: boolean;
-  error: string | null;
 }
 
 class PopupComponent extends React.Component<PopupProps, PopupState> {
@@ -31,8 +34,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     super(props);
     this.state = {
       activeImageIndex: 0,
-      isDeleting: false,
-      error: null
+      isDeleting: false
     };
   }
 
@@ -45,7 +47,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       await onToggleMark(sit.id, type);
       console.log('After toggle:', this.props.marks);
     } catch (error) {
-      this.setState({ error: 'Failed to update mark' });
+      console.error('Error toggling mark:', error);
     }
   };
 
@@ -57,11 +59,11 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         return;
       }
 
-      this.setState({ isDeleting: true, error: null });
+      this.setState({ isDeleting: true });
       try {
         await onDeleteImage(sit.id, imageId);
       } catch (error) {
-        this.setState({ error: 'Failed to delete image' });
+        console.error('Error deleting image:', error);
       } finally {
         this.setState({ isDeleting: false });
       }
@@ -213,50 +215,71 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   }
 
   render() {
-    const { sit, user, images } = this.props;
-    const { error } = this.state;
+    const {
+      sit,
+      user,
+      isOpen,
+      photoModalIsOpen,
+      onClose
+    } = this.props;
 
+    // Render the BottomSheet that wraps our popup content
     return (
-      <div className="satlas-popup">
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
+      <>
+        {sit && (
+          <BottomSheet
+            open={isOpen && !photoModalIsOpen}
+            onDismiss={onClose}
+            snapPoints={({ minHeight }) => [
+              minHeight,
+              Math.min(500, window.innerHeight * 0.6),
+              Math.min(700, window.innerHeight * 0.8)
+            ]}
+            expandOnContentDrag={false}
+            defaultSnap={({ minHeight }) => minHeight}
+            header={
+              <div className="bottom-sheet-header">
+                <span className="header-emoji">🪑</span>
+              </div>
+            }
+          >
+            <div className="satlas-popup">
+              {sit.imageCollectionId ? (
+                this.renderCarousel()
+              ) : (
+                <div className="pending-upload">
+                  <p>Uploading new sit...</p>
+                </div>
+              )}
+
+              {this.renderUploadButton()}
+
+              {/* Only show mark buttons if the sit is fully created */}
+              {sit.imageCollectionId && user && this.renderMarkButtons()}
+
+              {/* Display uploader information */}
+              {sit.uploadedBy && sit.createdAt && (
+                <div className="sit-uploader-info">
+                  Sit uploaded {formatRelativeTime(sit.createdAt)}
+                </div>
+              )}
+
+              {/* Only show favorite count for established sits */}
+              {sit.imageCollectionId && this.renderFavoriteCount()}
+
+              {/* Show Google Maps link */}
+              {sit.imageCollectionId && this.renderGoogleMapsLink()}
+
+              {/* Show appropriate status message */}
+              <div className="sit-info">
+                {!sit.imageCollectionId && (
+                  <p className="sit-status">Processing upload...</p>
+                )}
+              </div>
+            </div>
+          </BottomSheet>
         )}
-
-        {sit.imageCollectionId ? (
-          this.renderCarousel()
-        ) : (
-          <div className="pending-upload">
-            <p>Uploading new sit...</p>
-          </div>
-        )}
-
-        {this.renderUploadButton()}
-
-        {/* Only show mark buttons if the sit is fully created */}
-        {sit.imageCollectionId && user && this.renderMarkButtons()}
-
-        {/* Display uploader information */}
-        {sit.uploadedBy && sit.createdAt && (
-          <div className="sit-uploader-info">
-            Sit uploaded {formatRelativeTime(sit.createdAt)}
-          </div>
-        )}
-
-        {/* Only show favorite count for established sits */}
-        {sit.imageCollectionId && this.renderFavoriteCount()}
-
-        {/* Show Google Maps link */}
-        {sit.imageCollectionId && this.renderGoogleMapsLink()}
-
-        {/* Show appropriate status message */}
-        <div className="sit-info">
-          {!sit.imageCollectionId && (
-            <p className="sit-status">Processing upload...</p>
-          )}
-        </div>
-      </div>
+      </>
     );
   }
 }
