@@ -1034,3 +1034,36 @@ body:has(.bottom-nav-space) {
     bottom: calc(20px + 48px + var(--safe-area-bottom));
   }
 }
+
+.offline-notice {
+  background-color: #8a8a8a;
+  color: white;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #f44336;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  z-index: 1000;
+  font-weight: bold;
+}
+
+/* Adjust the header position when offline banner is shown */
+.offline-banner + header#app-header {
+  margin-top: 36px;
+}
+
+/* Adjust the map container position when offline banner is shown */
+.offline-banner ~ #map-container {
+  margin-top: 36px;
+}
