@@ -17,6 +17,7 @@ interface CarouselState {
   containerWidth: number;
   totalWidth: number;
   loadedImages: Set<number>;
+  visibleImages: Set<number>;
   imagesInLoadingProcess: Set<number>;
 }
 
@@ -30,17 +31,18 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   // it properly resets its state
   static getDerivedStateFromProps(nextProps: CarouselProps, prevState: CarouselState) {
     // If this is a new set of images (based on length), reset the state
-    if (nextProps.images.length > 0 && prevState.loadedImages.size === 0) {
+    if (nextProps.images.length > 0 && prevState.visibleImages.size === 0) {
       console.log('getDerivedStateFromProps: Initializing with new images');
 
-      // Initialize with the first image loaded
-      const initialLoadedImages = new Set<number>();
-      initialLoadedImages.add(0);
+      // Initialize with the first image visible
+      const initialVisibleImages = new Set<number>();
+      initialVisibleImages.add(0);
 
       return {
         activeIndex: 0,
         translateX: 0,
-        loadedImages: initialLoadedImages,
+        visibleImages: initialVisibleImages,
+        loadedImages: new Set<number>(),
         imagesInLoadingProcess: new Set<number>()
       };
     }
@@ -65,6 +67,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       containerWidth: 0,
       totalWidth: 0,
       loadedImages: new Set<number>(),
+      visibleImages: new Set<number>(),
       imagesInLoadingProcess: new Set<number>()
     };
   }
@@ -297,11 +300,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const buffer = containerWidth * 2; // Increased buffer for smoother experience
 
     let currentPosition = 0;
-    const newLoadedImages = new Set(this.state.loadedImages);
+    const newVisibleImages = new Set<number>();
 
     // Always ensure the first image is loaded
     if (this.props.images.length > 0) {
-      newLoadedImages.add(0);
+      newVisibleImages.add(0);
     }
 
     this.props.images.forEach((image, index) => {
@@ -337,18 +340,18 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
           (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer) ||
           // If any part of the image is in the visible area
           (currentPosition <= visibleEnd && imageEnd >= visibleStart)) {
-        newLoadedImages.add(index);
+        newVisibleImages.add(index);
       }
 
       currentPosition += imageWidth + 16; // 16px padding between images
     });
 
-    console.log('Images to load:', [...newLoadedImages]);
+    console.log('Images to load:', [...newVisibleImages]);
 
-    // Only update state if the loaded images set has changed
-    if (newLoadedImages.size !== this.state.loadedImages.size ||
-        ![...newLoadedImages].every(index => this.state.loadedImages.has(index))) {
-      this.setState({ loadedImages: newLoadedImages });
+    // Only update state if the visible images set has changed
+    if (newVisibleImages.size !== this.state.visibleImages.size ||
+        ![...newVisibleImages].every(index => this.state.visibleImages.has(index))) {
+      this.setState({ visibleImages: newVisibleImages });
     }
   };
 
@@ -384,19 +387,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private handleImageLoad = (index: number) => {
     console.log(`Image ${index} loaded`);
 
-    // Add to loading process first
-    this.setState(prevState => {
-      const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
-      newImagesInLoadingProcess.add(index);
-      return { imagesInLoadingProcess: newImagesInLoadingProcess };
-    });
-
-    // Then mark as fully loaded after delay
+    // Remove from loading process and mark as loaded
     this.setState(prevState => {
       const newLoadedImages = new Set(prevState.loadedImages);
       newLoadedImages.add(index);
 
-      // Remove from loading process
       const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
       newImagesInLoadingProcess.delete(index);
 
@@ -405,6 +400,22 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         imagesInLoadingProcess: newImagesInLoadingProcess
       };
     });
+
+    // For debugging - add artificial delay
+    // setTimeout(() => {
+    //   this.setState(prevState => {
+    //     const newLoadedImages = new Set(prevState.loadedImages);
+    //     newLoadedImages.add(index);
+    //
+    //     const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
+    //     newImagesInLoadingProcess.delete(index);
+    //
+    //     return {
+    //       loadedImages: newLoadedImages,
+    //       imagesInLoadingProcess: newImagesInLoadingProcess
+    //     };
+    //   });
+    // }, 2000);
   };
 
   private handleImageInteraction = () => {
@@ -416,7 +427,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   render() {
     const { images, currentUserId, onImageAction, isDeleting } = this.props;
-    const { showControls: showControlsState, translateX, loadedImages, isDragging, imagesInLoadingProcess } = this.state;
+    const { showControls: showControlsState, translateX, loadedImages, visibleImages, isDragging, imagesInLoadingProcess } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
@@ -426,11 +437,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Debug which images are being loaded in render
     console.log('Rendering carousel with loaded images:', [...loadedImages]);
+    console.log('Visible images:', [...visibleImages]);
     console.log('Images in loading process:', [...imagesInLoadingProcess]);
 
-    // If no images are loaded yet, show loading state
-    if (loadedImages.size === 0 && images.length > 0) {
-      console.log('No images loaded yet, showing loading state');
+    // If no images are visible yet, show loading state
+    if (visibleImages.size === 0 && images.length > 0) {
+      console.log('No images visible yet, showing loading state');
       return (
         <div className="carousel loading">
           <div className="placeholder-loader">
@@ -448,11 +460,19 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             style={{ transform: `translateX(${translateX}px)` }}
           >
             {images.map((image, index) => {
-              const shouldLoad = loadedImages.has(index);
-              const isCurrentlyLoading = imagesInLoadingProcess.has(index);
+              const shouldBeVisible = visibleImages.has(index);
+              const isLoaded = loadedImages.has(index);
               const canShowControls = currentUserId && image.userId === currentUserId;
 
-              console.log('Is hidden', shouldLoad && !isCurrentlyLoading);
+              // Track image loading state
+              if (shouldBeVisible && !isLoaded && !imagesInLoadingProcess.has(index)) {
+                // If image should be visible but isn't loaded or loading yet, mark it as loading
+                this.setState(prevState => {
+                  const newImagesInLoadingProcess = new Set(prevState.imagesInLoadingProcess);
+                  newImagesInLoadingProcess.add(index);
+                  return { imagesInLoadingProcess: newImagesInLoadingProcess };
+                });
+              }
 
               // Calculate aspect ratio for styling
               const aspectRatio = image.width && image.height ? image.width / image.height : 1;
@@ -468,7 +488,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     onClick={this.handleImageInteraction}
                   >
                     <div className="aspect-ratio-container">
-                      {shouldLoad ? (
+                      {shouldBeVisible ? (
                         <img
                           ref={this.imageRefs[index]}
                           src={image.base64Data ?
@@ -486,7 +506,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
                       {/* Set placeholder with aspect ratio from image dimensions */}
                       <div
-                        className={`placeholder-loader ${shouldLoad && !isCurrentlyLoading ? 'hidden' : ''}`}
+                        className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
                         style={{
                           '--aspect-ratio': aspectRatio
                         } as React.CSSProperties}
@@ -495,7 +515,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       </div>
 
                       {/* Only show the uploader info after the image has loaded */}
-                      {shouldLoad && (
+                      {shouldBeVisible && (
                         <div className="image-uploader">
                           {image.userName}
                         </div>
