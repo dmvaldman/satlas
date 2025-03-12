@@ -42,8 +42,9 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div ref={this.modalRef} className="modal-content photo-options" onClick={(e) => e.stopPropagation()}>
-          <h2>Existing Satlas Nearby</h2>
-          <p>You are close to an existing satlas. Would you like to upload a photo to it?</p>
+          <h2>Sit Nearby</h2>
+          <p>You are too close to an existing sit</p>
+          <p>Add a photo to it?</p>
 
           <button
             className="photo-option-button"
