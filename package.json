@@ -5,6 +5,7 @@
   "type": "module",
   "keywords": [],
   "scripts": {
+    "lint": "eslint",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -33,6 +34,7 @@
     "@capacitor/geolocation": "^7.1.1",
     "@capacitor/ios": "^7.0.1",
     "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/network": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0",
     "@types/exif-js": "^2.3.1",
     "@types/node": "^22.13.1",
@@ -49,8 +51,13 @@
     "typescript": "^5.7.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.22.0",
     "@types/mapbox-gl": "^3.4.1",
     "@vitejs/plugin-react": "^4.0.0",
+    "eslint": "^9.22.0",
+    "eslint-plugin-react": "^7.37.4",
+    "globals": "^16.0.0",
+    "typescript-eslint": "^8.26.1",
     "vite": "^5.4.2"
   },
   "author": "",
