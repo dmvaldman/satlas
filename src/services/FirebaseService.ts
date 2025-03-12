@@ -30,10 +30,11 @@ import {
   deleteObject
 } from 'firebase/storage';
 import { generateUniqueUsername } from '../utils/userUtils';
-import { Sit, Image, Coordinates, UserPreferences, MarkType } from '../types';
+import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { App } from '@capacitor/app';
+import { OfflineService } from './OfflineService';
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
@@ -52,7 +53,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const googleProvider = new GoogleAuthProvider();
 
 // Set persistence to LOCAL (survives browser restarts)
 setPersistence(auth, browserLocalPersistence);
@@ -65,6 +65,34 @@ export class FirebaseService {
   static storage = storage;
 
   private static isResumeListenerSet = false;
+
+  /**
+   * Check if the app is online
+   * @returns true if online, false if offline
+   */
+  static isOnline(): boolean {
+    // Use the OfflineService to check network status
+    return OfflineService.getInstance().isNetworkOnline();
+  }
+
+  /**
+   * Handle offline photo upload by adding to queue
+   * @param message The success message to show
+   */
+  static handleOfflinePhotoUpload(message: string = "Photo saved and will upload when you're back online"): never {
+    console.log('[Firebase] Offline upload queued:', message);
+    throw new Error(message);
+  }
+
+  /**
+   * Handle offline error
+   * @param originalError The original error that occurred
+   * @param message The error message to show
+   */
+  static handleOfflineError(originalError: any, message: string = 'Failed to save photo for later upload'): never {
+    console.error('[Firebase] Offline upload error:', originalError);
+    throw new Error(message);
+  }
 
   // Add this method to initialize app state listeners
   static initializeAppStateListeners() {
@@ -420,35 +448,60 @@ export class FirebaseService {
 
   /**
    * Create a sit with a photo
-   * @param photoData Base64 photo data
-   * @param location Location coordinates
-   * @param userId User ID
-   * @param userName User name
-   * @param dimensions Image dimensions
-   * @returns Created sit
+   * @param photoResult The photo result containing base64 data and location
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @returns Promise resolving to the created sit
+   * @throws Error when offline
    */
   static async createSitWithPhoto(
-    photoData: string,
-    location: Coordinates,
+    photoResult: PhotoResult,
     userId: string,
-    userName: string,
-    dimensions: { width: number, height: number }
+    userName: string
   ): Promise<Sit> {
+    // Check if we're online
+    if (!this.isOnline()) {
+      try {
+        console.log('[Firebase] Offline, adding to pending uploads queue');
+
+        // Add to pending uploads
+        await OfflineService.getInstance().addPendingNewSit(
+          photoResult,
+          userId,
+          userName
+        );
+
+        // Throw a success error to indicate offline handling
+        throw this.handleOfflinePhotoUpload();
+      } catch (error: any) {
+        // If this is already our offline success error, just rethrow
+        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
+          throw error;
+        }
+
+        // Otherwise, it's a real error from the queue operation
+        throw this.handleOfflineError(error);
+      }
+    }
+
     try {
+      // We're online, proceed with upload
+      console.log('[Firebase] Online, uploading photo and creating sit');
+
       // Upload photo
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
 
       // Detect content type from base64 data
       let contentType = 'image/jpeg'; // Default
-      if (photoData.startsWith('data:')) {
-        const matches = photoData.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (photoResult.base64Data.startsWith('data:')) {
+        const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
         if (matches && matches.length > 1) {
           contentType = matches[1];
         }
       }
 
-      const base64WithoutPrefix = photoData.replace(/^data:image\/\w+;base64,/, '');
+      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       // Add metadata with detected content type
       const metadata = {
@@ -469,49 +522,102 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions.width,
-        height: dimensions.height
+        width: photoResult.dimensions.width,
+        height: photoResult.dimensions.height
       });
 
       // Create the sit
-      return await this.createSit(location, imageCollectionId, userId);
-    } catch (error) {
+      return await this.createSit(photoResult.location, imageCollectionId, userId);
+    } catch (error: any) {
       console.error('Error creating sit with photo:', error);
+
+      // Check if this is a network-related error
+      if (!navigator.onLine || error.message?.includes('network')) {
+        console.log('[Firebase] Network error detected, falling back to offline mode');
+
+        try {
+          // Add to pending uploads
+          await OfflineService.getInstance().addPendingNewSit(
+            photoResult,
+            userId,
+            userName
+          );
+
+          // Throw a success error with custom message
+          throw this.handleOfflinePhotoUpload("Network error occurred, but photo was saved for later upload");
+        } catch (queueError: any) {
+          // Only throw a new error if it's not already our offline error
+          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
+            throw this.handleOfflineError(queueError);
+          }
+          throw queueError;
+        }
+      }
+
+      // For other errors, just rethrow
       throw error;
     }
   }
 
   /**
    * Add a photo to an existing sit
-   * @param base64Data Base64 photo data
-   * @param imageCollectionId Collection ID
-   * @param userId User ID
-   * @param userName User name
-   * @param dimensions Image dimensions
-   * @returns Created image
+   * @param photoResult The photo result containing base64 data
+   * @param imageCollectionId The image collection ID
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @returns Promise resolving to the created image
+   * @throws Error when offline
    */
   static async addPhotoToSit(
-    base64Data: string,
+    photoResult: PhotoResult,
     imageCollectionId: string,
     userId: string,
-    userName: string,
-    dimensions: { width: number, height: number }
+    userName: string
   ): Promise<Image> {
+    // Check if we're online
+    if (!this.isOnline()) {
+      try {
+        console.log('[Firebase] Offline, adding to pending uploads queue');
+
+        // Add to pending uploads
+        await OfflineService.getInstance().addPendingPhotoToSit(
+          photoResult,
+          imageCollectionId,
+          userId,
+          userName
+        );
+
+        // Throw a success error to indicate offline handling
+        throw this.handleOfflinePhotoUpload();
+      } catch (error: any) {
+        // If this is already our offline success error, just rethrow
+        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
+          throw error;
+        }
+
+        // Otherwise, it's a real error from the queue operation
+        throw this.handleOfflineError(error);
+      }
+    }
+
     try {
+      // We're online, proceed with upload
+      console.log('[Firebase] Online, uploading photo to existing sit');
+
       // Upload photo
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
 
       // Detect content type from base64 data
       let contentType = 'image/jpeg'; // Default
-      if (base64Data.startsWith('data:')) {
-        const matches = base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (photoResult.base64Data.startsWith('data:')) {
+        const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
         if (matches && matches.length > 1) {
           contentType = matches[1];
         }
       }
 
-      const base64WithoutPrefix = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       // Add metadata with detected content type
       const metadata = {
@@ -531,8 +637,8 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions.width,
-        height: dimensions.height
+        width: photoResult.dimensions.width,
+        height: photoResult.dimensions.height
       });
 
       return {
@@ -542,11 +648,37 @@ export class FirebaseService {
         userName,
         collectionId: imageCollectionId,
         createdAt: new Date(),
-        width: dimensions.width,
-        height: dimensions.height
+        width: photoResult.dimensions.width,
+        height: photoResult.dimensions.height
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding photo to sit:', error);
+
+      // Check if this is a network-related error
+      if (!navigator.onLine || error.message?.includes('network')) {
+        console.log('[Firebase] Network error detected, falling back to offline mode');
+
+        try {
+          // Add to pending uploads
+          await OfflineService.getInstance().addPendingPhotoToSit(
+            photoResult,
+            imageCollectionId,
+            userId,
+            userName
+          );
+
+          // Throw a success error with custom message
+          throw this.handleOfflinePhotoUpload("Network error occurred, but photo was saved for later upload");
+        } catch (queueError: any) {
+          // Only throw a new error if it's not already our offline error
+          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
+            throw this.handleOfflineError(queueError);
+          }
+          throw queueError;
+        }
+      }
+
+      // For other errors, just rethrow
       throw error;
     }
   }
@@ -822,26 +954,171 @@ export class FirebaseService {
     }
   }
 
-  // Add this method to your FirebaseService class
+  /**
+   * Replace an existing image
+   * @param photoResult The photo result containing base64 data
+   * @param imageCollectionId The image collection ID
+   * @param imageId The image ID to replace
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @throws Error when offline
+   */
   static async replaceImage(
-    base64Data: string,
+    photoResult: PhotoResult,
     imageCollectionId: string,
     imageId: string,
     userId: string,
-    userName: string,
-    dimensions: { width: number, height: number }
+    userName: string
   ): Promise<void> {
-    // Delete the old image first
-    await this.deleteImage(imageId, userId);
+    // Check if we're online
+    if (!this.isOnline()) {
+      try {
+        console.log('[Firebase] Offline, adding to pending uploads queue');
 
-    // Then add a new photo (we can't reuse the ID with the current addPhotoToSit implementation)
-    await this.addPhotoToSit(
-      base64Data,
-      imageCollectionId,
-      userId,
-      userName,
-      dimensions
-    );
+        // Add to pending uploads
+        await OfflineService.getInstance().addPendingReplaceImage(
+          photoResult,
+          imageCollectionId,
+          imageId,
+          userId,
+          userName
+        );
+
+        // Throw a success error to indicate offline handling
+        throw this.handleOfflinePhotoUpload();
+      } catch (error: any) {
+        // If this is already our offline success error, just rethrow
+        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
+          throw error;
+        }
+
+        // Otherwise, it's a real error from the queue operation
+        throw this.handleOfflineError(error);
+      }
+    }
+
+    try {
+      // We're online, proceed with upload
+      console.log('[Firebase] Online, replacing image');
+
+      // Delete the old image first
+      await this.deleteImage(imageId, userId);
+
+      // Then add a new photo
+      await this.addPhotoToSit(
+        photoResult,
+        imageCollectionId,
+        userId,
+        userName
+      );
+
+    } catch (error: any) {
+      console.error('Error replacing image:', error);
+
+      // Check if this is a network-related error
+      if (!navigator.onLine || error.message?.includes('network')) {
+        console.log('[Firebase] Network error detected, falling back to offline mode');
+
+        try {
+          // Add to pending uploads
+          await OfflineService.getInstance().addPendingReplaceImage(
+            photoResult,
+            imageCollectionId,
+            imageId,
+            userId,
+            userName
+          );
+
+          // Throw a success error with custom message
+          throw this.handleOfflinePhotoUpload("Network error occurred, but image replacement was saved for later");
+        } catch (queueError: any) {
+          // Only throw a new error if it's not already our offline error
+          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
+            throw this.handleOfflineError(queueError);
+          }
+          throw queueError;
+        }
+      }
+
+      // For other errors, just rethrow
+      throw error;
+    }
+  }
+
+  /**
+   * Process all pending uploads from the OfflineService
+   * @returns Promise that resolves when all uploads are processed
+   */
+  static async processPendingUploads(): Promise<void> {
+    try {
+      console.log('[Firebase] Processing pending uploads');
+      const offlineService = OfflineService.getInstance();
+
+      // Check if we're online
+      if (!this.isOnline()) {
+        console.log('[Firebase] Cannot process uploads while offline');
+        return;
+      }
+
+      // Process new sits
+      const pendingNewSits = offlineService.getPendingNewSits();
+      for (const upload of pendingNewSits) {
+        try {
+          await this.createSitWithPhoto(
+            upload.photoResult,
+            upload.userId,
+            upload.userName
+          );
+          // Remove from queue on success
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing new sit upload:', error);
+          // Continue with next upload
+        }
+      }
+
+      // Process add to existing sits
+      const pendingAddToSits = offlineService.getPendingAddToSits();
+      for (const upload of pendingAddToSits) {
+        try {
+          await this.addPhotoToSit(
+            upload.photoResult,
+            upload.imageCollectionId,
+            upload.userId,
+            upload.userName
+          );
+          // Remove from queue on success
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing add to sit upload:', error);
+          // Continue with next upload
+        }
+      }
+
+      // Process replace images
+      const pendingReplaceImages = offlineService.getPendingReplaceImages();
+      for (const upload of pendingReplaceImages) {
+        try {
+          await this.replaceImage(
+            upload.photoResult,
+            upload.imageCollectionId,
+            upload.imageId,
+            upload.userId,
+            upload.userName
+          );
+          // Remove from queue on success
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing replace image upload:', error);
+          // Continue with next upload
+        }
+      }
+
+      console.log('[Firebase] Finished processing pending uploads');
+    } catch (error) {
+      console.error('[Firebase] Error in processPendingUploads:', error);
+      throw error;
+    }
   }
 }
 

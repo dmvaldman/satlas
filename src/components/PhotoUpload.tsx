@@ -1,9 +1,10 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
-import { Coordinates, Sit } from '../types';
+import { Coordinates, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import ReactDOM from 'react-dom';
+import { OfflineService } from '../services/OfflineService';
 
 // Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
 function convertDMSToDD(dms: number[], direction: string): number {
@@ -26,18 +27,6 @@ interface PhotoUploadProps {
   onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
   isUploading?: boolean;
   sit?: Sit | { sitId: string; imageId: string; };
-}
-
-interface PhotoResult {
-  base64Data: string;
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  dimensions: {
-    width: number;
-    height: number;
-  };
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
@@ -369,6 +358,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
   render() {
     const { isOpen, isUploading, onClose } = this.props;
+    const isOffline = !OfflineService.getInstance().isNetworkOnline();
 
     if (!isOpen) return null;
 
@@ -383,6 +373,12 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           className="modal-content photo-options"
           onClick={e => e.stopPropagation()}
         >
+          {isOffline && (
+            <div className="offline-notice">
+              You're offline. Photos will be uploaded when you're back online.
+            </div>
+          )}
+
           <button
             className="photo-option-button"
             onClick={this.handleTakePhoto}

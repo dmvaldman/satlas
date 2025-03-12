@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
 import AuthComponent from './components/AuthComponent';
 import MapComponent from './components/MapComponent';
-import { Image, Sit, Coordinates, MarkType } from './types';
+import { Image, Sit, Coordinates, MarkType, PhotoResult } from './types';
 import { getDistanceInFeet } from './utils/geo';
 import PhotoUploadComponent from './components/PhotoUpload';
 import ProfileModal from './components/ProfileModal';
@@ -16,8 +16,7 @@ import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import PopupComponent from './components/Popup';
-import { BottomSheet } from 'react-spring-bottom-sheet'
-import 'react-spring-bottom-sheet/dist/style.css'
+import { OfflineService } from './services/OfflineService';
 
 interface AppState {
   // Auth state
@@ -43,7 +42,6 @@ interface AppState {
     };
     profile: {
       isOpen: boolean;
-      data: any | null;
     };
     nearbySit: {
       isOpen: boolean;
@@ -66,25 +64,17 @@ interface AppState {
     sit: Sit | null;
     images: Image[];
   };
-}
 
-type PhotoResult = {
-  base64Data: string;
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  dimensions: {
-    width: number;
-    height: number;
-  };
-};
+  // Add this new property
+  isOffline: boolean;
+}
 
 class App extends React.Component<{}, AppState> {
   private mapContainer = React.createRef<HTMLDivElement>();
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
   private authUnsubscribe: (() => void) | null = null;
+  private offlineServiceUnsubscribe: (() => void) | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -108,7 +98,7 @@ class App extends React.Component<{}, AppState> {
       // Modal state
       modals: {
         photo: { isOpen: false, data: null },
-        profile: { isOpen: false, data: null },
+        profile: { isOpen: false },
         nearbySit: { isOpen: false, data: null }
       },
 
@@ -127,6 +117,9 @@ class App extends React.Component<{}, AppState> {
         sit: null,
         images: []
       },
+
+      // Initialize offline state
+      isOffline: false
     };
 
     this.locationService = new LocationService();
@@ -183,6 +176,9 @@ class App extends React.Component<{}, AppState> {
 
     // Set up location listener
     this.locationService.addLocationListener(this.handleLocationUpdate);
+
+    // Initialize OfflineService and add listener
+    this.initializeOfflineService();
   }
 
   componentWillUnmount() {
@@ -198,6 +194,11 @@ class App extends React.Component<{}, AppState> {
     // Clean up auth listener
     if (this.authUnsubscribe) {
       this.authUnsubscribe();
+    }
+
+    // Clean up offline service listener
+    if (this.offlineServiceUnsubscribe) {
+      this.offlineServiceUnsubscribe();
     }
   }
 
@@ -374,8 +375,7 @@ class App extends React.Component<{}, AppState> {
           modals: {
             ...prevState.modals,
             profile: {
-              isOpen: false,
-              data: null
+              isOpen: false
             }
           }
         };
@@ -386,8 +386,7 @@ class App extends React.Component<{}, AppState> {
         modals: {
           ...prevState.modals,
           profile: {
-            isOpen: !prevState.modals.profile.isOpen,
-            data: prevState.modals.profile.data
+            isOpen: !prevState.modals.profile.isOpen
           }
         }
       };
@@ -719,18 +718,19 @@ class App extends React.Component<{}, AppState> {
           }
         });
 
-        // Upload to server in the background
-        FirebaseService.replaceImage(
-          photoResult.base64Data,
-          sit.imageCollectionId,
-          imageId,
-          user.uid,
-          userPreferences.username,
-          photoResult.dimensions
-        ).catch(error => {
-          console.error('Background upload failed:', error);
-          this.showNotification('Failed to upload image', 'error');
-        });
+        try {
+          // Upload to server in the background
+          await FirebaseService.replaceImage(
+            photoResult,
+            sit.imageCollectionId,
+            imageId,
+            user.uid,
+            userPreferences.username
+          );
+        } catch (error: any) {
+          // Show the error message to the user
+          this.showNotification(error.message, 'success');
+        }
 
         return;
       }
@@ -772,17 +772,18 @@ class App extends React.Component<{}, AppState> {
           }
         });
 
-        // Upload to server in the background
-        FirebaseService.addPhotoToSit(
-          photoResult.base64Data,
-          sit.imageCollectionId,
-          user.uid,
-          userPreferences.username,
-          photoResult.dimensions
-        ).catch(error => {
-          console.error('Background upload failed:', error);
-          this.showNotification('Image upload failed in the background', 'error');
-        });
+        try {
+          // Use FirebaseService to handle the upload (including offline case)
+          await FirebaseService.addPhotoToSit(
+            photoResult,
+            sit.imageCollectionId,
+            user.uid,
+            userPreferences.username
+          );
+        } catch (error: any) {
+          // Show the error message to the user
+          this.showNotification(error.message, 'success');
+        }
 
         return;
       }
@@ -822,14 +823,14 @@ class App extends React.Component<{}, AppState> {
           sits: new Map(this.state.sits).set(initialSit.id, initialSit)
         });
 
-        // Create sit with photo using FirebaseService in the background
-        FirebaseService.createSitWithPhoto(
-          photoResult.base64Data,
-          location,
-          user.uid,
-          userPreferences.username,
-          photoResult.dimensions
-        ).then(sit => {
+        try {
+          // Create sit with photo using FirebaseService in the background
+          const sit = await FirebaseService.createSitWithPhoto(
+            photoResult,
+            user.uid,
+            userPreferences.username
+          );
+
           // Replace initial sit with complete sit
           this.setState(prevState => {
             const newSits = new Map(prevState.sits);
@@ -839,8 +840,10 @@ class App extends React.Component<{}, AppState> {
             // Update drawer if it's showing the initial sit
             if (prevState.drawer.sit?.id === initialSit.id) {
               return {
+                ...prevState,
                 sits: newSits,
                 drawer: {
+                  ...prevState.drawer,
                   isOpen: true,
                   sit,
                   images: sit.imageCollectionId ?
@@ -851,14 +854,15 @@ class App extends React.Component<{}, AppState> {
             }
 
             return {
+              ...prevState,
               sits: newSits,
               drawer: prevState.drawer // Preserve the existing drawer state
             };
           });
-        }).catch(error => {
-          console.error('Background upload failed:', error);
-          this.showNotification('Sit creation failed in the background', 'error');
-        });
+        } catch (error: any) {
+          // Show the error message to the user
+          this.showNotification(error.message, 'success');
+        }
       }
     } catch (error) {
       // Close the photo modal on error
@@ -908,9 +912,23 @@ class App extends React.Component<{}, AppState> {
     this.togglePhotoUpload(sit);
   };
 
-  private showNotification = (message: string, type: 'success' | 'error') => {
+  private showNotification = (messageOrNotification: string | { message: string, type: 'success' | 'error' }, type?: 'success' | 'error') => {
+    // Handle both formats: (message, type) and ({ message, type })
+    let message: string;
+    let notificationType: 'success' | 'error';
+
+    if (typeof messageOrNotification === 'string') {
+      // Old format: (message, type)
+      message = messageOrNotification;
+      notificationType = type || 'error'; // Default to error if type is not provided
+    } else {
+      // New format: ({ message, type })
+      message = messageOrNotification.message;
+      notificationType = messageOrNotification.type;
+    }
+
     this.setState({
-      notification: { message, type, isVisible: true }
+      notification: { message, type: notificationType, isVisible: true }
     }, () => {
       setTimeout(() => {
         if (this.state.notification?.isVisible) {
@@ -988,6 +1006,67 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
+  private async initializeOfflineService() {
+    const offlineService = OfflineService.getInstance();
+    await offlineService.initialize();
+
+    // Add listener for network status changes
+    this.offlineServiceUnsubscribe = offlineService.addStatusListener((isOnline) => {
+      this.setState({ isOffline: !isOnline });
+
+      // If we're back online, process any pending uploads
+      if (isOnline) {
+        this.handleProcessPendingUploads();
+      }
+    });
+
+    // Also add a queue listener to update UI when queue changes
+    offlineService.addQueueListener((queue) => {
+      // You could update state here if you want to show pending uploads in the UI
+      console.log(`[App] Pending uploads queue updated: ${queue.length} items`);
+    });
+
+    // Check if there are pending uploads that need to be processed
+    if (offlineService.hasPendingUploadsToProcess()) {
+      console.log('[App] Found pending uploads on startup, processing...');
+      this.handleProcessPendingUploads();
+    }
+  }
+
+  /**
+   * Handle processing of pending uploads by showing notifications and refreshing the map
+   */
+  private async handleProcessPendingUploads() {
+    const offlineService = OfflineService.getInstance();
+    const pendingUploads = offlineService.getPendingUploads();
+
+    if (pendingUploads.length === 0) return;
+
+    // Show notification that we're processing uploads
+    this.showNotification(`Processing ${pendingUploads.length} pending uploads...`, 'success');
+
+    try {
+      // Let the FirebaseService handle the actual processing
+      await FirebaseService.processPendingUploads();
+
+      // Refresh the map to show any new sits
+      if (this.state.map) {
+        const bounds = this.state.map.getBounds();
+        if (bounds) {
+          this.handleLoadSits({
+            north: bounds.getNorth(),
+            south: bounds.getSouth()
+          });
+        }
+      }
+
+      this.showNotification('Finished processing pending uploads', 'success');
+    } catch (error) {
+      console.error('[App] Error during pending uploads processing:', error);
+      this.showNotification('Error processing some uploads', 'error');
+    }
+  }
+
   render() {
     const {
       user,
@@ -1002,7 +1081,8 @@ class App extends React.Component<{}, AppState> {
       userPreferences,
       isMapLoading,
       notification,
-      drawer
+      drawer,
+      isOffline
     } = this.state;
 
     const isAndroid = Capacitor.getPlatform() === 'android';
@@ -1024,6 +1104,13 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div className="app">
+        {/* Add offline banner */}
+        {isOffline && (
+          <div className="offline-banner">
+            You are currently offline. Some features may be limited.
+          </div>
+        )}
+
         <header id="app-header">
           <AuthComponent
             user={user}
