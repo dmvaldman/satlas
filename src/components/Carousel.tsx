@@ -412,72 +412,72 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               return (
                 <div
                   key={image.id}
-                  className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'}`}
+                  className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'} ${index === images.length - 1 ? 'last-item' : ''}`}
+                  onClick={this.handleImageInteraction}
                 >
+                  {/* Only show image if it should be visible */}
+                  {isVisible ? (
+                    <img
+                      ref={this.imageRefs[index]}
+                      src={image.base64Data ?
+                        `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                        `${image.photoURL}?size=med`
+                      }
+                      alt={`Photo by ${image.userName}`}
+                      className="carousel-image"
+                      style={{ opacity: isLoaded ? 1 : 0 }} // Hide image until fully loaded
+                      onLoad={() => this.handleImageLoad(index)}
+                      onError={(e) => {
+                        console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
+                      }}
+                    />
+                  ) : null}
+
+                  {/* Set placeholder with aspect ratio from image dimensions */}
                   <div
-                    className="carousel-img-container"
-                    onClick={this.handleImageInteraction}
+                    className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
+                    style={{
+                      '--aspect-ratio': aspectRatio
+                    } as React.CSSProperties}
                   >
-                    <div className="aspect-ratio-container">
-                      {/* Only show image if it should be visible */}
-                      {isVisible ? (
-                        <img
-                          ref={this.imageRefs[index]}
-                          src={image.base64Data ?
-                            `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                            `${image.photoURL}?size=med`
-                          }
-                          alt={`Photo by ${image.userName}`}
-                          className="carousel-image"
-                          style={{ opacity: isLoaded ? 1 : 0 }} // Hide image until fully loaded
-                          onLoad={() => this.handleImageLoad(index)}
-                          onError={(e) => {
-                            console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
-                          }}
-                        />
-                      ) : null}
-
-                      {/* Set placeholder with aspect ratio from image dimensions */}
-                      <div
-                        className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
-                        style={{
-                          '--aspect-ratio': aspectRatio
-                        } as React.CSSProperties}
-                      >
-                        <div className="spinner"></div>
-                      </div>
-
-                      {/* Only show the uploader info once image is visible */}
-                      {isVisible && (
-                        <div className="image-uploader">
-                          {image.userName}
-                        </div>
-                      )}
-                    </div>
-
-                    {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
-                      <div className="image-controls">
-                        <button
-                          className="image-control-button"
-                          onClick={() => onImageAction('replace', image.id)}
-                          disabled={isDeleting}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                          </svg>
-                        </button>
-                        <button
-                          className="image-control-button delete"
-                          onClick={() => onImageAction('delete', image.id)}
-                          disabled={isDeleting}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                          </svg>
-                        </button>
-                      </div>
-                    )}
+                    <div className="spinner"></div>
                   </div>
+
+                  {/* Only show the uploader info once image is visible */}
+                  {isVisible && (
+                    <div className="image-uploader">
+                      {image.userName}
+                    </div>
+                  )}
+
+                  {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
+                    <div className="image-controls">
+                      <button
+                        className="image-control-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageAction('replace', image.id);
+                        }}
+                        disabled={isDeleting}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                        </svg>
+                      </button>
+                      <button
+                        className="image-control-button delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageAction('delete', image.id);
+                        }}
+                        disabled={isDeleting}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
