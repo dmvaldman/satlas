@@ -35,6 +35,7 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { App } from '@capacitor/app';
 import { OfflineService } from './OfflineService';
+import { ValidationUtils } from '../utils/ValidationUtils';
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
@@ -485,9 +486,6 @@ export class FirebaseService {
     }
 
     try {
-      // We're online, proceed with upload
-      console.log('[Firebase] Online, uploading photo and creating sit');
-
       // Upload photo
       const filename = `sit_${Date.now()}.jpg`;
       const storageRef = ref(storage, `sits/${filename}`);
@@ -601,8 +599,34 @@ export class FirebaseService {
     }
 
     try {
-      // We're online, proceed with upload
-      console.log('[Firebase] Online, uploading photo to existing sit');
+      // Check if user is authenticated
+      if (!ValidationUtils.isUserAuthenticated(userId)) {
+        throw new Error("You must be logged in to add a photo");
+      }
+
+      // Check if the location is valid
+      if (!ValidationUtils.isLocationValid(photoResult.location)) {
+        throw new Error("Valid location data is required to add a photo");
+      }
+
+      // Check if user already has an image in this collection
+      const existingImages = await this.getImages(imageCollectionId);
+      const canAddPhoto = ValidationUtils.canUserAddPhotoToSit(
+        imageCollectionId,
+        userId,
+        true, // isOnline
+        existingImages
+      );
+
+      if (!canAddPhoto) {
+        throw new Error("You've already added a photo to this sit");
+      }
+
+      // Check if photo location is near the sit
+      const sit = await this.getSitByCollectionId(imageCollectionId);
+      if (sit && !ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
+        throw new Error("Photo location is too far from the sit location");
+      }
 
       // Upload photo
       const filename = `sit_${Date.now()}.jpg`;
@@ -653,32 +677,6 @@ export class FirebaseService {
       };
     } catch (error: any) {
       console.error('Error adding photo to sit:', error);
-
-      // Check if this is a network-related error
-      if (!navigator.onLine || error.message?.includes('network')) {
-        console.log('[Firebase] Network error detected, falling back to offline mode');
-
-        try {
-          // Add to pending uploads
-          await OfflineService.getInstance().addPendingPhotoToSit(
-            photoResult,
-            imageCollectionId,
-            userId,
-            userName
-          );
-
-          // Throw a success error with custom message
-          throw this.handleOfflinePhotoUpload("Network error occurred, but photo was saved for later upload");
-        } catch (queueError: any) {
-          // Only throw a new error if it's not already our offline error
-          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
-            throw this.handleOfflineError(queueError);
-          }
-          throw queueError;
-        }
-      }
-
-      // For other errors, just rethrow
       throw error;
     }
   }
@@ -998,7 +996,41 @@ export class FirebaseService {
     }
 
     try {
-      // We're online, proceed with upload
+      // We're online, validate first using ValidationUtils directly
+      let canReplaceImage = false;
+
+      // For temporary images, use ValidationUtils directly
+      if (imageId.startsWith('temp_')) {
+        canReplaceImage = ValidationUtils.canUserReplaceImage(imageId, userId, true);
+      } else {
+        // Get the image document
+        const imageDoc = await getDoc(doc(db, 'images', imageId));
+        if (!imageDoc.exists()) {
+          throw new Error('Image not found');
+        }
+
+        // Convert to Image type
+        const imageData = imageDoc.data();
+        const image = {
+          id: imageId,
+          photoURL: imageData.photoURL || '',
+          userId: imageData.userId,
+          userName: imageData.userName,
+          collectionId: imageData.collectionId,
+          createdAt: imageData.createdAt.toDate(),
+          width: imageData.width || undefined,
+          height: imageData.height || undefined
+        };
+
+        // Use ValidationUtils directly
+        canReplaceImage = ValidationUtils.canUserReplaceImage(imageId, userId, true, image);
+      }
+
+      if (!canReplaceImage) {
+        throw new Error("You can only replace your own images");
+      }
+
+      // Proceed with replacement if validation passes
       console.log('[Firebase] Online, replacing image');
 
       // Delete the old image first
@@ -1014,33 +1046,6 @@ export class FirebaseService {
 
     } catch (error: any) {
       console.error('Error replacing image:', error);
-
-      // Check if this is a network-related error
-      if (!navigator.onLine || error.message?.includes('network')) {
-        console.log('[Firebase] Network error detected, falling back to offline mode');
-
-        try {
-          // Add to pending uploads
-          await OfflineService.getInstance().addPendingReplaceImage(
-            photoResult,
-            imageCollectionId,
-            imageId,
-            userId,
-            userName
-          );
-
-          // Throw a success error with custom message
-          throw this.handleOfflinePhotoUpload("Network error occurred, but image replacement was saved for later");
-        } catch (queueError: any) {
-          // Only throw a new error if it's not already our offline error
-          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
-            throw this.handleOfflineError(queueError);
-          }
-          throw queueError;
-        }
-      }
-
-      // For other errors, just rethrow
       throw error;
     }
   }
@@ -1081,6 +1086,22 @@ export class FirebaseService {
       const pendingAddToSits = offlineService.getPendingAddToSits();
       for (const upload of pendingAddToSits) {
         try {
+          // Validate directly using ValidationUtils
+          const existingImages = await this.getImages(upload.imageCollectionId);
+          const canAddPhoto = ValidationUtils.canUserAddPhotoToSit(
+            upload.imageCollectionId,
+            upload.userId,
+            true, // isOnline
+            existingImages
+          );
+
+          if (!canAddPhoto) {
+            console.log(`[Firebase] User ${upload.userId} already has an image in collection ${upload.imageCollectionId}, skipping`);
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
+          // Proceed with upload if validation passes
           await this.addPhotoToSit(
             upload.photoResult,
             upload.imageCollectionId,
@@ -1099,6 +1120,38 @@ export class FirebaseService {
       const pendingReplaceImages = offlineService.getPendingReplaceImages();
       for (const upload of pendingReplaceImages) {
         try {
+          // Validate directly using ValidationUtils
+          let canReplaceImage = false;
+
+          if (upload.imageId.startsWith('temp_')) {
+            canReplaceImage = ValidationUtils.canUserReplaceImage(upload.imageId, upload.userId, true);
+          } else {
+            // Get the image document
+            const imageDoc = await getDoc(doc(db, 'images', upload.imageId));
+            if (imageDoc.exists()) {
+              const imageData = imageDoc.data();
+              const image = {
+                id: upload.imageId,
+                photoURL: imageData.photoURL || '',
+                userId: imageData.userId,
+                userName: imageData.userName,
+                collectionId: imageData.collectionId,
+                createdAt: imageData.createdAt.toDate(),
+                width: imageData.width || undefined,
+                height: imageData.height || undefined
+              };
+
+              canReplaceImage = ValidationUtils.canUserReplaceImage(upload.imageId, upload.userId, true, image);
+            }
+          }
+
+          if (!canReplaceImage) {
+            console.log(`[Firebase] User ${upload.userId} cannot replace image ${upload.imageId}, skipping`);
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
+          // Proceed with replacement if validation passes
           await this.replaceImage(
             upload.photoResult,
             upload.imageCollectionId,
@@ -1118,6 +1171,41 @@ export class FirebaseService {
     } catch (error) {
       console.error('[Firebase] Error in processPendingUploads:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get a sit by its image collection ID
+   * @param imageCollectionId The image collection ID
+   * @returns Sit object or null if not found
+   */
+  static async getSitByCollectionId(imageCollectionId: string): Promise<Sit | null> {
+    try {
+      const sitsRef = collection(db, 'sits');
+      const q = query(sitsRef, where('imageCollectionId', '==', imageCollectionId));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        return null;
+      }
+
+      // There should be only one sit with this collection ID
+      const sitDoc = querySnapshot.docs[0];
+      const sitData = sitDoc.data();
+
+      return {
+        id: sitDoc.id,
+        location: {
+          latitude: sitData.location.latitude,
+          longitude: sitData.location.longitude
+        },
+        imageCollectionId: sitData.imageCollectionId,
+        createdAt: sitData.createdAt,
+        uploadedBy: sitData.uploadedBy
+      };
+    } catch (error) {
+      console.error('Error getting sit by collection ID:', error);
+      return null;
     }
   }
 }

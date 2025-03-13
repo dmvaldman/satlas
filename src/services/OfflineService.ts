@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { Network } from '@capacitor/network';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { PhotoResult } from '../types';
+import { ValidationUtils } from '../utils/ValidationUtils';
 
 // Define explicit types for different kinds of pending uploads
 export enum PendingUploadType {
@@ -182,6 +183,11 @@ export class OfflineService {
     userId: string,
     userName: string
   ): Promise<string> {
+    // Client-side validation using ValidationUtils directly
+    if (!ValidationUtils.canUserAddPhotoToSit(imageCollectionId, userId, false)) {
+      throw new Error("You've already added a photo to this sit");
+    }
+
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const pendingUpload: AddToSitPendingUpload = {
@@ -220,6 +226,11 @@ export class OfflineService {
     userId: string,
     userName: string
   ): Promise<string> {
+    // Client-side validation using ValidationUtils directly
+    if (!ValidationUtils.canUserReplaceImage(imageId, userId, false)) {
+      throw new Error("You can only replace your own images");
+    }
+
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const pendingUpload: ReplaceImagePendingUpload = {
