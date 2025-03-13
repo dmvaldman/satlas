@@ -19,7 +19,6 @@ interface CarouselState {
   isDragging: boolean;
   containerWidth: number;
   totalWidth: number;
-  // A map of image indices to their loading status
   imageStatus: Map<number, ImageStatus>;
 }
 
@@ -28,6 +27,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private containerRef = React.createRef<HTMLDivElement>();
   private imageRefs: React.RefObject<HTMLImageElement>[] = [];
   private resizeObserver: ResizeObserver | null = null;
+  private padding = 16;
 
   // This static method ensures that when the component receives new props,
   // it properly resets its state
@@ -162,42 +162,36 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
-    const maxHeight = 300; // Maximum height constraint for all images
+    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint for all images
 
-    // For single images, set totalWidth equal to containerWidth to prevent dragging
-    if (this.props.images.length <= 1) {
-      this.setState({
-        containerWidth,
-        totalWidth: containerWidth,
-        translateX: 0 // Reset position for single image
-      });
-      return;
-    }
-
+    // Calculate total width of all images with padding
     let totalWidth = 0;
-
-    // Calculate total width of all images with padding using metadata
     this.props.images.forEach((image, index) => {
-      if (image.width && image.height) {
-        const aspectRatio = image.width / image.height;
-        // All images are constrained by height, so width = height * aspectRatio
-        const estimatedWidth = maxHeight * aspectRatio;
-        totalWidth += estimatedWidth + (index < this.props.images.length - 1 ? 16 : 0);
-      } else {
-        // Fallback if dimensions are not available - assume square image
-        totalWidth += maxHeight + (index < this.props.images.length - 1 ? 16 : 0);
-      }
+      const padding = index < this.props.images.length - 1 ? this.padding : 0;
+      const aspectRatio = image.width / image.height;
+      const estimatedWidth = maxHeight * aspectRatio;
+      totalWidth += estimatedWidth + padding;
     });
 
-    // If total content width is less than container width, we don't need to allow dragging
-    // Just set totalWidth to match containerWidth exactly
-    if (totalWidth <= containerWidth) {
+    // If total content width is less than or equal to container width,
+    // or if there's only one image, disable scrolling
+    const shouldDisableScrolling = totalWidth <= containerWidth || this.props.images.length <= 1;
+
+    if (shouldDisableScrolling) {
       totalWidth = containerWidth;
     }
 
-    console.log('Calculated dimensions:', { containerWidth, totalWidth });
+    console.log('Calculated dimensions:', {
+      containerWidth,
+      totalWidth,
+      shouldDisableScrolling
+    });
 
-    this.setState({ containerWidth, totalWidth });
+    this.setState({
+      containerWidth,
+      totalWidth,
+      translateX: 0 // Reset position
+    });
   };
 
   private handleResize = () => {
@@ -208,8 +202,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   private handleDragStart = (e: MouseEvent | TouchEvent) => {
-    // Explicitly prevent dragging for single images
-    if (this.props.images.length <= 1) {
+    // Prevent dragging if all images fit within the container
+    if (this.state.totalWidth <= this.state.containerWidth || this.props.images.length <= 1) {
       return;
     }
 
@@ -244,9 +238,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     let newTranslateX = this.state.translateX + deltaX;
 
     // Don't allow dragging past the start
-    if (newTranslateX > 0) {
-      newTranslateX = 0;
-    }
+    if (newTranslateX > 0) newTranslateX = 0;
 
     // Don't allow dragging past the end
     const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
@@ -269,7 +261,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
-    const maxHeight = 300; // Maximum height constraint for all images
+    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint for all images
+
     const visibleStart = -translateX;
     const visibleEnd = visibleStart + containerWidth;
 
@@ -286,14 +279,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.props.images.forEach((image, index) => {
       // Calculate image width based on metadata
-      let imageWidth;
-      if (image.width && image.height) {
-        const aspectRatio = image.width / image.height;
-        imageWidth = maxHeight * aspectRatio;
-      } else {
-        // Fallback if dimensions are not available - assume square image
-        imageWidth = maxHeight;
-      }
+      const aspectRatio = image.width / image.height;
+      let imageWidth = maxHeight * aspectRatio;
 
       const imageEnd = currentPosition + imageWidth;
 
@@ -305,7 +292,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         visibleImages.add(index);
       }
 
-      currentPosition += imageWidth + 16; // 16px padding between images
+      currentPosition += imageWidth + this.padding;
     });
 
     // Update image statuses: set any newly visible images to 'loading'
@@ -353,7 +340,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   private handleImageLoad = (index: number) => {
-    console.log(`Image ${index} loaded naturally`);
+    console.log(`Image ${index} loaded`);
     // Remove this timeout in production. Just for testing.
     setTimeout(() => {
       this.setState(prevState => {
@@ -373,13 +360,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   render() {
     const { images, currentUserId, onImageAction, isDeleting } = this.props;
-    const { showControls: showControlsState, translateX, imageStatus, isDragging } = this.state;
+    const { showControls: showControlsState, translateX, imageStatus, isDragging, containerWidth, totalWidth } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
     }
 
-    const isSingleImage = images.length === 1;
+    const isScrollDisabled = totalWidth <= containerWidth;
 
     // Get visible images (those with status)
     const visibleImages = new Set([...imageStatus.keys()]);
@@ -399,7 +386,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       <div className="carousel" ref={this.carouselRef}>
         <div className="carousel-content" ref={this.containerRef}>
           <div
-            className={`carousel-track ${isDragging ? 'dragging' : ''} ${isSingleImage ? 'single-image' : ''}`}
+            className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
             style={{ transform: `translateX(${translateX}px)` }}
           >
             {images.map((image, index) => {

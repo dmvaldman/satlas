@@ -1,9 +1,21 @@
-/* Add at the top - Safe area insets */
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* Remove focus outline from all buttons and interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+.image-control-button,
+.photo-option-button {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent; /* Removes tap highlight on mobile */
 }
 
 html,
@@ -367,15 +379,15 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transition: none;
 }
 
-/* Center single image */
-.carousel-track.single-image {
-  justify-content: center;
+/* Add this to your existing carousel styles */
+.carousel-track.scroll-disabled {
+  justify-content: center; /* Center the content when scrolling is disabled */
+  cursor: default; /* Change cursor to indicate no scrolling */
 }
 
-.carousel-track.single-image .carousel-item {
-  margin-right: 0; /* No margin needed for single images */
+.carousel-track.scroll-disabled .carousel-item {
+  cursor: pointer; /* Keep the item cursor as pointer for interaction */
 }
-
 /* Carousel item */
 .carousel-item {
   /* Allow items to size based on content */
@@ -672,8 +684,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .image-control-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
 .image-control-button:disabled {
