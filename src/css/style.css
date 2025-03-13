@@ -1062,8 +1062,3 @@ body:has(.bottom-nav-space) {
 .offline-banner + header#app-header {
   margin-top: 36px;
 }
-
-/* Adjust the map container position when offline banner is shown */
-.offline-banner ~ #map-container {
-  margin-top: 36px;
-}

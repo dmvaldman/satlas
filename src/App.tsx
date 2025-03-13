@@ -4,7 +4,6 @@ import { User } from 'firebase/auth';
 import AuthComponent from './components/AuthComponent';
 import MapComponent from './components/MapComponent';
 import { Image, Sit, Coordinates, MarkType, PhotoResult } from './types';
-import { getDistanceInFeet } from './utils/geo';
 import PhotoUploadComponent from './components/PhotoUpload';
 import ProfileModal from './components/ProfileModal';
 import { UserPreferences } from './types';
@@ -17,6 +16,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import PopupComponent from './components/Popup';
 import { OfflineService } from './services/OfflineService';
+import { ValidationUtils } from './utils/ValidationUtils';
 
 interface AppState {
   // Auth state
@@ -881,30 +881,24 @@ class App extends React.Component<{}, AppState> {
   private findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
     const { sits } = this.state;
 
-    // Check existing sits first
-    for (const sit of sits.values()) {
-      if (getDistanceInFeet(coordinates, sit.location) < 100) {
-        return sit;
-      }
-    }
-
-    // If not found in current sits, check database using FirebaseService
     try {
-      const allSits = await FirebaseService.loadSits({
-        north: coordinates.latitude + 0.001, // Roughly 100 meters
-        south: coordinates.latitude - 0.001
-      });
+      // Use ValidationUtils to check if location is valid - will throw if invalid
+      ValidationUtils.isLocationValid(coordinates);
 
-      for (const sit of allSits.values()) {
-        if (getDistanceInFeet(coordinates, sit.location) < 100) {
+      // Check existing sits first using ValidationUtils
+      for (const sit of sits.values()) {
+        if (ValidationUtils.isLocationNearSit(coordinates, sit)) {
           return sit;
         }
       }
-    } catch (error) {
-      console.error('Error finding nearby sit:', error);
-    }
 
-    return null;
+      return null; // No nearby sit found
+    } catch (error) {
+      // If there's a validation error, just return null
+      // The caller will handle validation errors separately
+      console.error('Error in findNearbySit:', error);
+      throw error; // Re-throw the error to be handled by the caller
+    }
   };
 
   private handleUploadToExisting = (sit: Sit) => {

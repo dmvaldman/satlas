@@ -3,26 +3,53 @@ import { getDistanceInFeet } from './geo';
 import { OfflineService } from '../services/OfflineService';
 import { getDoc, doc } from 'firebase/firestore';
 
+export class ValidationError extends Error {}
+
+export class UserNotAuthenticatedError extends ValidationError {
+  constructor(message: string = 'You must be signed in to create a sit') {
+    super(message);
+  }
+}
+
+export class InvalidLocationError extends ValidationError {
+  constructor(message: string = 'Valid location data is required') {
+    super(message);
+  }
+}
+
+export class SitTooCloseError extends ValidationError {
+  constructor(message: string = 'Too close to an existing sit') {
+    super(message);
+  }
+}
+
 export class ValidationUtils {
   /**
    * Check if a user is authenticated
    * @param userId The user ID to check
    * @returns True if the user is authenticated
+   * @throws UserNotAuthenticatedError if the user is not authenticated
    */
   static isUserAuthenticated(userId: string | null | undefined): boolean {
-    return !!userId;
+    if (!userId) {
+      throw new UserNotAuthenticatedError();
+    }
+    return true;
   }
 
   /**
    * Check if a location is valid
    * @param location The location to check
    * @returns True if the location is valid
+   * @throws InvalidLocationError if the location is invalid
    */
   static isLocationValid(location: Coordinates | null | undefined): boolean {
-    if (!location) return false;
+    if (!location) {
+      throw new InvalidLocationError();
+    }
 
     const { latitude, longitude } = location;
-    return (
+    const isValid = (
       typeof latitude === 'number' &&
       typeof longitude === 'number' &&
       !isNaN(latitude) &&
@@ -32,6 +59,12 @@ export class ValidationUtils {
       longitude >= -180 &&
       longitude <= 180
     );
+
+    if (!isValid) {
+      throw new InvalidLocationError();
+    }
+
+    return true;
   }
 
   /**
@@ -146,7 +179,8 @@ export class ValidationUtils {
    * @param userId The user ID
    * @param nearbySits Optional array of nearby sits (for online mode)
    * @param maxDistanceFeet Maximum distance in feet (default: 100)
-   * @returns True if the user can create a sit
+   * @returns True if validation passes
+   * @throws ValidationError subclasses for different validation failures
    */
   static canUserCreateSitAtLocation(
     location: Coordinates,
@@ -154,21 +188,17 @@ export class ValidationUtils {
     nearbySits?: Sit[],
     maxDistanceFeet: number = 100
   ): boolean {
-    // Check authentication
-    if (!this.isUserAuthenticated(userId)) {
-      return false;
-    }
+    // Check authentication - will throw UserNotAuthenticatedError if not authenticated
+    this.isUserAuthenticated(userId);
 
-    // Check location validity
-    if (!this.isLocationValid(location)) {
-      return false;
-    }
+    // Check location validity - will throw InvalidLocationError if invalid
+    this.isLocationValid(location);
 
     // If we have nearby sits, check distance
     if (nearbySits && nearbySits.length > 0) {
       for (const sit of nearbySits) {
         if (this.isLocationNearSit(location, sit, maxDistanceFeet)) {
-          return false; // Too close to an existing sit
+          throw new SitTooCloseError();
         }
       }
     }
