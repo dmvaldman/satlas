@@ -354,11 +354,14 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   private handleImageLoad = (index: number) => {
     console.log(`Image ${index} loaded naturally`);
-    this.setState(prevState => {
-      const newImageStatus = new Map(prevState.imageStatus);
-      newImageStatus.set(index, 'loaded');
-      return { imageStatus: newImageStatus };
-    });
+    // Remove this timeout in production. Just for testing.
+    setTimeout(() => {
+      this.setState(prevState => {
+        const newImageStatus = new Map(prevState.imageStatus);
+        newImageStatus.set(index, 'loaded');
+        return { imageStatus: newImageStatus };
+      });
+    }, 500);
   };
 
   private handleImageInteraction = () => {
