@@ -21,11 +21,20 @@ const config: CapacitorConfig = {
       camera: true,
       geolocation: true,
       storage: true,
-      photos: true
+      photos: true,
+      notifications: true
     },
     FirebaseAuthentication: {
       skipNativeAuth: false,
       providers: ['google.com'],
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
+    },
+    LocalNotifications: {
+      smallIcon: "ic_stat_icon_config_sample",
+      iconColor: "#3880ff",
+      sound: "beep.wav"
     }
   }
 };

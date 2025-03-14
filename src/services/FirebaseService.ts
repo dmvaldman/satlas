@@ -30,7 +30,7 @@ import {
   deleteObject
 } from 'firebase/storage';
 import { generateUniqueUsername } from '../utils/userUtils';
-import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult } from '../types';
+import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { App } from '@capacitor/app';
@@ -294,6 +294,88 @@ export class FirebaseService {
       }, { merge: true }); // Use merge to preserve other fields
     } catch (error) {
       console.error('Error saving preferences:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save user push notification token to Firestore
+   * @param userId User ID
+   * @param token Push notification token
+   * @param platform Platform identifier (ios, android, web)
+   */
+  static async saveUserPushToken(userId: string, token: string, platform: 'ios' | 'android' | 'web'): Promise<void> {
+    try {
+      // Create a unique ID for the token
+      const tokenId = `${userId}_${token.substring(0, 8)}`;
+
+      // Save to push_tokens collection
+      await setDoc(doc(db, 'push_tokens', tokenId), {
+        userId,
+        token,
+        platform,
+        createdAt: new Date(),
+        lastUsed: new Date()
+      });
+
+      // Also update the user's pushNotificationsEnabled flag
+      await setDoc(doc(db, 'users', userId), {
+        pushNotificationsEnabled: true,
+        updatedAt: new Date()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error saving push token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all push tokens for a user
+   * @param userId User ID
+   * @returns Array of push tokens
+   */
+  static async getUserPushTokens(userId: string): Promise<PushToken[]> {
+    try {
+      const tokensRef = collection(db, 'push_tokens');
+      const q = query(tokensRef, where('userId', '==', userId));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate(),
+        lastUsed: doc.data().lastUsed.toDate()
+      })) as PushToken[];
+    } catch (error) {
+      console.error('Error getting user push tokens:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a push token
+   * @param tokenId Token ID to delete
+   */
+  static async deletePushToken(tokenId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'push_tokens', tokenId));
+    } catch (error) {
+      console.error('Error deleting push token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update the last used timestamp for a push token
+   * @param tokenId Token ID to update
+   */
+  static async updateTokenLastUsed(tokenId: string): Promise<void> {
+    try {
+      await setDoc(doc(db, 'push_tokens', tokenId), {
+        lastUsed: new Date()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error updating token last used:', error);
       throw error;
     }
   }
