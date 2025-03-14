@@ -17,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 import PopupComponent from './components/Popup';
 import { OfflineService } from './services/OfflineService';
 import { ValidationUtils } from './utils/ValidationUtils';
+import Notification from './components/Notification';
 
 interface AppState {
   // Auth state
@@ -48,13 +49,6 @@ interface AppState {
       data: Sit | null;
     };
   };
-
-  // Notification state
-  notification: {
-    message: string;
-    type: 'success' | 'error';
-    isVisible: boolean;
-  } | null;
 
   userPreferences: UserPreferences;
 
@@ -101,9 +95,6 @@ class App extends React.Component<{}, AppState> {
         profile: { isOpen: false },
         nearbySit: { isOpen: false, data: null }
       },
-
-      // Notification state
-      notification: null,
 
       userPreferences: {
         username: '',
@@ -906,34 +897,21 @@ class App extends React.Component<{}, AppState> {
     this.togglePhotoUpload(sit);
   };
 
-  private showNotification = (messageOrNotification: string | { message: string, type: 'success' | 'error' }, type?: 'success' | 'error') => {
-    // Handle both formats: (message, type) and ({ message, type })
-    let message: string;
-    let notificationType: 'success' | 'error';
-
-    if (typeof messageOrNotification === 'string') {
-      // Old format: (message, type)
-      message = messageOrNotification;
-      notificationType = type || 'error'; // Default to error if type is not provided
-    } else {
-      // New format: ({ message, type })
-      message = messageOrNotification.message;
-      notificationType = messageOrNotification.type;
+  private showNotification = (
+    messageOrNotification: string | { message: string, type: 'success' | 'error' },
+    type?: 'success' | 'error'
+  ) => {
+    const notification = Notification.getInstance();
+    if (notification) {
+      notification.showNotification(messageOrNotification, type);
     }
-
-    this.setState({
-      notification: { message, type: notificationType, isVisible: true }
-    }, () => {
-      setTimeout(() => {
-        if (this.state.notification?.isVisible) {
-          this.setState({ notification: null });
-        }
-      }, 6000);
-    });
   };
 
   private closeNotification = () => {
-    this.setState({ notification: null });
+    const notification = Notification.getInstance();
+    if (notification) {
+      notification.clearNotification();
+    }
   };
 
   private configureStatusBar = async () => {
@@ -1041,7 +1019,10 @@ class App extends React.Component<{}, AppState> {
 
     try {
       // Let the FirebaseService handle the actual processing
-      await FirebaseService.processPendingUploads();
+      await FirebaseService.processPendingUploads((uploadId, error) => {
+        // Show a notification for each individual error
+        this.showNotification(`Error uploading photo: ${error.message || 'Unknown error'}`, 'error');
+      });
 
       // Refresh the map to show any new sits
       if (this.state.map) {
@@ -1057,7 +1038,6 @@ class App extends React.Component<{}, AppState> {
       this.showNotification('Finished processing pending uploads', 'success');
     } catch (error) {
       console.error('[App] Error during pending uploads processing:', error);
-      this.showNotification('Error processing some uploads', 'error');
     }
   }
 
@@ -1074,7 +1054,6 @@ class App extends React.Component<{}, AppState> {
       modals,
       userPreferences,
       isMapLoading,
-      notification,
       drawer,
       isOffline
     } = this.state;
@@ -1181,18 +1160,7 @@ class App extends React.Component<{}, AppState> {
           onUploadToExisting={this.handleUploadToExisting}
         />
 
-        {notification && (
-          <div className={`notification ${notification.type}`}>
-            <span className="notification-message">{notification.message}</span>
-            <button
-              className="notification-close"
-              onClick={this.closeNotification}
-              aria-label="Close notification"
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <Notification />
 
         {drawer.sit && (
           <PopupComponent

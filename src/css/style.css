@@ -839,17 +839,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   to { transform: rotate(360deg); }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translate(-50%, 100%);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
-}
-
 /* Update bottom sheet styling with more specific selectors */
 .react-spring-bottom-sheet {
   --rsbs-bg: white;
@@ -943,18 +932,25 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 /* Update notification styles */
-.notification {
+.notifications-container {
   position: fixed;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 90%;
+  max-width: 400px;
+}
+
+.notification {
+  position: relative; /* Change from fixed to relative */
   padding: 12px 16px;
   border-radius: 8px;
   color: white;
   font-size: 14px;
-  z-index: 2000;
-  max-width: 90%;
-  width: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -983,6 +979,18 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .notification.error {
   background-color: #f44336;
+}
+
+/* Update the animation for notifications */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Android UI adjustments */
@@ -1016,6 +1024,10 @@ body:has(.bottom-nav-space) {
 
   /* Notifications */
   .notification {
+    bottom: calc(20px + 48px + var(--safe-area-bottom));
+  }
+
+  .notifications-container {
     bottom: calc(20px + 48px + var(--safe-area-bottom));
   }
 }
