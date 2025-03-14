@@ -22,6 +22,7 @@ interface PopupProps {
   onReplaceImage: (sitId: string, imageId: string) => void;
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
+  onSignIn?: () => Promise<void>;
 }
 
 interface PopupState {
@@ -40,16 +41,32 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
-    const { sit, onToggleMark } = this.props;
+    const { sit, onToggleMark, user, onSignIn } = this.props;
 
-    console.log('Before toggle:', this.props.marks);
-    try {
-      await onToggleMark(sit.id, type);
-      console.log('After toggle:', this.props.marks);
-    } catch (error) {
-      console.error('Error toggling mark:', error);
+    // If user is not authenticated and we have a sign-in handler, trigger sign-in
+    if (!user && onSignIn) {
+      try {
+        await onSignIn();
+        // After sign-in, the component will re-render with the user prop
+        // We don't need to toggle the mark here as the user might not be set immediately
+      } catch (error) {
+        console.error('Error signing in:', error);
+      }
+      return;
+    }
+
+    // Only proceed with toggling mark if user is authenticated
+    if (user) {
+      console.log('Before toggle:', this.props.marks);
+      try {
+        await onToggleMark(sit.id, type);
+        console.log('After toggle:', this.props.marks);
+      } catch (error) {
+        console.error('Error toggling mark:', error);
+      }
     }
   };
+
 
   private handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
     const { sit, onDeleteImage, onReplaceImage } = this.props;
@@ -220,7 +237,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       user,
       isOpen,
       photoModalIsOpen,
-      onClose
+      onClose,
+      images
     } = this.props;
 
     // Render the BottomSheet that wraps our popup content
@@ -245,7 +263,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
           >
             <div className="satlas-popup">
               {/* Show carousel if there are images (even for pending uploads with base64 data) */}
-              {(sit.imageCollectionId || this.props.images.some(img => img.base64Data)) ? (
+              {(sit.imageCollectionId || images.some(img => img.base64Data)) ? (
                 this.renderCarousel()
               ) : (
                 <div className="pending-upload">
@@ -255,8 +273,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
               {this.renderUploadButton()}
 
-              {/* Only show mark buttons if the sit is fully created */}
-              {user && this.renderMarkButtons()}
+              {this.renderMarkButtons()}
 
               {/* Display uploader information */}
               {sit.uploadedBy && sit.createdAt && (
