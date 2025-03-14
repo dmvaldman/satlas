@@ -1172,6 +1172,22 @@ export class FirebaseService {
         }
       }
 
+      // Process pending deletions
+      const pendingDeletions = offlineService.getPendingImageDeletions();
+      if (pendingDeletions.length > 0) {
+        console.log(`[FirebaseService] Processing ${pendingDeletions.length} pending image deletions`);
+
+        for (const deletion of pendingDeletions) {
+          try {
+            await FirebaseService.deleteImage(deletion.imageId, deletion.userId);
+            await offlineService.removePendingUpload(deletion.id);
+          } catch (error) {
+            console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
+            onError(deletion.id, error);
+          }
+        }
+      }
+
       console.log('[Firebase] Finished processing pending uploads');
 
     } catch (error) {
