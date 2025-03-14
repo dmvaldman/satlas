@@ -684,10 +684,9 @@ export class FirebaseService {
   /**
    * Delete a sit
    * @param sitId Sit ID
-   * @param userId User ID
    * @returns Whether deletion was successful
    */
-  static async deleteSit(sitId: string, userId: string): Promise<boolean> {
+  static async deleteSit(sitId: string): Promise<boolean> {
     try {
       // Get the sit first to verify ownership
       const sitRef = doc(db, 'sits', sitId);
@@ -695,14 +694,6 @@ export class FirebaseService {
 
       if (!sitDoc.exists()) {
         console.log(`Sit ${sitId} not found`);
-        return false;
-      }
-
-      const sitData = sitDoc.data();
-
-      // Verify ownership
-      if (sitData.uploadedBy !== userId) {
-        console.log(`User ${userId} is not the owner of sit ${sitId}, not deleting`);
         return false;
       }
 
@@ -782,7 +773,7 @@ export class FirebaseService {
           const sitId = sitDoc.id;
 
           // Use the deleteSit method to handle the deletion
-          await this.deleteSit(sitId, userId);
+          await this.deleteSit(sitId);
         }
       }
     } catch (error) {
