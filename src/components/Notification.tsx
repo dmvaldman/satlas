@@ -102,7 +102,10 @@ class Notification extends React.Component<{}, { notifications: NotificationItem
             <span className="notification-message">{notification.message}</span>
             <button
               className="notification-close"
-              onClick={() => this.removeNotification(index)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent event from bubbling
+                this.removeNotification(index);
+              }}
               aria-label="Close notification"
             >
               ×

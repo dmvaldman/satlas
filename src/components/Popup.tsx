@@ -244,7 +244,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
             }
           >
             <div className="satlas-popup">
-              {sit.imageCollectionId ? (
+              {/* Show carousel if there are images (even for pending uploads with base64 data) */}
+              {(sit.imageCollectionId || this.props.images.some(img => img.base64Data)) ? (
                 this.renderCarousel()
               ) : (
                 <div className="pending-upload">
@@ -255,7 +256,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
               {this.renderUploadButton()}
 
               {/* Only show mark buttons if the sit is fully created */}
-              {sit.imageCollectionId && user && this.renderMarkButtons()}
+              {user && this.renderMarkButtons()}
 
               {/* Display uploader information */}
               {sit.uploadedBy && sit.createdAt && (
@@ -265,17 +266,10 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
               )}
 
               {/* Only show favorite count for established sits */}
-              {sit.imageCollectionId && this.renderFavoriteCount()}
+              {this.renderFavoriteCount()}
 
               {/* Show Google Maps link */}
-              {sit.imageCollectionId && this.renderGoogleMapsLink()}
-
-              {/* Show appropriate status message */}
-              <div className="sit-info">
-                {!sit.imageCollectionId && (
-                  <p className="sit-status">Processing upload...</p>
-                )}
-              </div>
+              {this.renderGoogleMapsLink()}
             </div>
           </BottomSheet>
         )}
