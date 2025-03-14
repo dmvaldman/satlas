@@ -18,8 +18,8 @@ interface ProfileModalProps {
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
-  onUpdatePreferences?: (preferences: UserPreferences) => void;
-  showNotification?: (message: string, type: 'success' | 'error') => void;
+  onUpdatePreferences: (preferences: UserPreferences) => void;
+  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
 interface ProfileModalState {
@@ -176,14 +176,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
-  public static clearCache(userId: string) {
-    ProfileModal.loadedUserIds.delete(userId);
-  }
-
-  public static clearAllCache() {
-    ProfileModal.loadedUserIds.clear();
-  }
-
   private generateUniqueUsername = async () => {
     const { user } = this.props;
     if (!user) return;
@@ -224,78 +216,19 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     });
   }
 
-  private handleSave = async (): Promise<boolean> => {
-    const { onSave, onClose, preferences, user } = this.props;
-    const { username, pushNotifications, usernameError } = this.state;
-
-    if (usernameError) {
-      return false;
-    }
-
-    if (!username || username.length < 3) {
-      this.setState({ usernameError: 'Please enter a valid username (min 3 characters)' });
-      return false;
-    }
-
-    this.setState({ isSubmitting: true, error: null });
-
-    try {
-      const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
-      if (isTaken) {
-        this.setState({
-          usernameError: 'This username is already taken',
-          isSubmitting: false
-        });
-        return false;
-      }
-
-      const originalUsername = preferences?.username || '';
-      const usernameChanged = username !== originalUsername;
-
-      if (usernameChanged && user) {
-        await this.updateUserImagesWithNewUsername(user.uid, username);
-      }
-
-      await onSave({
-        username,
-        pushNotificationsEnabled: pushNotifications,
-        lastVisit: Date.now()
-      });
-
-      onClose();
-      return true;
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      this.setState({
-        error: 'Failed to save preferences. Please try again.',
-        isSubmitting: false
-      });
-      return false;
-    }
-  };
-
-  private updateUserImagesWithNewUsername = async (userId: string, newUsername: string) => {
-    try {
-      await FirebaseService.updateUserImagesWithNewUsername(userId, newUsername);
-    } catch (error) {
-      console.error('Error updating images with new username:', error);
-      throw error;
-    }
-  };
-
   private saveInBackground = async (data: {
     username: string;
     pushNotifications: boolean;
     preferences: UserPreferences | undefined;
   }) => {
     const { username, pushNotifications, preferences } = data;
-    const { user } = this.props;
+    const { user, showNotification } = this.props;
 
     try {
       // Check if username is taken
       const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
       if (isTaken) {
-        this.showNotification('Username is already taken. Changes were not saved.', 'error');
+        showNotification('Username is already taken. Changes were not saved.', 'error');
         return;
       }
 
@@ -304,7 +237,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Update images with new username if needed
       if (usernameChanged && user) {
-        await this.updateUserImagesWithNewUsername(user.uid, username);
+        await FirebaseService.updateUserImagesWithNewUsername(user.uid, username);
       }
 
       // Create the updated preferences object
@@ -318,24 +251,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences);
 
       // Important: Update the state in the parent component
-      if (this.props.onUpdatePreferences) {
-        this.props.onUpdatePreferences(updatedPreferences);
-      }
+      this.props.onUpdatePreferences(updatedPreferences);
 
       // Don't show success notification - only notify on failure
     } catch (error) {
       console.error('Error saving profile in background:', error);
-      this.showNotification('Failed to save profile settings. Please try again.', 'error');
-    }
-  };
-
-  private showNotification = (message: string, type: 'success' | 'error') => {
-    // Check if App has a showNotification method in props
-    if (this.props.showNotification) {
-      this.props.showNotification(message, type);
-    } else {
-      // Fallback to console
-      console.log(`[ProfileModal] ${type}: ${message}`);
+      showNotification('Failed to save profile settings. Please try again.', 'error');
     }
   };
 
@@ -343,7 +264,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // Update state immediately for responsive UI
     this.setState({ pushNotifications: enabled });
 
-    const { user } = this.props;
+    const { user, showNotification } = this.props;
     if (!user) return;
 
     try {
@@ -363,7 +284,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       console.error('Error toggling push notifications:', error);
       // Revert the state if there was an error
       this.setState({ pushNotifications: !enabled });
-      this.showNotification('Failed to update push notification settings', 'error');
+      showNotification('Failed to update push notification settings', 'error');
     }
   };
 

@@ -289,7 +289,6 @@ export class FirebaseService {
       await setDoc(doc(db, 'users', userId), {
         username: preferences.username,
         pushNotificationsEnabled: preferences.pushNotificationsEnabled,
-        updatedAt: new Date(),
         lastVisit: Date.now()
       }, { merge: true }); // Use merge to preserve other fields
     } catch (error) {
