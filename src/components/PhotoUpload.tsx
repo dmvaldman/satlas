@@ -27,6 +27,7 @@ interface PhotoUploadProps {
   onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
   isUploading?: boolean;
   sit?: Sit | { sitId: string; imageId: string; };
+  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
@@ -59,14 +60,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         this.modalRef.current.classList.remove('active');
       }
     }
-  }
-
-  private showNotification(message: string, type: 'success' | 'error') {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
   }
 
   private async getImageLocationFromBase64(base64Image: string): Promise<Coordinates | null> {
@@ -123,7 +116,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
                 resolve(null);
               }
             } else {
-              console.log('[PhotoUpload] No GPS data in EXIF');
+              console.error('[PhotoUpload] No GPS data in EXIF');
               resolve(null);
             }
           });
@@ -216,7 +209,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
             const location = await this.getImageLocationFromBase64(base64Data);
 
             if (!location) {
-              this.showNotification('No location data in image', 'error');
+              console.error('[PhotoUpload] No location data in image');
+              this.props.showNotification('No location data in image', 'error');
               return;
             }
 
@@ -231,11 +225,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
               }, this.props.sit);
             } catch (dimensionError) {
               console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-              this.showNotification('Invalid image dimensions', 'error');
+              this.props.showNotification('Invalid image dimensions', 'error');
             }
           } catch (error) {
             console.error('[PhotoUpload] Error processing selected image:', error);
-            this.showNotification('Error processing image', 'error');
+            this.props.showNotification('Error processing image', 'error');
           }
         };
 
@@ -250,13 +244,16 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         });
 
         if (!image.base64String) {
+          console.error('[PhotoUpload] No image data received');
+          this.props.showNotification('No image data received', 'error');
           throw new Error('No image data received');
         }
 
         const location = await this.getImageLocationFromBase64(image.base64String);
 
         if (!location) {
-          this.showNotification('No location data in image', 'error');
+          console.error('[PhotoUpload] No location data in image');
+          this.props.showNotification('No location data in image', 'error');
           return;
         }
 
@@ -271,7 +268,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           }, this.props.sit);
         } catch (dimensionError) {
           console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-          this.showNotification('Invalid image dimensions', 'error');
+          this.props.showNotification('Invalid image dimensions', 'error');
         }
       }
     } catch (error) {
@@ -281,13 +278,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         if (errorMessage.includes('cancel') ||
             errorMessage.includes('denied') ||
             errorMessage.includes('permission')) {
-          console.log('[PhotoUpload] Gallery selection cancelled or permission denied');
+          console.error('[PhotoUpload] Gallery selection cancelled or permission denied');
           return;
         }
       }
 
       console.error('[PhotoUpload] Error choosing photo:', error);
-      this.showNotification('Error accessing photos', 'error');
+      this.props.showNotification('Error accessing photos', 'error');
     }
   };
 
@@ -305,6 +302,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       console.log('[PhotoUpload] Photo captured, extracting data');
 
       if (!image.base64String) {
+        console.error('[PhotoUpload] No image data received');
+        this.props.showNotification('No image data received', 'error');
         throw new Error('No image data received');
       }
 
@@ -322,7 +321,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       }
 
       if (!location) {
-        this.showNotification('No location data found', 'error');
+        console.error('[PhotoUpload] No location data found');
+        this.props.showNotification('No location data found', 'error');
         return;
       }
 
@@ -337,7 +337,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         }, this.props.sit);
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-        this.showNotification('Invalid image dimensions', 'error');
+        this.props.showNotification('Invalid image dimensions', 'error');
       }
     } catch (error) {
       // Check if error is a cancellation
@@ -346,13 +346,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         if (errorMessage.includes('cancel') ||
             errorMessage.includes('denied') ||
             errorMessage.includes('permission')) {
-          console.log('[PhotoUpload] Camera capture cancelled or permission denied');
+          console.error('[PhotoUpload] Camera capture cancelled or permission denied');
           return;
         }
       }
 
       console.error('[PhotoUpload] Error taking photo:', error);
-      this.showNotification('Error accessing camera', 'error');
+      this.props.showNotification('Error accessing camera', 'error');
     }
   };
 
@@ -402,13 +402,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
             Choose from Gallery
           </button>
 
-          <button
-            className="photo-option-button cancel-button"
-            onClick={onClose}
-            disabled={isUploading}
-          >
-            Cancel
-          </button>
         </div>
       </div>,
       document.body

@@ -1119,13 +1119,13 @@ class App extends React.Component<{}, AppState> {
           />
         )}
 
-        {/* Only render PhotoUploadComponent when needed */}
         {modals.photo.isOpen && (
           <PhotoUploadComponent
             isOpen={modals.photo.isOpen}
             onClose={this.togglePhotoUpload}
             onPhotoCapture={this.handlePhotoUploadComplete}
             sit={modals.photo.data || undefined}
+            showNotification={this.showNotification}
           />
         )}
 
