@@ -1195,6 +1195,7 @@ class App extends React.Component<{}, AppState> {
             onReplaceImage={this.handleReplaceImage}
             onOpenPhotoModal={() => drawer.sit ? this.togglePhotoUpload(drawer.sit) : undefined}
             onOpenProfileModal={this.toggleProfile}
+            onSignIn={this.handleSignIn}
           />
         )}
 
