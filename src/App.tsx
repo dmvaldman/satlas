@@ -592,29 +592,21 @@ class App extends React.Component<{}, AppState> {
         try {
           // Try to delete from server
           await FirebaseService.deleteImage(imageId, user.uid);
+
+          // If this was the last image, remove the sit from local state
+          const wasLastImage = drawer.images.length <= 1;
+          if (wasLastImage) {
+            // Remove the sit from the local state
+            this.setState(prevState => {
+              const updatedSits = new Map(prevState.sits);
+              updatedSits.delete(sitId);
+              return { sits: updatedSits };
+            });
+          }
         } catch (error) {
           console.error('Error deleting image:', error);
-
-          // If server deletion fails but it's a local image with base64Data,
-          // we can consider the deletion successful for the UI
-          const hasLocalBase64 = drawer.images.some(img =>
-            img.id === imageId && img.base64Data
-          );
-
-          if (!hasLocalBase64) {
-            // Only revert UI and show error if it's not a local image with base64
-            if (drawer.sit && drawer.sit.id === sitId) {
-              // Revert the UI change
-              const originalImages = await this.getImagesForSit(sit.imageCollectionId!);
-              this.setState(prevState => ({
-                drawer: {
-                  ...prevState.drawer,
-                  images: originalImages
-                }
-              }));
-            }
-            throw error;
-          }
+          this.showNotification(error instanceof Error ? error.message : 'Failed to delete image', 'error');
+          throw error;
         }
       }
     } catch (error) {
