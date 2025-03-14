@@ -9,6 +9,7 @@ import {
 } from '../utils/userUtils';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
+import { PushNotificationService } from '../services/PushNotificationService';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -338,6 +339,34 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
+  private handlePushNotificationToggle = async (enabled: boolean) => {
+    // Update state immediately for responsive UI
+    this.setState({ pushNotifications: enabled });
+
+    const { user } = this.props;
+    if (!user) return;
+
+    try {
+      // Get the current preferences
+      const updatedPreferences = {
+        ...this.props.preferences,
+        pushNotificationsEnabled: enabled
+      };
+
+      // Update the notification service
+      const notificationService = PushNotificationService.getInstance();
+      await notificationService.updatePreferences(updatedPreferences);
+
+      // No need to call requestPushPermission or unregisterPushNotifications
+      // The NotificationService handles that internally
+    } catch (error) {
+      console.error('Error toggling push notifications:', error);
+      // Revert the state if there was an error
+      this.setState({ pushNotifications: !enabled });
+      this.showNotification('Failed to update push notification settings', 'error');
+    }
+  };
+
   render() {
     const { isOpen, onClose, onSignOut } = this.props;
     const {
@@ -434,9 +463,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   <input
                     type="checkbox"
                     checked={pushNotifications}
-                    onChange={(e) => this.setState({
-                      pushNotifications: e.target.checked
-                    })}
+                    onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
                   />
                   <span className="toggle-slider"></span>
                 </label>
