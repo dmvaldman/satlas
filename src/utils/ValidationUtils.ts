@@ -1,7 +1,6 @@
 import { Coordinates, Sit, Image } from '../types';
 import { getDistanceInFeet } from './geo';
 import { OfflineService } from '../services/OfflineService';
-import { getDoc, doc } from 'firebase/firestore';
 
 export class ValidationError extends Error {}
 
@@ -204,49 +203,5 @@ export class ValidationUtils {
     }
 
     return true;
-  }
-
-  /**
-   * Helper method to validate image replacement with Firestore lookup
-   * @param imageId The image ID to replace
-   * @param userId The user ID
-   * @param db Firestore database instance
-   * @returns Promise resolving to true if the user can replace the image
-   */
-  static async validateImageReplacementWithLookup(
-    imageId: string,
-    userId: string,
-    db: any
-  ): Promise<boolean> {
-    // For temporary images
-    if (imageId.startsWith('temp_')) {
-      return this.canUserReplaceImage(imageId, userId, true);
-    }
-
-    try {
-      // Get the image document
-      const imageDoc = await getDoc(doc(db, 'images', imageId));
-      if (!imageDoc.exists()) {
-        return false;
-      }
-
-      // Convert to Image type
-      const imageData = imageDoc.data();
-      const image = {
-        id: imageId,
-        photoURL: imageData.photoURL || '',
-        userId: imageData.userId,
-        userName: imageData.userName,
-        collectionId: imageData.collectionId,
-        createdAt: imageData.createdAt.toDate(),
-        width: imageData.width || undefined,
-        height: imageData.height || undefined
-      };
-
-      return this.canUserReplaceImage(imageId, userId, true, image);
-    } catch (error) {
-      console.error('[ValidationUtils] Error validating image replacement:', error);
-      return false;
-    }
   }
 }
