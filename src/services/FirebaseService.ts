@@ -1052,9 +1052,12 @@ export class FirebaseService {
 
   /**
    * Process all pending uploads from the OfflineService
+   * @param onError Optional callback that will be called for each failed upload
    * @returns Promise that resolves when all uploads are processed
    */
-  static async processPendingUploads(): Promise<void> {
+  static async processPendingUploads(
+    onError: (uploadId: string, error: any) => void = () => {}
+  ): Promise<void> {
     try {
       console.log('[Firebase] Processing pending uploads');
       const offlineService = OfflineService.getInstance();
@@ -1078,7 +1081,7 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing new sit upload:', error);
-          // Continue with next upload
+          onError(upload.id, error);
         }
       }
 
@@ -1098,6 +1101,7 @@ export class FirebaseService {
           if (!canAddPhoto) {
             console.log(`[Firebase] User ${upload.userId} already has an image in collection ${upload.imageCollectionId}, skipping`);
             await offlineService.removePendingUpload(upload.id);
+            onError(upload.id, new Error('You already have an image in this collection'));
             continue;
           }
 
@@ -1112,7 +1116,7 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing add to sit upload:', error);
-          // Continue with next upload
+          onError(upload.id, error);
         }
       }
 
@@ -1148,6 +1152,7 @@ export class FirebaseService {
           if (!canReplaceImage) {
             console.log(`[Firebase] User ${upload.userId} cannot replace image ${upload.imageId}, skipping`);
             await offlineService.removePendingUpload(upload.id);
+            onError(upload.id, new Error('You cannot replace this image'));
             continue;
           }
 
@@ -1163,11 +1168,12 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing replace image upload:', error);
-          // Continue with next upload
+          onError(upload.id, error);
         }
       }
 
       console.log('[Firebase] Finished processing pending uploads');
+
     } catch (error) {
       console.error('[Firebase] Error in processPendingUploads:', error);
       throw error;
