@@ -29,7 +29,6 @@ import {
   uploadString,
   deleteObject
 } from 'firebase/storage';
-import { generateUniqueUsername } from '../utils/userUtils';
 import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -227,7 +226,7 @@ export class FirebaseService {
 
       if (!userDoc.exists()) {
         // Generate a unique username
-        const username = await generateUniqueUsername(
+        const username = await this.generateUniqueUsername(
           user.uid,
           user.displayName
         );
@@ -1144,6 +1143,13 @@ export class FirebaseService {
       const pendingNewSits = offlineService.getPendingNewSits();
       for (const upload of pendingNewSits) {
         try {
+          if (!upload.photoResult) {
+            console.error('[Firebase] Missing photoResult in pending upload:', upload.id);
+            onError(upload.id, new Error('Missing photo data'));
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
           await this.createSitWithPhoto(
             upload.photoResult,
             upload.userId,
@@ -1302,6 +1308,79 @@ export class FirebaseService {
       return null;
     }
   }
+
+  /**
+   * Check if a username is already taken by another user
+   * @param username The username to check
+   * @param currentUserId The current user's ID (to exclude from the check)
+   * @param originalUsername The user's original username (to skip check if unchanged)
+   * @returns Promise<boolean> True if the username is taken, false otherwise
+   */
+  static async isUsernameTaken(
+    username: string,
+    currentUserId?: string,
+    originalUsername?: string
+  ): Promise<boolean> {
+    // Skip check if it's the user's current username
+    if (originalUsername && username === originalUsername) {
+      return false;
+    }
+
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('username', '==', username));
+      const querySnapshot = await getDocs(q);
+
+      // If currentUserId is provided, exclude the current user from the check
+      if (currentUserId) {
+        return querySnapshot.docs.some(doc => doc.id !== currentUserId);
+      }
+
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return false; // Assume it's not taken if there's an error
+    }
+  }
+
+    /**
+   * Generates a unique username based on user information
+   * @param userId The user's ID (to exclude from uniqueness check)
+   * @param displayName The user's display name (optional)
+   * @returns Promise<string> A unique username
+   */
+  static async generateUniqueUsername(
+    userId: string,
+    displayName?: string | null
+  ): Promise<string> {
+    // Create base name from user info
+    let baseName = '';
+    if (displayName) {
+      baseName = displayName.split(' ')[0];
+    } else {
+      baseName = `user${Math.floor(Math.random() * 1000)}`;
+    }
+
+    // Clean up the name (remove special chars, lowercase)
+    let cleanName = baseName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Ensure minimum length
+    if (cleanName.length < 3) {
+      cleanName = `user${userId.substring(0, 5)}`;
+    }
+
+    // Try the base name first
+    let uniqueName = cleanName;
+    let counter = 1;
+
+    // Keep trying until we find a unique name
+    while (await this.isUsernameTaken(uniqueName, userId)) {
+      uniqueName = `${cleanName}${counter}`;
+      counter++;
+    }
+
+    return uniqueName;
+  };
 }
 
 // Export auth for direct access (moved outside the class)
