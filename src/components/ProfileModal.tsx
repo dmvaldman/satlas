@@ -2,11 +2,6 @@ import React from 'react';
 import { User } from 'firebase/auth';
 import { UserPreferences } from '../types';
 import { FirebaseService } from '../services/FirebaseService';
-import {
-  isUsernameTaken,
-  generateUniqueUsername,
-  validateUsername,
-} from '../utils/userUtils';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
@@ -180,7 +175,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const { user } = this.props;
     if (!user) return;
 
-    const username = await generateUniqueUsername(
+    const username = await FirebaseService.generateUniqueUsername(
       user.uid,
       user.displayName
     );
@@ -199,13 +194,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       return;
     }
 
-    const validation = validateUsername(username);
+    const validation = this.validateUsername(username);
     if (!validation.isValid) {
       this.setState({ usernameError: validation.error || null });
       return;
     }
 
-    const isTaken = await isUsernameTaken(
+    const isTaken = await FirebaseService.isUsernameTaken(
       username,
       this.props.user?.uid,
       originalUsername
@@ -215,6 +210,24 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       usernameError: isTaken ? 'This username is already taken' : null
     });
   }
+
+  private validateUsername = (username: string): { isValid: boolean; error?: string } => {
+    if (!username || username.length < 3) {
+      return {
+        isValid: false,
+        error: 'Username must be at least 3 characters'
+      };
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return {
+        isValid: false,
+        error: 'Only letters, numbers, and underscores allowed'
+      };
+    }
+
+    return { isValid: true };
+  };
 
   private saveInBackground = async (data: {
     username: string;
@@ -226,7 +239,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     try {
       // Check if username is taken
-      const isTaken = await isUsernameTaken(username, user?.uid, preferences?.username);
+      const isTaken = await FirebaseService.isUsernameTaken(username, user?.uid, preferences?.username);
       if (isTaken) {
         showNotification('Username is already taken. Changes were not saved.', 'error');
         return;
