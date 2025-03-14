@@ -599,7 +599,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   padding: 1rem 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
 }
 
 .map-loading p {
@@ -628,45 +627,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
-}
-
-.satlas-popup-container {
-  z-index: 1000;
-  min-width: 300px;
-}
-
-.satlas-popup-loading,
-.satlas-popup-error {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-}
-
-.satlas-popup-error {
-  color: #ff3b30;
-}
-
-/* Dots are now separate from the image container */
-.carousel-dots {
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-  gap: 8px;
-}
-
-.carousel-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #ccc;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-  padding: 0;
-}
-
-.carousel-dot.active {
-  background: #31d53d;
 }
 
 /* Image controls */
@@ -931,22 +891,35 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   font-weight: bold;
 }
 
-/* Update notification styles */
+/* Update notification styles - move from bottom to top */
 .notifications-container {
   position: fixed;
-  bottom: 20px;
+  top: 20px; /* Place below the header */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2000;
+  z-index: 5000;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* Reverse the order so new items appear at the top */
   gap: 10px;
   width: 90%;
   max-width: 400px;
+  pointer-events: auto !important;
+}
+
+/* Update animation for top notifications */
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .notification {
-  position: relative; /* Change from fixed to relative */
+  position: relative;
   padding: 12px 16px;
   border-radius: 8px;
   color: white;
@@ -955,7 +928,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: slideUp 0.3s ease-out;
+  animation: slideDown 0.3s ease-out; /* Changed to slideDown */
 }
 
 .notification-message {
@@ -970,7 +943,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
-  opacity: 0.8;
 }
 
 .notification.success {
@@ -979,18 +951,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .notification.error {
   background-color: #f44336;
-}
-
-/* Update the animation for notifications */
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 /* Android UI adjustments */
