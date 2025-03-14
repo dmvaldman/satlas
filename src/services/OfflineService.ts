@@ -8,14 +8,15 @@ import { ValidationUtils } from '../utils/ValidationUtils';
 export enum PendingUploadType {
   NEW_SIT = 'NEW_SIT',
   ADD_TO_EXISTING_SIT = 'ADD_TO_EXISTING_SIT',
-  REPLACE_IMAGE = 'REPLACE_IMAGE'
+  REPLACE_IMAGE = 'REPLACE_IMAGE',
+  DELETE_IMAGE = 'DELETE_IMAGE'
 }
 
 // Base interface for all pending uploads
 interface BasePendingUpload {
   id: string;
   type: PendingUploadType;
-  photoResult: PhotoResult;
+  photoResult: PhotoResult | null;
   timestamp: number;
   userId: string;
   userName: string;
@@ -42,8 +43,15 @@ export interface ReplaceImagePendingUpload extends BasePendingUpload {
   imageId: string;
 }
 
+// Add an interface for deletion operations
+export interface DeleteImagePendingUpload extends BasePendingUpload {
+  type: PendingUploadType.DELETE_IMAGE;
+  photoResult: null;  // No photo for deletions
+  imageId: string;
+}
+
 // Union type for all pending upload types
-export type PendingUpload = NewSitPendingUpload | AddToSitPendingUpload | ReplaceImagePendingUpload;
+export type PendingUpload = NewSitPendingUpload | AddToSitPendingUpload | ReplaceImagePendingUpload | DeleteImagePendingUpload;
 
 export class OfflineService {
   private static instance: OfflineService;
@@ -262,6 +270,31 @@ export class OfflineService {
     return id;
   }
 
+  // Add this new method to queue image deletions
+  public async addPendingImageDeletion(
+    imageId: string,
+    userId: string,
+    userName: string
+  ): Promise<string> {
+    const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const pendingDeletion: DeleteImagePendingUpload = {
+      id,
+      type: PendingUploadType.DELETE_IMAGE,
+      photoResult: null, // No photo data needed for deletion
+      imageId,
+      userId,
+      userName,
+      timestamp: Date.now()
+    };
+
+    this.pendingUploads.push(pendingDeletion);
+    await this.savePendingUploads();
+    this.notifyQueueListeners();
+
+    return id;
+  }
+
   private async saveImageToFileSystem(id: string, base64Data: string): Promise<void> {
     try {
       // Ensure the base64 data doesn't have the prefix
@@ -380,9 +413,9 @@ export class OfflineService {
     if (!upload) return;
 
     // If the image was saved to the filesystem, delete it
-    if (Capacitor.isNativePlatform() && typeof upload.photoResult.base64Data === 'string' &&
-        upload.photoResult.base64Data.startsWith('file:')) {
-      const fileId = upload.photoResult.base64Data.substring(5);
+    if (Capacitor.isNativePlatform() && typeof upload.photoResult?.base64Data === 'string' &&
+        upload.photoResult?.base64Data.startsWith('file:')) {
+      const fileId = upload.photoResult?.base64Data.substring(5);
       await this.deleteImageFromFileSystem(fileId);
     }
 
@@ -401,19 +434,22 @@ export class OfflineService {
 
     // If we're on a native platform and the image is a file reference, load it
     if (Capacitor.isNativePlatform() &&
-        typeof upload.photoResult.base64Data === 'string' &&
-        upload.photoResult.base64Data.startsWith('file:')) {
+        typeof upload.photoResult?.base64Data === 'string' &&
+        upload.photoResult?.base64Data.startsWith('file:')) {
 
-      const fileId = upload.photoResult.base64Data.substring(5);
+      const fileId = upload.photoResult?.base64Data.substring(5);
       const base64Data = await this.getImageFromFileSystem(fileId);
 
-      return {
-        ...upload,
-        photoResult: {
-          ...upload.photoResult,
-          base64Data
-        }
-      };
+      // Only process photoResult if it exists
+      if (upload.photoResult) {
+        return {
+          ...upload,
+          photoResult: {
+            ...upload.photoResult,
+            base64Data
+          }
+        };
+      }
     }
 
     return { ...upload };
@@ -443,7 +479,8 @@ export class OfflineService {
     const counts = {
       [PendingUploadType.NEW_SIT]: 0,
       [PendingUploadType.ADD_TO_EXISTING_SIT]: 0,
-      [PendingUploadType.REPLACE_IMAGE]: 0
+      [PendingUploadType.REPLACE_IMAGE]: 0,
+      [PendingUploadType.DELETE_IMAGE]: 0
     };
 
     this.pendingUploads.forEach(upload => {
@@ -459,6 +496,13 @@ export class OfflineService {
    */
   public hasPendingUploadsToProcess(): boolean {
     return this.isOnline && this.pendingUploads.length > 0;
+  }
+
+  // Add helper method to get pending deletions
+  public getPendingImageDeletions(): DeleteImagePendingUpload[] {
+    return this.pendingUploads.filter(
+      (upload): upload is DeleteImagePendingUpload => upload.type === PendingUploadType.DELETE_IMAGE
+    );
   }
 }
 

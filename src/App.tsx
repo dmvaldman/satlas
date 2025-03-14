@@ -541,7 +541,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleDeleteImage = async (sitId: string, imageId: string) => {
-    const { user, sits, drawer } = this.state;
+    const { user, sits, drawer, isOffline } = this.state;
     if (!user) throw new Error('Must be logged in to delete images');
 
     const sit = sits.get(sitId);
@@ -564,6 +564,18 @@ class App extends React.Component<{}, AppState> {
 
       // If it's a temporary image, we don't need to delete it from the server
       if (!isTemporaryImage) {
+        // If we're offline, queue the deletion
+        if (isOffline) {
+          const offlineService = OfflineService.getInstance();
+          await offlineService.addPendingImageDeletion(
+            imageId,
+            user.uid,
+            this.state.userPreferences.username
+          );
+          this.showNotification('Image will be deleted when you\'re back online', 'success');
+          return;
+        }
+
         try {
           // Try to delete from server
           await FirebaseService.deleteImage(imageId, user.uid);
@@ -772,8 +784,7 @@ class App extends React.Component<{}, AppState> {
             userPreferences.username
           );
         } catch (error: any) {
-          // Show the error message to the user
-          this.showNotification(error.message, 'success');
+          this.showNotification(error.message, 'error');
         }
 
         return;
