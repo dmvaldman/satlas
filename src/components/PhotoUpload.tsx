@@ -1,6 +1,5 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Geolocation } from '@capacitor/geolocation';
 import { Coordinates, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import ReactDOM from 'react-dom';
@@ -195,6 +194,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
       console.error('[PhotoUpload] Error choosing photo:', error);
       this.props.showNotification('Error accessing photos', 'error');
+      this.props.onClose(); // Close the modal on error
     }
   };
 
@@ -243,6 +243,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     if (!image.base64String) {
       console.error('[PhotoUpload] No image data received');
       this.props.showNotification('No image data received', 'error');
+      this.props.onClose(); // Close the modal on error
       throw new Error('No image data received');
     }
 
@@ -257,6 +258,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       if (!location) {
         console.error('[PhotoUpload] No location data in image');
         this.props.showNotification('No location data in image', 'error');
+        this.props.onClose(); // Close the modal on error
         return;
       }
 
@@ -272,10 +274,12 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
         this.props.showNotification('Invalid image dimensions', 'error');
+        this.props.onClose(); // Close the modal on error
       }
     } catch (error) {
       console.error('[PhotoUpload] Error processing image data:', error);
       this.props.showNotification('Error processing image', 'error');
+      this.props.onClose(); // Close the modal on error
       throw error; // Re-throw to be caught by the caller
     }
   };
@@ -296,6 +300,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       if (!image.base64String) {
         console.error('[PhotoUpload] No image data received');
         this.props.showNotification('No image data received', 'error');
+        this.props.onClose(); // Close the modal on error
         throw new Error('No image data received');
       }
 
@@ -305,6 +310,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       if (!location) {
         console.error('[PhotoUpload] No location data found');
         this.props.showNotification('No location data found', 'error');
+        this.props.onClose(); // Close the modal on error
         return;
       }
 
@@ -320,6 +326,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
         this.props.showNotification('Invalid image dimensions', 'error');
+        this.props.onClose(); // Close the modal on error
       }
     } catch (error) {
       // Check if error is a cancellation
@@ -335,6 +342,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
       console.error('[PhotoUpload] Error taking photo:', error);
       this.props.showNotification('Error accessing camera', 'error');
+      this.props.onClose(); // Close the modal on error
     }
   };
 
