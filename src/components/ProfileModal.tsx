@@ -423,7 +423,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   placeholder="Enter username"
                   className={usernameError ? 'error' : ''}
                 />
-                {usernameError && <div className="error-message">{usernameError}</div>}
+                <div className={`error-message ${usernameError ? 'visible' : 'hidden'}`}>
+                  {usernameError || '\u00A0'}
+                </div>
               </div>
 
               <div className="profile-section">
@@ -443,7 +445,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </>
           )}
 
-          <div className="profile-section logout-section">
+          <div className="profile-section">
             <button
               className="profile-button danger"
               onClick={async () => {

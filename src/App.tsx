@@ -336,6 +336,7 @@ class App extends React.Component<{}, AppState> {
       }
     } catch (error) {
       console.error('[App] Sign-in error:', error);
+      this.showNotification('Failed to sign in.', 'error');
     }
   };
 
@@ -1096,7 +1097,7 @@ class App extends React.Component<{}, AppState> {
         {/* Add offline banner */}
         {isOffline && (
           <div className="offline-banner">
-            You are currently offline. Some features may be limited.
+            You are currently offline. Some features won't work.
           </div>
         )}
 

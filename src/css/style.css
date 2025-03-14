@@ -12,10 +12,16 @@ input,
 select,
 textarea,
 [role="button"],
+.toggle-slider,
+.toggle-label,
 .image-control-button,
 .photo-option-button {
   outline: none !important;
-  -webkit-tap-highlight-color: transparent; /* Removes tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent !important; /* Prevent tap highlight on mobile */
+  -webkit-touch-callout: none !important; /* Prevent callout to copy image, etc when tap to hold */
+  -webkit-user-select: none !important; /* Prevent text selection */
+  user-select: none !important; /* Prevent text selection */
+  outline: none !important; /* Remove outline */
 }
 
 html,
@@ -188,7 +194,6 @@ body {
   cursor: default;
   padding-bottom: calc(20px + var(--safe-area-bottom));
   max-height: calc(80vh - 48px - var(--safe-area-bottom));
-  overflow-y: auto;
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
   will-change: transform;
@@ -217,10 +222,16 @@ body {
 }
 
 .profile-section input[type="text"] {
-  width: 100%;
+  width: calc(100% - 24px);
   padding: 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.profile-section .error-message {
+  color: gray;
+  font-size: 12px;
   margin-bottom: 8px;
 }
 
@@ -229,6 +240,11 @@ body {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  height: 40px;
+}
+
+.toggle-label span {
+  vertical-align: middle;
 }
 
 .toggle-slider {
@@ -238,6 +254,10 @@ body {
   height: 24px;
   border-radius: 12px;
   transition: 0.4s;
+  background-color: #ccc;
+  vertical-align: middle;
+  cursor: pointer;
+  margin-left: 20px;
 }
 
 .toggle-slider:before {
@@ -283,12 +303,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
-}
-
-.logout-section {
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
 }
 
 .profile-button.danger {
