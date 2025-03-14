@@ -23,10 +23,10 @@ function convertDMSToDD(dms: number[], direction: string): number {
 
 interface PhotoUploadProps {
   isOpen: boolean;
-  onClose: () => void;
-  onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
   isUploading?: boolean;
   sit?: Sit | { sitId: string; imageId: string; };
+  onClose: () => void;
+  onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -133,23 +133,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   }
 
-  private async getDeviceLocation(): Promise<Coordinates | null> {
-    try {
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 5000
-      });
-
-      return {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
-    } catch (error) {
-      console.error('Error getting device location:', error);
-      return null;
-    }
-  }
-
   private getImageDimensions = (base64Data: string): Promise<{width: number, height: number}> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -182,95 +165,22 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
   private handleChooseFromGallery = async () => {
     try {
+      let base64Data: string;
+
+      // Platform-specific code to get the base64 image data
       if (Capacitor.getPlatform() === 'web') {
         // Web implementation using file input
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-
-        input.onchange = async (e) => {
-          try {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (!file) {
-              console.log('Photo selection cancelled');
-              return; // User cancelled, just return
-            }
-
-            // Convert to base64
-            const base64Data = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                const base64 = (e.target?.result as string).split(',')[1];
-                resolve(base64);
-              };
-              reader.readAsDataURL(file);
-            });
-
-            const location = await this.getImageLocationFromBase64(base64Data);
-
-            if (!location) {
-              console.error('[PhotoUpload] No location data in image');
-              this.props.showNotification('No location data in image', 'error');
-              return;
-            }
-
-            // Get image dimensions
-            try {
-              const dimensions = await this.getImageDimensions(base64Data);
-
-              await this.props.onPhotoCapture({
-                base64Data,
-                location,
-                dimensions
-              }, this.props.sit);
-            } catch (dimensionError) {
-              console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-              this.props.showNotification('Invalid image dimensions', 'error');
-            }
-          } catch (error) {
-            console.error('[PhotoUpload] Error processing selected image:', error);
-            this.props.showNotification('Error processing image', 'error');
-          }
-        };
-
-        input.click();
+        base64Data = await this.getImageFromWebFileInput();
+        if (!base64Data) return; // User cancelled
       } else {
         // Native implementation using Capacitor
-        const image = await Camera.getPhoto({
-          quality: 90,
-          allowEditing: false,
-          resultType: CameraResultType.Base64,
-          source: CameraSource.Photos
-        });
-
-        if (!image.base64String) {
-          console.error('[PhotoUpload] No image data received');
-          this.props.showNotification('No image data received', 'error');
-          throw new Error('No image data received');
-        }
-
-        const location = await this.getImageLocationFromBase64(image.base64String);
-
-        if (!location) {
-          console.error('[PhotoUpload] No location data in image');
-          this.props.showNotification('No location data in image', 'error');
-          return;
-        }
-
-        // Get image dimensions
-        try {
-          const dimensions = await this.getImageDimensions(image.base64String);
-
-          await this.props.onPhotoCapture({
-            base64Data: image.base64String,
-            location,
-            dimensions
-          }, this.props.sit);
-        } catch (dimensionError) {
-          console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-          this.props.showNotification('Invalid image dimensions', 'error');
-        }
+        base64Data = await this.getImageFromNativeGallery();
+        if (!base64Data) return; // User cancelled or error
       }
+
+      // Common code for both platforms
+      await this.processImageData(base64Data);
+
     } catch (error) {
       // Check if error is a cancellation or user denied permission
       if (error instanceof Error) {
@@ -285,6 +195,88 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
       console.error('[PhotoUpload] Error choosing photo:', error);
       this.props.showNotification('Error accessing photos', 'error');
+    }
+  };
+
+  // Get image from web file input
+  private getImageFromWebFileInput = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+
+      input.onchange = async (e) => {
+        try {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) {
+            console.log('Photo selection cancelled');
+            resolve(''); // User cancelled, return empty string
+            return;
+          }
+
+          // Convert to base64
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = (e.target?.result as string).split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(file);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      input.click();
+    });
+  };
+
+  // Get image from native gallery
+  private getImageFromNativeGallery = async (): Promise<string> => {
+    const image = await Camera.getPhoto({
+      quality: 90,
+      allowEditing: false,
+      resultType: CameraResultType.Base64,
+      source: CameraSource.Photos
+    });
+
+    if (!image.base64String) {
+      console.error('[PhotoUpload] No image data received');
+      this.props.showNotification('No image data received', 'error');
+      throw new Error('No image data received');
+    }
+
+    return image.base64String;
+  };
+
+  // Process the image data (common for both platforms)
+  private processImageData = async (base64Data: string): Promise<void> => {
+    try {
+      const location = await this.getImageLocationFromBase64(base64Data);
+
+      if (!location) {
+        console.error('[PhotoUpload] No location data in image');
+        this.props.showNotification('No location data in image', 'error');
+        return;
+      }
+
+      // Get image dimensions
+      try {
+        const dimensions = await this.getImageDimensions(base64Data);
+
+        this.props.onPhotoCapture({
+          base64Data,
+          location,
+          dimensions
+        }, this.props.sit);
+      } catch (dimensionError) {
+        console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
+        this.props.showNotification('Invalid image dimensions', 'error');
+      }
+    } catch (error) {
+      console.error('[PhotoUpload] Error processing image data:', error);
+      this.props.showNotification('Error processing image', 'error');
+      throw error; // Re-throw to be caught by the caller
     }
   };
 
@@ -309,16 +301,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
       // Try to get location from EXIF data first
       let location = await this.getImageLocationFromBase64(image.base64String);
-
-      // If no location from EXIF, try to get current device location
-      if (!location) {
-        console.log('[PhotoUpload] No EXIF location, trying device location');
-        location = await this.getDeviceLocation();
-
-        if (location) {
-          console.log('[PhotoUpload] Using device location instead:', location);
-        }
-      }
 
       if (!location) {
         console.error('[PhotoUpload] No location data found');
@@ -375,7 +357,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         >
           {isOffline && (
             <div className="offline-notice">
-              You're offline. Photos will be uploaded when you're back online.
+              You're offline. Photos will upload when you're back online.
             </div>
           )}
 
