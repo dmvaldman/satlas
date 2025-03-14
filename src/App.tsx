@@ -554,12 +554,25 @@ class App extends React.Component<{}, AppState> {
       // Optimistically update UI first
       if (drawer.sit && drawer.sit.id === sitId) {
         const updatedImages = drawer.images.filter(img => img.id !== imageId);
-        this.setState(prevState => ({
-          drawer: {
-            ...prevState.drawer,
-            images: updatedImages
-          }
-        }));
+
+        // If this was the last image, close the drawer
+        if (updatedImages.length === 0) {
+          this.setState({
+            drawer: {
+              isOpen: false,
+              sit: null,
+              images: []
+            }
+          });
+        } else {
+          // Otherwise just update the images list
+          this.setState(prevState => ({
+            drawer: {
+              ...prevState.drawer,
+              images: updatedImages
+            }
+          }));
+        }
       }
 
       // If it's a temporary image, we don't need to delete it from the server
