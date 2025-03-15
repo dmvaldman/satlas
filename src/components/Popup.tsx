@@ -60,23 +60,17 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     }
   };
 
-
-  private handleImageAction = async (action: 'replace' | 'delete', imageId: string) => {
-    const { sit, onDeleteImage, onReplaceImage } = this.props;
-
-    if (action === 'delete') {
-      if (!window.confirm('Are you sure you want to delete this photo?')) {
-        return;
-      }
-
-      try {
-        await onDeleteImage(sit.id, imageId);
-      } catch (error) {
-        console.error('Error deleting image:', error);
-      }
-    } else if (action === 'replace') {
-      onReplaceImage(sit.id, imageId);
+  private handleImageDelete = async (imageId: string) => {
+    const { sit, onDeleteImage } = this.props;
+    if (!window.confirm('Are you sure you want to delete this photo?')) {
+      return;
     }
+    await onDeleteImage(sit.id, imageId);
+  };
+
+  private handleImageReplace = async (imageId: string) => {
+    const { sit, onReplaceImage } = this.props;
+    onReplaceImage(sit.id, imageId);
   };
 
   private renderCarousel() {
@@ -89,7 +83,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         key={`carousel-${sit.id}-${images.length}-${isOpen ? 'open' : 'closed'}`}
         images={images}
         currentUserId={user?.uid || null}
-        onImageAction={this.handleImageAction}
+        onImageDelete={this.handleImageDelete}
+        onImageReplace={this.handleImageReplace}
       />
     );
   }
