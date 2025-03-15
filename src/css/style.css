@@ -45,7 +45,7 @@ body {
   z-index: 2;
   height: 64px;
   padding-right: 2rem;
-  padding-top: var(--safe-area-top);
+  padding-top: calc(var(--safe-area-top) + 2rem);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -322,13 +322,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   background-color: #007AFF;  /* Blue for own sits */
 }
 
-.favorite-count {
-  font-size: 0.9em;
-  color: #666;
-  margin-top: 8px;
-  text-align: center;
-}
-
 .favorite-button {
   display: flex;
   align-items: center;
@@ -549,7 +542,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .mark-buttons {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
   margin-bottom: 8px;
   justify-content: center; /* Center the buttons horizontally */
 }
@@ -797,6 +790,12 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 [data-rsbs-header] {
   box-shadow: none !important;
   border-bottom: 1px solid #eee;
+  padding-top: 30px !important;
+}
+
+[data-rsbs-header]::before {
+  width: 60px !important;
+  top: 8px !important;
 }
 
 /* Add these more specific styles */
@@ -832,12 +831,24 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   margin: 0 auto;
 }
 
+.sit-metadata-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+}
+
+.favorite-count {
+  color: #666;
+  margin: 8px 0;
+}
+
 /* Add styling for the sit uploader info */
 .sit-uploader-info {
   color: #666;
   margin: 8px 0;
   text-align: left;
-  padding: 4px 8px;
   border-radius: 4px;
 }
 
@@ -845,7 +856,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: block;
   color: #4285f4;
   text-decoration: none;
-  padding: 4px 8px;
   margin: 8px 0;
   transition: background-color 0.2s;
 }

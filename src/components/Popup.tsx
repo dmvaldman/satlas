@@ -275,18 +275,21 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
               {this.renderMarkButtons()}
 
-              {/* Display uploader information */}
-              {sit.uploadedBy && sit.createdAt && (
-                <div className="sit-uploader-info">
-                  Sit uploaded {formatRelativeTime(sit.createdAt)}
-                </div>
-              )}
+              {/* Group metadata elements in a single div */}
+              <div className="sit-metadata-container">
+                {/* Display uploader information */}
+                {sit.uploadedBy && sit.createdAt && (
+                  <div className="sit-uploader-info">
+                    Sit uploaded {formatRelativeTime(sit.createdAt)}
+                  </div>
+                )}
 
-              {/* Only show favorite count for established sits */}
-              {this.renderFavoriteCount()}
+                {/* Only show favorite count for established sits */}
+                {this.renderFavoriteCount()}
 
-              {/* Show Google Maps link */}
-              {this.renderGoogleMapsLink()}
+                {/* Show Google Maps link */}
+                {this.renderGoogleMapsLink()}
+              </div>
             </div>
           </BottomSheet>
         )}
