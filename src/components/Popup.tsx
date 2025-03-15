@@ -76,11 +76,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   private renderCarousel() {
     const { images, user, sit, isOpen } = this.props;
 
-    // Add a key that combines the sit ID and the number of images
-    // This ensures a new instance is created when the drawer is reopened or images change
     return (
       <Carousel
-        key={`carousel-${sit.id}-${images.length}-${isOpen ? 'open' : 'closed'}`}
         images={images}
         currentUserId={user?.uid || null}
         onImageDelete={this.handleImageDelete}
