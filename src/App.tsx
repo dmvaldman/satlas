@@ -949,6 +949,9 @@ class App extends React.Component<{}, AppState> {
     // Update state with new location
     this.setState({ currentLocation: location });
 
+    // Also update LocationService's cache
+    LocationService.setLastKnownLocation(location);
+
     // If MapComponent ref exists, update the user marker
     if (this.mapComponentRef.current) {
       this.mapComponentRef.current.updateUserLocation(location);

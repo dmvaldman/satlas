@@ -44,8 +44,8 @@ body {
   right: 0;
   z-index: 2;
   height: 64px;
-  padding: 1rem;
-  padding-top: calc(var(--safe-area-top) + 1rem);
+  padding-right: 2rem;
+  padding-top: var(--safe-area-top);
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -1,9 +1,10 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Coordinates, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
-import ReactDOM from 'react-dom';
 import { OfflineService } from '../services/OfflineService';
+import { LocationService } from '../utils/LocationService';
 
 // Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
 function convertDMSToDD(dms: number[], direction: string): number {
@@ -300,19 +301,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       if (!image.base64String) {
         console.error('[PhotoUpload] No image data received');
         this.props.showNotification('No image data received', 'error');
-        this.props.onClose(); // Close the modal on error
+        this.props.onClose();
         throw new Error('No image data received');
       }
 
-      // Try to get location from EXIF data first
-      let location = await this.getImageLocationFromBase64(image.base64String);
-
-      if (!location) {
-        console.error('[PhotoUpload] No location data found');
-        this.props.showNotification('No location data found', 'error');
-        this.props.onClose(); // Close the modal on error
-        return;
-      }
+      let location = await this.getLocation();
 
       // Get image dimensions
       try {
@@ -326,7 +319,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
         this.props.showNotification('Invalid image dimensions', 'error');
-        this.props.onClose(); // Close the modal on error
+        this.props.onClose();
       }
     } catch (error) {
       // Check if error is a cancellation
@@ -334,17 +327,31 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         const errorMessage = error.message.toLowerCase();
         if (errorMessage.includes('cancel') ||
             errorMessage.includes('denied') ||
-            errorMessage.includes('permission')) {
-          console.error('[PhotoUpload] Camera capture cancelled or permission denied');
+            errorMessage.includes('permission') ||
+            errorMessage.includes('file does not exist')) {
+          console.error('[PhotoUpload] Camera capture cancelled or permission denied:', error);
+          this.props.onClose();
           return;
         }
       }
 
       console.error('[PhotoUpload] Error taking photo:', error);
       this.props.showNotification('Error accessing camera', 'error');
-      this.props.onClose(); // Close the modal on error
+      this.props.onClose();
     }
   };
+
+  private async getLocation(): Promise<Coordinates> {
+    // Try cached location first
+    const cachedLocation = LocationService.getLastKnownLocation();
+    if (cachedLocation) {
+      return cachedLocation;
+    }
+
+    // Fall back to getting fresh location
+    const locationService = new LocationService();
+    return locationService.getCurrentLocation();
+  }
 
   render() {
     const { isOpen, isUploading, onClose } = this.props;

@@ -23,6 +23,7 @@ export class LocationService {
   private storage: Storage;
   private locationWatchId: string | null = null;
   private locationCallbacks: LocationCallback[] = [];
+  private static lastKnownLocation: Location | null = null;
 
   constructor(storage: Storage = localStorage) {
     this.storage = storage;
@@ -223,5 +224,13 @@ export class LocationService {
       this.storage.removeItem(LAST_LOCATION_KEY);
       return null;
     }
+  }
+
+  public static setLastKnownLocation(location: Location): void {
+    LocationService.lastKnownLocation = location;
+  }
+
+  public static getLastKnownLocation(): Location | null {
+    return LocationService.lastKnownLocation;
   }
 }
