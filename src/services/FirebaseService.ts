@@ -32,7 +32,6 @@ import {
 import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { App } from '@capacitor/app';
 import { OfflineService } from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
 
@@ -92,40 +91,6 @@ export class FirebaseService {
   static handleOfflineError(originalError: any, message: string = 'Failed to save photo for later upload'): never {
     console.error('[Firebase] Offline upload error:', originalError);
     throw new Error(message);
-  }
-
-  // Add this method to initialize app state listeners
-  static initializeAppStateListeners() {
-    if (Capacitor.isNativePlatform() && !this.isResumeListenerSet) {
-      // Listen for app resume events
-      App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          console.log('[Firebase] App resumed, checking auth state');
-
-          // Check if user is still signed in
-          const currentUser = auth.currentUser;
-          console.log('[Firebase] Current user on resume:', currentUser?.uid || 'null');
-
-          if (currentUser) {
-            // Don't force refresh the token as it can cause issues
-            // Just log the current state and verify we're still authenticated
-            console.log('[Firebase] User is still authenticated on resume');
-
-            // Only check token validity, don't force refresh
-            currentUser.getIdToken(false)
-              .then(() => console.log('[Firebase] Token is valid on resume'))
-              .catch(error => {
-                console.error('[Firebase] Token validation error on resume:', error);
-                // Don't attempt to fix token issues here, let the normal auth flow handle it
-              });
-          } else {
-            console.log('[Firebase] No user found on resume');
-          }
-        }
-      });
-
-      this.isResumeListenerSet = true;
-    }
   }
 
   // ===== Authentication Methods =====

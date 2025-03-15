@@ -120,9 +120,6 @@ class App extends React.Component<{}, AppState> {
     // Configure status bar for mobile devices
     if (Capacitor.isNativePlatform()) {
       this.configureStatusBar();
-
-      // Initialize Firebase app state listeners
-      FirebaseService.initializeAppStateListeners();
     }
 
     // 1. Set up auth listener (which may never fire in Capacitor)
@@ -924,13 +921,6 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private closeNotification = () => {
-    const notification = Notification.getInstance();
-    if (notification) {
-      notification.clearNotification();
-    }
-  };
-
   private configureStatusBar = async () => {
     try {
       // Configure dark system bars (light icons on transparent background)
@@ -1002,27 +992,56 @@ class App extends React.Component<{}, AppState> {
     const offlineService = OfflineService.getInstance();
     await offlineService.initialize();
 
-    // Add listener for network status changes
-    this.offlineServiceUnsubscribe = offlineService.addStatusListener((isOnline) => {
-      this.setState({ isOffline: !isOnline });
+    // Keep track of the last known network state to detect real changes
+    let lastKnownNetworkState = offlineService.isNetworkOnline();
 
-      // If we're back online, process any pending uploads
-      if (isOnline) {
-        this.handleProcessPendingUploads();
+    this.offlineServiceUnsubscribe = offlineService.addStatusListener(async (isOnline) => {
+      console.log('[App] Network status changed:', isOnline ? 'online' : 'offline');
+
+      // Check if this is a real network change or just the app coming back to foreground
+      const isRealNetworkChange = (lastKnownNetworkState !== isOnline);
+      lastKnownNetworkState = isOnline;
+
+      if (!isRealNetworkChange) {
+        console.log('[App] Not a real network change, likely app lifecycle event. Ignoring.');
+        return;
+      }
+
+      // If we're going offline, update the UI immediately
+      if (!isOnline) {
+        this.setState({ isOffline: true });
+        return;
+      }
+
+      // If we're coming back online, don't update the UI state immediately
+      // First check authentication state to prevent momentary logout
+      console.log('[App] Back online, checking authentication before updating UI');
+
+      try {
+        // Check if we have a current user in Firebase
+        const currentUser = auth.currentUser;
+
+        if (currentUser) {
+          console.log('[App] Found Firebase user, updating state with user:', currentUser.uid);
+
+          // Update state with the current user and set offline to false in one update
+          // This prevents the momentary logout
+          this.setState({
+            user: currentUser,
+            isAuthenticated: true,
+            isOffline: false
+          }, () => {
+            // Now process uploads with the authenticated user
+            console.log('[App] Processing pending uploads with authenticated user');
+            this.handleProcessPendingUploads();
+          });
+        }
+      } catch (error) {
+        console.error('[App] Error during network status change handling:', error);
+        // Still update offline state even if there was an error
+        this.setState({ isOffline: false });
       }
     });
-
-    // Also add a queue listener to update UI when queue changes
-    offlineService.addQueueListener((queue) => {
-      // You could update state here if you want to show pending uploads in the UI
-      console.log(`[App] Pending uploads queue updated: ${queue.length} items`);
-    });
-
-    // Check if there are pending uploads that need to be processed
-    if (offlineService.hasPendingUploadsToProcess()) {
-      console.log('[App] Found pending uploads on startup, processing...');
-      this.handleProcessPendingUploads();
-    }
   }
 
   /**
@@ -1043,17 +1062,6 @@ class App extends React.Component<{}, AppState> {
         // Show a notification for each individual error
         this.showNotification(`Error uploading photo: ${error.message || 'Unknown error'}`, 'error');
       });
-
-      // Refresh the map to show any new sits
-      if (this.state.map) {
-        const bounds = this.state.map.getBounds();
-        if (bounds) {
-          this.handleLoadSits({
-            north: bounds.getNorth(),
-            south: bounds.getSouth()
-          });
-        }
-      }
 
       this.showNotification('Finished processing pending uploads', 'success');
     } catch (error) {
