@@ -15,7 +15,7 @@ interface CarouselState {
   activeIndex: number;
   showControls: boolean;
   translateX: number;
-  startX: number | null;
+  startX: number;
   isDragging: boolean;
   containerWidth: number;
   totalWidth: number;
@@ -63,7 +63,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       activeIndex: 0,
       showControls: false,
       translateX: 0,
-      startX: null,
+      startX: 0,
       isDragging: false,
       containerWidth: 0,
       totalWidth: 0,
@@ -228,7 +228,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       return;
     }
 
-    if (!this.state.isDragging || this.state.startX === null) return;
+    if (!this.state.isDragging) return;
 
     // Always prevent default during drag to prevent page scrolling
     e.preventDefault();
@@ -244,8 +244,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Don't allow dragging past the end
     const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
-
-    // Only apply max boundary if there's actually content that extends beyond the container
     if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
       newTranslateX = maxTranslateX;
     }
@@ -336,9 +334,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       translateX: finalTranslateX,
       isDragging: false
     });
-
-    // Update visible images based on final position
-    this.updateVisibleImages(finalTranslateX);
   };
 
   private handleImageLoad = (index: number) => {
@@ -351,13 +346,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         return { imageStatus: newImageStatus };
       });
     }, 500);
-  };
-
-  private handleImageInteraction = () => {
-    // For mobile, toggle controls on tap
-    if ('ontouchstart' in window) {
-      this.setState(prev => ({ showControls: !prev.showControls }));
-    }
   };
 
   render() {
@@ -405,7 +393,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                 <div
                   key={image.id}
                   className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'} ${index === images.length - 1 ? 'last-item' : ''}`}
-                  onClick={this.handleImageInteraction}
                 >
                   {/* Only show image if it should be visible */}
                   {isVisible ? (
