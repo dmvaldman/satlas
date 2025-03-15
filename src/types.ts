@@ -20,7 +20,7 @@ export interface Coordinates {
 export interface Sit {
   id: string;
   location: Coordinates;
-  imageCollectionId?: string;
+  imageCollectionId: string;
   createdAt?: Date;
   uploadedBy?: string;
 }
