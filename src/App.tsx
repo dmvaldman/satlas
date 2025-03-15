@@ -39,14 +39,15 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      data: Sit | { sitId: string; imageId: string; } | null;
+      sit: Sit | { sitId: string; imageId: string; } | null;
     };
     profile: {
       isOpen: boolean;
     };
     nearbySit: {
       isOpen: boolean;
-      data: Sit | null;
+      sit: Sit | null;
+      hasUserContributed: boolean;
     };
   };
 
@@ -91,9 +92,9 @@ class App extends React.Component<{}, AppState> {
 
       // Modal state
       modals: {
-        photo: { isOpen: false, data: null },
+        photo: { isOpen: false, sit: null },
         profile: { isOpen: false },
-        nearbySit: { isOpen: false, data: null }
+        nearbySit: { isOpen: false, sit: null }
       },
 
       userPreferences: {
@@ -396,7 +397,7 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: true,
-              data: sit || null
+              sit: sit || null
             }
           }
         };
@@ -410,7 +411,7 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: false,
-              data: null
+              sit: null
             }
           }
         };
@@ -418,16 +419,37 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private toggleNearbySitModal = (sit?: Sit) => {
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        nearbySit: {
-          isOpen: !prevState.modals.nearbySit.isOpen,
-          data: sit || null
+  private toggleNearbySitModal = async (sit: Sit) => {
+    // If we're opening the modal with a sit
+    if (!this.state.modals.nearbySit.isOpen) {
+      // Fetch images for the sit if it has an image collection
+      const images = await FirebaseService.getImages(sit.imageCollectionId);
+      const hasUserContributed = images.some(image => image.userId === this.state.user?.uid);
+
+      // Now open the modal with the sit and whether the user has contributed
+      this.setState(prevState => ({
+        modals: {
+          ...prevState.modals,
+          nearbySit: {
+            isOpen: true,
+            sit: sit,
+            hasUserContributed: hasUserContributed
+          }
         }
-      }
-    }));
+      }));
+    } else {
+      // We're closing the modal or opening it without a sit
+      this.setState(prevState => ({
+        modals: {
+          ...prevState.modals,
+          nearbySit: {
+            isOpen: !prevState.modals.nearbySit.isOpen,
+            sit: null,
+            hasUserContributed: false
+          }
+        }
+      }));
+    }
   };
 
   private handleSavePreferences = async (prefs: UserPreferences) => {
@@ -650,7 +672,7 @@ class App extends React.Component<{}, AppState> {
         ...prevState.modals,
         photo: {
           isOpen: true,
-          data: replacementData
+          sit: replacementData
         }
       }
     }));
@@ -715,7 +737,7 @@ class App extends React.Component<{}, AppState> {
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, data: null }
+            photo: { isOpen: false, sit: null }
           },
           drawer: {
             isOpen: true,
@@ -769,7 +791,7 @@ class App extends React.Component<{}, AppState> {
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, data: null }
+            photo: { isOpen: false, sit: null }
           },
           drawer: {
             isOpen: true,
@@ -818,7 +840,7 @@ class App extends React.Component<{}, AppState> {
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, data: null }
+            photo: { isOpen: false, sit: null }
           },
           drawer: {
             isOpen: true,
@@ -874,7 +896,7 @@ class App extends React.Component<{}, AppState> {
       this.setState({
         modals: {
           ...this.state.modals,
-          photo: { isOpen: false, data: null }
+          photo: { isOpen: false, sit: null }
         }
       });
 
@@ -907,7 +929,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleUploadToExisting = (sit: Sit) => {
-    this.toggleNearbySitModal();
+    this.toggleNearbySitModal(sit);
     this.togglePhotoUpload(sit);
   };
 
@@ -1152,7 +1174,7 @@ class App extends React.Component<{}, AppState> {
             isOpen={modals.photo.isOpen}
             onClose={this.togglePhotoUpload}
             onPhotoCapture={this.handlePhotoUploadComplete}
-            sit={modals.photo.data || undefined}
+            sit={modals.photo.sit || undefined}
             showNotification={this.showNotification}
           />
         )}
@@ -1183,7 +1205,8 @@ class App extends React.Component<{}, AppState> {
 
         <NearbyExistingSitModal
           isOpen={modals.nearbySit.isOpen}
-          sit={modals.nearbySit.data}
+          sit={modals.nearbySit.sit}
+          hasUserContributed={modals.nearbySit.hasUserContributed}
           onClose={this.toggleNearbySitModal}
           onUploadToExisting={this.handleUploadToExisting}
         />
