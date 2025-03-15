@@ -5,7 +5,7 @@ interface NearbyExistingSitModalProps {
   isOpen: boolean;
   sit: Sit | null;
   hasUserContributed?: boolean;
-  onClose: () => void;
+  onClose: (sit: Sit) => void;
   onUploadToExisting: (sit: Sit) => void;
 }
 
@@ -41,7 +41,7 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
     if (!isOpen || !sit) return null;
 
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onClick={() => onClose(sit)}>
         <div ref={this.modalRef} className="modal-content photo-options" onClick={(e) => e.stopPropagation()}>
           <h2>Sit Nearby</h2>
 
