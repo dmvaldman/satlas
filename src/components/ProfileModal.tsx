@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
 
+
 interface ProfileModalProps {
   isOpen: boolean;
   user: User | null;
@@ -274,29 +275,48 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   };
 
   private handlePushNotificationToggle = async (enabled: boolean) => {
-    // Update state immediately for responsive UI
-    this.setState({ pushNotifications: enabled });
+    const { user, showNotification, preferences } = this.props;
+    console.log('[ProfileModal] Toggle notifications:', enabled);
 
-    const { user, showNotification } = this.props;
-    if (!user) return;
+    if (!user) {
+      console.log('[ProfileModal] No user, cannot toggle notifications');
+      return;
+    }
 
     try {
-      // Get the current preferences
-      const updatedPreferences = {
-        ...this.props.preferences,
-        pushNotificationsEnabled: enabled
-      };
-
-      // Update the notification service
       const notificationService = PushNotificationService.getInstance();
-      await notificationService.updatePreferences(updatedPreferences);
 
-      // No need to call requestPushPermission or unregisterPushNotifications
-      // The NotificationService handles that internally
+      // Initialize service first
+      console.log('[ProfileModal] Initializing notification service');
+      await notificationService.initialize(user.uid, preferences || { username: '', pushNotificationsEnabled: false });
+
+      let success: boolean;
+
+      if (enabled) {
+        console.log('[ProfileModal] Attempting to enable notifications');
+        success = await notificationService.enable();
+        console.log('[ProfileModal] Enable result:', success);
+      } else {
+        console.log('[ProfileModal] Attempting to disable notifications');
+        await notificationService.disable();
+        success = true;
+        console.log('[ProfileModal] Disable completed');
+      }
+
+      if (success) {
+        console.log('[ProfileModal] Operation successful, updating state and preferences');
+        // Update local state and preferences only after successful operation
+        this.setState({ pushNotifications: enabled });
+        const updatedPreferences = {
+          ...this.props.preferences,
+          pushNotificationsEnabled: enabled
+        };
+        this.props.onUpdatePreferences(updatedPreferences);
+      } else {
+        console.log('[ProfileModal] Operation failed, not updating state');
+      }
     } catch (error) {
-      console.error('Error toggling push notifications:', error);
-      // Revert the state if there was an error
-      this.setState({ pushNotifications: !enabled });
+      console.error('[ProfileModal] Error in handlePushNotificationToggle:', error);
       showNotification('Failed to update push notification settings', 'error');
     }
   };

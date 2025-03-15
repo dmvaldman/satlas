@@ -3,6 +3,7 @@ import { PushNotifications, Token, PushNotificationSchema, ActionPerformed as Pu
 import { LocalNotifications, LocalNotificationSchema, ActionPerformed as LocalActionPerformed } from '@capacitor/local-notifications';
 import { FirebaseService } from './FirebaseService';
 import { UserPreferences } from '../types';
+import { AndroidSettings, IOSSettings, NativeSettings } from 'capacitor-native-settings';
 
 // Notification types
 export enum NotificationType {
@@ -17,9 +18,8 @@ export class PushNotificationService {
   private static instance: PushNotificationService;
   private initialized = false;
   private listeners: NotificationListener[] = [];
-  private userPreferences: UserPreferences | null = null;
   private userId: string | null = null;
-  private backgroundGeolocationEnabled = false;
+  private enabled = false;
 
   /**
    * Get the singleton instance
@@ -35,50 +35,109 @@ export class PushNotificationService {
    * Initialize the notification service
    */
   public async initialize(userId: string, preferences: UserPreferences): Promise<void> {
-    if (this.initialized && this.userId === userId) return;
+    console.log('[PushNotificationService] Initializing with userId:', userId);
 
+    // Always update userId and enabled state
     this.userId = userId;
-    this.userPreferences = preferences;
+    this.enabled = preferences.pushNotificationsEnabled;
+
+    // If already initialized with same user, just update the enabled state
+    if (this.initialized && this.userId === userId) {
+      console.log('[PushNotificationService] Already initialized for this user, updating enabled state');
+      return;
+    }
 
     if (Capacitor.isNativePlatform()) {
+      console.log('[PushNotificationService] Initializing on native platform');
+
       // Register for push notifications if enabled
-      if (preferences.pushNotificationsEnabled) {
+      if (this.enabled) {
+        console.log('[PushNotificationService] Notifications enabled, registering...');
         await this.registerPushNotifications();
       }
 
       // Initialize local notifications for in-app handling
       await this.initializeLocalNotifications();
-
-      // Initialize background geolocation if push notifications are enabled
-      if (preferences.pushNotificationsEnabled) {
-        await this.initializeBackgroundGeolocation();
-      }
+    } else {
+      console.log('[PushNotificationService] Not a native platform, skipping native initialization');
     }
 
     this.initialized = true;
+    console.log('[PushNotificationService] Initialization complete');
   }
 
   /**
-   * Update user preferences
+   * Enable push notifications
+   * @returns true if successfully enabled
    */
-  public async updatePreferences(preferences: UserPreferences): Promise<void> {
-    const previousEnabled = this.userPreferences?.pushNotificationsEnabled || false;
-    this.userPreferences = preferences;
+  public async enable(): Promise<boolean> {
+    console.log('[PushNotificationService] Attempting to enable notifications');
 
-    // Handle push notification preference changes
-    if (Capacitor.isNativePlatform()) {
-      if (preferences.pushNotificationsEnabled && !previousEnabled) {
-        // Newly enabled - register for push notifications
-        await this.registerPushNotifications();
-        // Start background geolocation
-        await this.initializeBackgroundGeolocation();
-      } else if (!preferences.pushNotificationsEnabled && previousEnabled) {
-        // Newly disabled - unregister push notifications
-        await this.unregisterPushNotifications();
-        // Stop background geolocation
-        await this.stopBackgroundGeolocation();
-      }
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[PushNotificationService] Not a native platform, cannot enable notifications');
+      return false;
     }
+    if (!this.userId) {
+      console.log('[PushNotificationService] No user ID, cannot enable notifications');
+      return false;
+    }
+
+    try {
+      // Request permission first
+      console.log('[PushNotificationService] Requesting permissions...');
+      const permission = await PushNotifications.requestPermissions();
+      console.log('[PushNotificationService] Permission result:', permission);
+
+      if (permission.receive !== 'granted') {
+        console.log('[PushNotificationService] Permission denied, showing settings prompt');
+        // Permission denied, handle error internally
+        await this.handlePermissionError();
+        return false;
+      }
+
+      // Permission granted, proceed with registration
+      console.log('[PushNotificationService] Permission granted, registering...');
+      await this.registerPushNotifications();
+      this.enabled = true;
+      console.log('[PushNotificationService] Successfully enabled notifications');
+      return true;
+    } catch (error) {
+      console.error('[PushNotificationService] Error in enable():', error);
+      await this.handlePermissionError();
+      return false;
+    }
+  }
+
+  /**
+   * Disable push notifications
+   */
+  public async disable(): Promise<void> {
+    console.log('[PushNotificationService] Attempting to disable notifications');
+
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[PushNotificationService] Not a native platform, skipping disable');
+      return;
+    }
+    if (!this.userId) {
+      console.log('[PushNotificationService] No user ID, skipping disable');
+      return;
+    }
+
+    try {
+      await this.unregisterPushNotifications();
+      this.enabled = false;
+      console.log('[PushNotificationService] Successfully disabled notifications');
+    } catch (error) {
+      console.error('[PushNotificationService] Error in disable():', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if push notifications are currently enabled
+   */
+  public isEnabled(): boolean {
+    return this.enabled;
   }
 
   /**
@@ -103,38 +162,34 @@ export class PushNotificationService {
    */
   private async registerPushNotifications(): Promise<void> {
     try {
-      // Request permission
-      const permission = await PushNotifications.requestPermissions();
-      if (permission.receive !== 'granted') {
-        console.warn('Push notification permission not granted');
-        return;
-      }
-
+      console.log('[PushNotificationService] Registering with FCM...');
       // Register with FCM
       await PushNotifications.register();
+      console.log('[PushNotificationService] Successfully registered with FCM');
 
       // Listen for registration token
       PushNotifications.addListener('registration', (token: Token) => {
-        console.log('Push registration success:', token.value);
+        console.log('[PushNotificationService] Got registration token:', token.value);
         this.savePushToken(token.value);
       });
 
       // Listen for push notification received
       PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        console.log('Push notification received:', notification);
+        console.log('[PushNotificationService] Push notification received:', notification);
         this.notifyListeners(notification);
       });
 
       // Listen for push notification action performed
       PushNotifications.addListener('pushNotificationActionPerformed', (action: PushActionPerformed) => {
-        console.log('Push notification action performed:', action);
+        console.log('[PushNotificationService] Push notification action performed:', action);
         // Also notify listeners of the action
         if (action.notification) {
           this.notifyListeners(action.notification);
         }
       });
     } catch (error) {
-      console.error('Error registering push notifications:', error);
+      console.error('[PushNotificationService] Error in registerPushNotifications():', error);
+      throw error;
     }
   }
 
@@ -218,5 +273,43 @@ export class PushNotificationService {
         console.error('Error in notification listener:', error);
       }
     });
+  }
+
+  /**
+   * Open device settings for push notifications
+   * @returns true if settings were opened successfully
+   */
+  private async openNotificationSettings(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) {
+      return false;
+    }
+
+    try {
+      if (Capacitor.getPlatform() === 'ios') {
+        await NativeSettings.openIOS({
+          option: IOSSettings.App
+        });
+        return true;
+      } else if (Capacitor.getPlatform() === 'android') {
+        await NativeSettings.openAndroid({
+          option: AndroidSettings.ApplicationDetails
+        });
+        return true;
+      }
+    } catch (error) {
+      console.error('Error opening notification settings:', error);
+    }
+    return false;
+  }
+
+  /**
+   * Handle push notification permission error
+   * @returns true if user was prompted to open settings
+   */
+  private async handlePermissionError(): Promise<boolean> {
+    if (confirm('Push notifications are disabled. Would you like to enable them in settings?')) {
+      return await this.openNotificationSettings();
+    }
+    return false;
   }
 }
