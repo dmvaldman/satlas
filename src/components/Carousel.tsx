@@ -102,8 +102,14 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       // Reset image refs array to match new images array
       this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
-      // Update image statuses array to match new images array
+      // New images should have loading state
       const newImageStatuses = Array(this.props.images.length).fill('loading');
+      this.props.images.forEach((newImage, newIndex) => {
+        const oldIndex = prevProps.images.findIndex(oldImage => oldImage.id === newImage.id);
+        if (oldIndex >= 0) {
+          newImageStatuses[newIndex] = prevState.imageStatuses[oldIndex];
+        }
+      });
 
       // Keep position at 0 when images change
       this.setState({
