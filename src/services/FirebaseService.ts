@@ -101,12 +101,25 @@ export class FirebaseService {
       App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
           console.log('[Firebase] App resumed, checking auth state');
-          // Force refresh the token when app comes back to foreground
+
+          // Check if user is still signed in
           const currentUser = auth.currentUser;
+          console.log('[Firebase] Current user on resume:', currentUser?.uid || 'null');
+
           if (currentUser) {
-            currentUser.getIdToken(true)
-              .then(() => console.log('[Firebase] Token refreshed on resume'))
-              .catch(error => console.error('[Firebase] Error refreshing token:', error));
+            // Don't force refresh the token as it can cause issues
+            // Just log the current state and verify we're still authenticated
+            console.log('[Firebase] User is still authenticated on resume');
+
+            // Only check token validity, don't force refresh
+            currentUser.getIdToken(false)
+              .then(() => console.log('[Firebase] Token is valid on resume'))
+              .catch(error => {
+                console.error('[Firebase] Token validation error on resume:', error);
+                // Don't attempt to fix token issues here, let the normal auth flow handle it
+              });
+          } else {
+            console.log('[Firebase] No user found on resume');
           }
         }
       });
@@ -127,9 +140,20 @@ export class FirebaseService {
       if (Capacitor.isNativePlatform()) {
         console.log('[Firebase] Using native authentication');
         try {
+          // First check if we already have credentials
+          const signInState = await FirebaseAuthentication.getCurrentUser();
+          console.log('[Firebase] Current sign-in state:', signInState?.user ? 'signed in' : 'not signed in');
+
           // Use the native plugin
-          const result = await FirebaseAuthentication.signInWithGoogle();
-          console.log('[Firebase] Native Google sign-in result:', JSON.stringify(result));
+          const result = await FirebaseAuthentication.signInWithGoogle({
+            mode: 'popup'  // Force popup mode which works better on emulators
+          });
+          console.log('[Firebase] Native Google sign-in raw result:', result);
+
+          if (!result) {
+            console.error('[Firebase] No result from native sign-in');
+            throw new Error('No result from native sign-in');
+          }
 
           // Always force a manual auth state check right after sign-in
           const currentUser = auth.currentUser;
@@ -151,11 +175,22 @@ export class FirebaseService {
                   email: (auth.currentUser as User).email,
                   displayName: (auth.currentUser as User).displayName
                 } : 'Still null');
+            } else {
+              console.error('[Firebase] No credentials in result:', result);
+              throw new Error('No credentials available');
             }
           }
-        } catch (pluginError) {
-          console.error('[Firebase] Plugin error:', JSON.stringify(pluginError));
-          throw pluginError;
+        } catch (error: unknown) {
+          console.error('[Firebase] Plugin error:', error);
+          // If we get a specific error about credentials, try web fallback
+          if (error instanceof Error &&
+              (error.message.includes('credentials') || error.message.includes('cancelled'))) {
+            console.log('[Firebase] Falling back to web authentication');
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+          } else {
+            throw error;
+          }
         }
       } else {
         console.log('[Firebase] Using web authentication');
@@ -197,10 +232,26 @@ export class FirebaseService {
 
         // Add debug statement for current auth state
         const currentUser = auth.currentUser;
-        console.log('[Firebase] JS SDK current user:', currentUser);
+        console.log('[Firebase] JS SDK current user:', currentUser?.uid || 'null');
 
-        // The callback expects a Firebase User object
-        callback(auth.currentUser);
+        // Only trigger the callback if there's a real change in auth state
+        // This prevents camera/photo activities from triggering unwanted logouts
+        if (event.user) {
+          // User is signed in
+          if (!currentUser || currentUser.uid !== event.user.uid) {
+            console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
+            // The callback expects a Firebase User object
+            callback(auth.currentUser);
+          } else {
+            console.log('[Firebase] Auth state unchanged, still signed in as:', currentUser.uid);
+          }
+        } else if (!event.user && currentUser) {
+          // Only trigger logout if we were previously logged in
+          console.log('[Firebase] Auth state changed to signed out');
+          callback(null);
+        } else {
+          console.log('[Firebase] Auth state unchanged, still signed out');
+        }
       });
 
       // Return a function to remove the listener

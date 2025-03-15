@@ -5,21 +5,8 @@ import { Coordinates, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { OfflineService } from '../services/OfflineService';
 import { LocationService } from '../utils/LocationService';
+import { convertDMSToDD } from '../utils/geo';
 
-// Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
-function convertDMSToDD(dms: number[], direction: string): number {
-  const degrees = dms[0];
-  const minutes = dms[1];
-  const seconds = dms[2];
-
-  let dd = degrees + (minutes / 60) + (seconds / 3600);
-
-  if (direction === 'S' || direction === 'W') {
-    dd *= -1;
-  }
-
-  return dd;
-}
 
 interface PhotoUploadProps {
   isOpen: boolean;
@@ -305,7 +292,16 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         throw new Error('No image data received');
       }
 
-      let location = await this.getLocation();
+      let location: Coordinates | null = null;
+      try {
+        location = await this.getLocation();
+        console.log('[PhotoUpload] Location:', location.latitude, location.longitude);
+      } catch (locationError) {
+        console.error('[PhotoUpload] Error getting location:', locationError);
+        this.props.showNotification('Error getting location', 'error');
+        this.props.onClose();
+        return;
+      }
 
       // Get image dimensions
       try {
