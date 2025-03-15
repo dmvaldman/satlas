@@ -14,3 +14,18 @@ export function getDistanceInFeet(coord1: Coordinates, coord2: Coordinates): num
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
 }
+
+// Helper function to convert GPS coordinates from degrees/minutes/seconds to decimal degrees
+export function convertDMSToDD(dms: number[], direction: string): number {
+  const degrees = dms[0];
+  const minutes = dms[1];
+  const seconds = dms[2];
+
+  let dd = degrees + (minutes / 60) + (seconds / 3600);
+
+  if (direction === 'S' || direction === 'W') {
+    dd *= -1;
+  }
+
+  return dd;
+}
