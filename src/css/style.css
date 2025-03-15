@@ -975,13 +975,9 @@ body:has(.bottom-nav-space) {
     margin-bottom: calc(48px + var(--safe-area-bottom));
   }
 
-  /* Notifications */
-  .notification {
-    bottom: calc(20px + 48px + var(--safe-area-bottom));
-  }
-
+  /* Notifications - adjust top padding for Android, but keep notifications at the top */
   .notifications-container {
-    bottom: calc(20px + 48px + var(--safe-area-bottom));
+    top: calc(20px + var(--safe-area-top)) !important;
   }
 }
 

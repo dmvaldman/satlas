@@ -9,7 +9,7 @@ export interface NotificationItem {
 
 class Notification extends React.Component<{}, { notifications: NotificationItem[] }> {
   private static instance: Notification | null = null;
-  private timeout: number = 50000;
+  private timeout: number = 5000;
 
   constructor(props: {}) {
     super(props);
@@ -88,10 +88,8 @@ class Notification extends React.Component<{}, { notifications: NotificationItem
   render() {
     const { notifications } = this.state;
 
-    if (notifications.length === 0) {
-      return null;
-    }
-
+    // Always render the container even when there are no notifications
+    // This keeps the component mounted and the singleton instance available
     return (
       <div className="notifications-container">
         {notifications.map((notification, index) => (
