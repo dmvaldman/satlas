@@ -19,7 +19,7 @@ interface CarouselState {
   isDragging: boolean;
   containerWidth: number;
   totalWidth: number;
-  imageStatus: Map<number, ImageStatus>;
+  imageStatuses: ImageStatus[]; // Array instead of Map
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -29,35 +29,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private resizeObserver: ResizeObserver | null = null;
   private padding = 16;
 
-  // This static method ensures that when the component receives new props,
-  // it properly resets its state
-  static getDerivedStateFromProps(nextProps: CarouselProps, prevState: CarouselState) {
-    // If this is a new set of images, reset the state
-    if (nextProps.images.length > 0 && prevState.imageStatus.size === 0) {
-      console.log('getDerivedStateFromProps: Initializing with new images');
-
-      // Initialize with the first image visible
-      const initialImageStatus = new Map<number, ImageStatus>();
-      // Mark the first image as loading by default
-      initialImageStatus.set(0, 'loading');
-
-      return {
-        activeIndex: 0,
-        translateX: 0,
-        imageStatus: initialImageStatus
-      };
-    }
-
-    return null; // No state update needed
-  }
-
   constructor(props: CarouselProps) {
     super(props);
 
     // Initialize image refs
-    this.props.images.forEach(() => {
-      this.imageRefs.push(React.createRef<HTMLImageElement>());
-    });
+    this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
     this.state = {
       activeIndex: 0,
@@ -67,40 +43,35 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       isDragging: false,
       containerWidth: 0,
       totalWidth: 0,
-      imageStatus: new Map<number, ImageStatus>()
+      imageStatuses: Array(this.props.images.length).fill('notLoaded')
     };
   }
 
   componentDidMount() {
     console.log('Carousel mounted with images:', this.props.images.length);
 
-    // Reset state to ensure we always start from the beginning
+    // Add event listeners for touch and mouse events
+    if (this.containerRef.current) {
+      this.containerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: false });
+      this.containerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
+      this.containerRef.current.addEventListener('touchend', this.handleDragEnd);
+      this.containerRef.current.addEventListener('mousedown', this.handleDragStart);
+      window.addEventListener('mousemove', this.handleDragMove);
+      window.addEventListener('mouseup', this.handleDragEnd);
+    }
+
+    // Set up resize observer to handle container size changes
+    this.resizeObserver = new ResizeObserver(this.handleResize);
+    if (this.containerRef.current) {
+      this.resizeObserver.observe(this.containerRef.current);
+    }
+
+    // Initial calculation of container width
+    this.calculateDimensions();
+
+    // Initialize all images to loading state
     this.setState({
-      translateX: 0,
-      activeIndex: 0,
-      imageStatus: new Map<number, ImageStatus>()
-    }, () => {
-      // Add event listeners for touch and mouse events
-      if (this.containerRef.current) {
-        this.containerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: false });
-        this.containerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
-        this.containerRef.current.addEventListener('touchend', this.handleDragEnd);
-        this.containerRef.current.addEventListener('mousedown', this.handleDragStart);
-        window.addEventListener('mousemove', this.handleDragMove);
-        window.addEventListener('mouseup', this.handleDragEnd);
-      }
-
-      // Set up resize observer to handle container size changes
-      this.resizeObserver = new ResizeObserver(this.handleResize);
-      if (this.containerRef.current) {
-        this.resizeObserver.observe(this.containerRef.current);
-      }
-
-      // Initial calculation of container width
-      this.calculateDimensions();
-
-      // Initialize visible images
-      this.updateVisibleImages(0);
+      imageStatuses: Array(this.props.images.length).fill('loading')
     });
   }
 
@@ -125,36 +96,27 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
     // If images array changed (e.g., after deletion or when a new sit is loaded)
-    if (prevProps.images !== this.props.images || prevProps.images.length !== this.props.images.length) {
-      console.log('Images array changed, resetting carousel');
+    if (prevProps.images !== this.props.images) {
+      console.log('Images array changed, updating carousel');
 
-      // Reset image refs
-      this.imageRefs = [];
-      this.props.images.forEach(() => {
-        this.imageRefs.push(React.createRef<HTMLImageElement>());
-      });
+      // Reset image refs array to match new images array
+      this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
-      // Reset state completely
+      // Update image statuses array to match new images array
+      const newImageStatuses = Array(this.props.images.length).fill('loading');
+
+      // Keep position at 0 when images change
       this.setState({
-        activeIndex: 0,
-        translateX: 0,
-        imageStatus: new Map<number, ImageStatus>()
+        imageStatuses: newImageStatuses,
+        translateX: 0 // Reset position when images change
       }, () => {
-        // Recalculate dimensions after state reset
+        // Recalculate dimensions with the new images
         this.calculateDimensions();
-
-        // Update visible images
-        this.updateVisibleImages(0);
       });
     }
-    // Log dimension changes for debugging
-    else if (prevState.totalWidth !== this.state.totalWidth ||
-        prevState.containerWidth !== this.state.containerWidth) {
-      console.log('Dimensions updated:', {
-        totalWidth: this.state.totalWidth,
-        containerWidth: this.state.containerWidth,
-        maxTranslateX: -(this.state.totalWidth - this.state.containerWidth)
-      });
+    else if (prevState.containerWidth !== this.state.containerWidth) {
+      // Recalculate total width if container size changed
+      this.calculateDimensions();
     }
   }
 
@@ -162,21 +124,19 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
-    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint for all images
+    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint
 
-    // Calculate total width of all images with padding
+    // Calculate total width using the known image dimensions
     let totalWidth = 0;
     this.props.images.forEach((image, index) => {
       const padding = index < this.props.images.length - 1 ? this.padding : 0;
       const aspectRatio = image.width / image.height;
-      const estimatedWidth = maxHeight * aspectRatio;
-      totalWidth += estimatedWidth + padding;
+      const imageWidth = maxHeight * aspectRatio;
+      totalWidth += imageWidth + padding;
     });
 
-    // If total content width is less than or equal to container width,
-    // or if there's only one image, disable scrolling
+    // If total content width is less than container width, or only one image, disable scrolling
     const shouldDisableScrolling = totalWidth <= containerWidth || this.props.images.length <= 1;
-
     if (shouldDisableScrolling) {
       totalWidth = containerWidth;
     }
@@ -185,22 +145,38 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       containerWidth,
       totalWidth,
       shouldDisableScrolling,
-      images: this.props.images.length,
-      startX: this.state.startX
+      images: this.props.images.length
     });
 
     this.setState({
       containerWidth,
-      totalWidth,
-      translateX: 0 // Reset position
+      totalWidth
     });
   };
 
   private handleResize = () => {
+    // Keep current translateX ratio when resizing
+    const prevContainerWidth = this.state.containerWidth;
+    const prevTotalWidth = this.state.totalWidth;
+    const prevTranslateX = this.state.translateX;
+
+    // Calculate the current scroll percentage before resize
+    const scrollPercentage = prevContainerWidth && prevTotalWidth > prevContainerWidth ?
+      -prevTranslateX / (prevTotalWidth - prevContainerWidth) : 0;
+
+    // Calculate dimensions first
     this.calculateDimensions();
 
-    // Reset position when resizing
-    this.setState({ translateX: 0 });
+    // Now update translateX based on new dimensions and previous scroll percentage
+    this.setState(prevState => {
+      const maxTranslateX = prevState.totalWidth > prevState.containerWidth ?
+        -(prevState.totalWidth - prevState.containerWidth) : 0;
+
+      // Apply the same scroll percentage to the new dimensions
+      const newTranslateX = Math.max(maxTranslateX, Math.min(0, maxTranslateX * scrollPercentage));
+
+      return { translateX: newTranslateX };
+    });
   };
 
   private handleDragStart = (e: MouseEvent | TouchEvent) => {
@@ -261,53 +237,38 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
-    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint for all images
-
     const visibleStart = -translateX;
     const visibleEnd = visibleStart + containerWidth;
 
-    // Buffer zone - load images that are just outside the visible area
-    const buffer = containerWidth * 2; // Increased buffer for smoother experience
+    // We'll load images with a buffer zone
+    const buffer = containerWidth;
 
     let currentPosition = 0;
-    const visibleImages = new Set<number>();
-
-    // Always ensure the first image is loaded
-    if (this.props.images.length > 0) {
-      visibleImages.add(0);
-    }
+    const newImageStatuses = [...this.state.imageStatuses];
+    const maxHeight = this.containerRef.current.clientHeight;
 
     this.props.images.forEach((image, index) => {
-      // Calculate image width based on metadata
+      // Calculate image width based on aspect ratio
       const aspectRatio = image.width / image.height;
-      let imageWidth = maxHeight * aspectRatio;
-
+      const imageWidth = maxHeight * aspectRatio;
       const imageEnd = currentPosition + imageWidth;
 
-      // If image is visible or within buffer zone, mark it for loading
+      // If image is visible or within buffer zone, mark for loading
       if ((currentPosition >= visibleStart - buffer && currentPosition <= visibleEnd + buffer) ||
-          (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer) ||
-          // If any part of the image is in the visible area
-          (currentPosition <= visibleEnd && imageEnd >= visibleStart)) {
-        visibleImages.add(index);
+          (imageEnd >= visibleStart - buffer && imageEnd <= visibleEnd + buffer)) {
+        // Only update status if it's not already loading or loaded
+        if (newImageStatuses[index] === 'notLoaded') {
+          newImageStatuses[index] = 'loading';
+        }
       }
 
       currentPosition += imageWidth + this.padding;
     });
 
-    // Update image statuses: set any newly visible images to 'loading'
-    this.setState(prevState => {
-      const newImageStatus = new Map(prevState.imageStatus);
-
-      // Mark visible images that aren't already loading or loaded
-      visibleImages.forEach(index => {
-        if (!newImageStatus.has(index)) {
-          newImageStatus.set(index, 'loading');
-        }
-      });
-
-      return { imageStatus: newImageStatus };
-    });
+    // Only update state if anything changed
+    if (newImageStatuses.some((status, i) => status !== this.state.imageStatuses[i])) {
+      this.setState({ imageStatuses: newImageStatuses });
+    }
   };
 
   private handleDragEnd = () => {
@@ -338,39 +299,23 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   private handleImageLoad = (index: number) => {
     console.log(`Image ${index} loaded`);
-    // Remove this timeout in production. Just for testing.
-    setTimeout(() => {
-      this.setState(prevState => {
-        const newImageStatus = new Map(prevState.imageStatus);
-        newImageStatus.set(index, 'loaded');
-        return { imageStatus: newImageStatus };
-      });
-    }, 500);
+    // Update the status of this image to loaded
+    this.setState(prevState => {
+      const newImageStatuses = [...prevState.imageStatuses];
+      newImageStatuses[index] = 'loaded';
+      return { imageStatuses: newImageStatuses };
+    });
   };
 
   render() {
     const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
-    const { showControls: showControlsState, translateX, imageStatus, isDragging, containerWidth, totalWidth } = this.state;
+    const { showControls: showControlsState, translateX, imageStatuses, isDragging, containerWidth, totalWidth } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
     }
 
     const isScrollDisabled = totalWidth <= containerWidth;
-
-    // Get visible images (those with status)
-    const visibleImages = new Set([...imageStatus.keys()]);
-
-    // If no images are visible yet, show loading state
-    if (visibleImages.size === 0 && images.length > 0) {
-      return (
-        <div className="carousel loading">
-          <div className="placeholder-loader">
-            <div className="spinner"></div>
-          </div>
-        </div>
-      );
-    }
 
     return (
       <div className="carousel" ref={this.carouselRef}>
@@ -380,13 +325,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             style={{ transform: `translateX(${translateX}px)` }}
           >
             {images.map((image, index) => {
-              const status = imageStatus.get(index) || 'notLoaded';
+              const status = imageStatuses[index] || 'notLoaded';
               const isVisible = status === 'loading' || status === 'loaded';
               const isLoaded = status === 'loaded';
               const canShowControls = currentUserId && image.userId === currentUserId;
 
               // Calculate aspect ratio for styling
-              const aspectRatio = image.width && image.height ? image.width / image.height : 1;
+              const aspectRatio = image.width / image.height;
               const isPortrait = aspectRatio < 1;
 
               return (
@@ -394,7 +339,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                   key={image.id}
                   className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'} ${index === images.length - 1 ? 'last-item' : ''}`}
                 >
-                  {/* Only show image if it should be visible */}
+                  {/* Only render image if it should be visible */}
                   {isVisible ? (
                     <img
                       ref={this.imageRefs[index]}
