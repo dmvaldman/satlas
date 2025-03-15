@@ -787,6 +787,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   --rsbs-z-index: 1000;
 }
 
+/* Only modify the transition properties, not the transform */
+[data-rsbs-overlay] {
+  transition-duration: 300ms !important;
+  transition-timing-function: ease-out !important;
+  will-change: transform;
+}
+
+[data-rsbs-backdrop] {
+  transition-duration: 300ms !important;
+  transition-timing-function: ease-out !important;
+}
+
+/* Fix header styling */
 [data-rsbs-header] {
   box-shadow: none !important;
   border-bottom: 1px solid #eee;
