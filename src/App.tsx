@@ -94,7 +94,7 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false, sit: null },
         profile: { isOpen: false },
-        nearbySit: { isOpen: false, sit: null }
+        nearbySit: { isOpen: false, sit: null, hasUserContributed: false }
       },
 
       userPreferences: {

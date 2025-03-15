@@ -798,21 +798,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   top: 8px !important;
 }
 
-/* Add these more specific styles */
-[data-rsbs-overlay] {
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-[data-rsbs-content] {
-  margin: 0 auto !important;
-}
-/* Add a semi-transparent overlay behind the bottom sheet */
-[data-rsbs-backdrop] {
-  z-index: 999 !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-}
-
 /* Force higher z-index for bottom sheet with !important */
 [data-rsbs-root],
 [data-rsbs-overlay],

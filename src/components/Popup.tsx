@@ -25,18 +25,11 @@ interface PopupProps {
   onSignIn?: () => Promise<void>;
 }
 
-interface PopupState {
-  activeImageIndex: number;
-  isDeleting: boolean;
-}
+interface PopupState {}
 
 class PopupComponent extends React.Component<PopupProps, PopupState> {
   constructor(props: PopupProps) {
     super(props);
-    this.state = {
-      activeImageIndex: 0,
-      isDeleting: false
-    };
   }
 
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
@@ -76,13 +69,10 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         return;
       }
 
-      this.setState({ isDeleting: true });
       try {
         await onDeleteImage(sit.id, imageId);
       } catch (error) {
         console.error('Error deleting image:', error);
-      } finally {
-        this.setState({ isDeleting: false });
       }
     } else if (action === 'replace') {
       onReplaceImage(sit.id, imageId);
@@ -100,7 +90,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         images={images}
         currentUserId={user?.uid || null}
         onImageAction={this.handleImageAction}
-        isDeleting={this.state.isDeleting}
       />
     );
   }
@@ -234,7 +223,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   render() {
     const {
       sit,
-      user,
       isOpen,
       photoModalIsOpen,
       onClose,
@@ -250,7 +238,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
             onDismiss={onClose}
             snapPoints={({ minHeight }) => [
               minHeight,
-              Math.min(500, window.innerHeight * 0.6),
               Math.min(700, window.innerHeight * 0.8)
             ]}
             expandOnContentDrag={false}
