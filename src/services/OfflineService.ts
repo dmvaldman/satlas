@@ -58,12 +58,7 @@ export class OfflineService {
   private isOnline: boolean = navigator.onLine;
   private pendingUploads: PendingUpload[] = [];
   private listeners: Set<(isOnline: boolean) => void> = new Set();
-  private queueListeners: Set<(queue: PendingUpload[]) => void> = new Set();
   private initialized: boolean = false;
-
-  private constructor() {
-    // Private constructor for singleton
-  }
 
   public static getInstance(): OfflineService {
     if (!OfflineService.instance) {
@@ -130,23 +125,8 @@ export class OfflineService {
     };
   }
 
-  public addQueueListener(listener: (queue: PendingUpload[]) => void): () => void {
-    this.queueListeners.add(listener);
-    // Immediately notify with current queue
-    listener([...this.pendingUploads]);
-
-    // Return function to remove listener
-    return () => {
-      this.queueListeners.delete(listener);
-    };
-  }
-
   private notifyListeners(): void {
     this.listeners.forEach(listener => listener(this.isOnline));
-  }
-
-  private notifyQueueListeners(): void {
-    this.queueListeners.forEach(listener => listener([...this.pendingUploads]));
   }
 
   // Add a new sit with photo
@@ -179,7 +159,6 @@ export class OfflineService {
 
     this.pendingUploads.push(pendingUpload);
     await this.savePendingUploads();
-    this.notifyQueueListeners();
 
     return id;
   }
@@ -221,7 +200,6 @@ export class OfflineService {
 
     this.pendingUploads.push(pendingUpload);
     await this.savePendingUploads();
-    this.notifyQueueListeners();
 
     return id;
   }
@@ -265,7 +243,6 @@ export class OfflineService {
 
     this.pendingUploads.push(pendingUpload);
     await this.savePendingUploads();
-    this.notifyQueueListeners();
 
     return id;
   }
@@ -290,7 +267,6 @@ export class OfflineService {
 
     this.pendingUploads.push(pendingDeletion);
     await this.savePendingUploads();
-    this.notifyQueueListeners();
 
     return id;
   }
@@ -405,7 +381,6 @@ export class OfflineService {
     // This method is now implemented in the App component
     // We just notify listeners that the queue is ready to be processed
     console.log('[OfflineService] Network is online, ready to process pending uploads');
-    this.notifyQueueListeners();
   }
 
   public async removePendingUpload(id: string): Promise<void> {
@@ -421,7 +396,6 @@ export class OfflineService {
 
     this.pendingUploads = this.pendingUploads.filter(upload => upload.id !== id);
     await this.savePendingUploads();
-    this.notifyQueueListeners();
   }
 
   public getPendingUploads(): PendingUpload[] {
