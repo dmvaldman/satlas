@@ -242,6 +242,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
             ]}
             expandOnContentDrag={false}
             defaultSnap={({ minHeight }) => minHeight}
+            blocking={true}
             header={
               <div className="bottom-sheet-header">
                 <span className="header-emoji">🪑</span>

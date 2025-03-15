@@ -934,12 +934,12 @@ class App extends React.Component<{}, AppState> {
   };
 
   private showNotification = (
-    messageOrNotification: string | { message: string, type: 'success' | 'error' },
-    type?: 'success' | 'error'
+    message: string,
+    type: 'success' | 'error'
   ) => {
     const notification = Notification.getInstance();
     if (notification) {
-      notification.showNotification(messageOrNotification, type);
+      notification.showNotification(message, type);
     }
   };
 
