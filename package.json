@@ -43,6 +43,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "buffer-image-size": "^0.6.4",
+    "capacitor-native-settings": "^7.0.1",
     "dotenv": "^16.4.7",
     "exif-parser": "^0.1.12",
     "firebase": "^11.2.0",
