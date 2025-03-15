@@ -4,7 +4,8 @@ import { Image } from '../types';
 interface CarouselProps {
   images: Image[];
   currentUserId: string | null;
-  onImageAction?: (action: 'replace' | 'delete', imageId: string) => void;
+  onImageDelete: (imageId: string) => void;
+  onImageReplace: (imageId: string) => void;
 }
 
 // Define image status types
@@ -124,7 +125,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
     // If images array changed (e.g., after deletion or when a new sit is loaded)
-    if (prevProps.images !== this.props.images) {
+    if (prevProps.images !== this.props.images || prevProps.images.length !== this.props.images.length) {
       console.log('Images array changed, resetting carousel');
 
       // Reset image refs
@@ -183,7 +184,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     console.log('Calculated dimensions:', {
       containerWidth,
       totalWidth,
-      shouldDisableScrolling
+      shouldDisableScrolling,
+      images: this.props.images.length,
+      startX: this.state.startX
     });
 
     this.setState({
@@ -358,7 +361,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, currentUserId, onImageAction } = this.props;
+    const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
     const { showControls: showControlsState, translateX, imageStatus, isDragging, containerWidth, totalWidth } = this.state;
 
     if (images.length === 0) {
@@ -439,13 +442,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     </div>
                   )}
 
-                  {canShowControls && onImageAction && (showControlsState || ('ontouchstart' in window)) && (
+                  {canShowControls && (showControlsState || ('ontouchstart' in window)) && (
                     <div className="image-controls">
                       <button
                         className="image-control-button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onImageAction('replace', image.id);
+                          onImageReplace(image.id);
                         }}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -456,7 +459,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                         className="image-control-button delete"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onImageAction('delete', image.id);
+                          onImageDelete(image.id);
                         }}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
