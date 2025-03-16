@@ -404,10 +404,9 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .carousel-item {
-  /* Allow items to size based on content */
   flex: 0 0 auto;
   height: 100%;
-  margin-right: 16px; /* Use margin instead of padding for spacing between items */
+  margin-right: 16px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -423,11 +422,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* Image styling */
 .carousel-image {
-  display: block; /* Remove any extra space below the image */
-  max-width: 100%;
-  max-height: 100%; /* Match the carousel height */
-  width: auto;
-  height: auto;
+  display: block;
   z-index: 1;
   transition: opacity 0.3s ease;
   object-fit: contain;
@@ -439,15 +434,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0; /* Ensure it spans the full width of the carousel item */
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
   background-color: #f5f5f5;
-  width: calc(300px * var(--aspect-ratio));
-  max-width: 100%;
-  /* Add minimum width to prevent collapse during loading */
   z-index: 2;
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -467,10 +457,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   border-radius: 50%;
   border-top-color: black;
   animation: spin 1s ease-in-out infinite;
-  /* Ensure spinner maintains its shape regardless of container */
-  flex-shrink: 0;
-  min-width: 40px;
-  min-height: 40px;
 }
 
 /* Position controls absolutely */
