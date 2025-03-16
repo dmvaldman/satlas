@@ -11,9 +11,10 @@ import { convertDMSToDD } from '../utils/geo';
 interface PhotoUploadProps {
   isOpen: boolean;
   isUploading?: boolean;
-  sit?: Sit | { sitId: string; imageId: string; };
+  sit?: Sit;
+  replacementImageId?: string;
   onClose: () => void;
-  onPhotoCapture: (result: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => void;
+  onPhotoCapture: (result: PhotoResult, existingSit?: Sit, replacementImageId?: string) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -256,7 +257,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           base64Data,
           location,
           dimensions
-        }, this.props.sit);
+        }, this.props.sit, this.props.replacementImageId);
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
         this.props.showNotification('Invalid image dimensions', 'error');
@@ -305,7 +306,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           base64Data: image.base64String,
           location,
           dimensions
-        }, this.props.sit);
+        }, this.props.sit, this.props.replacementImageId);
       } catch (dimensionError) {
         console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
         this.props.showNotification('Invalid image dimensions', 'error');
