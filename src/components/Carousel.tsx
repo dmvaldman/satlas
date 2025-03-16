@@ -339,12 +339,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
               // Calculate aspect ratio for styling
               const aspectRatio = image.width / image.height;
-              const isPortrait = aspectRatio < 1;
 
               return (
                 <div
                   key={image.id}
-                  className={`carousel-item ${isPortrait ? 'portrait' : 'landscape'} ${index === images.length - 1 ? 'last-item' : ''}`}
+                  className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
                 >
                   {/* Only render image if it should be visible */}
                   {isVisible ? (
