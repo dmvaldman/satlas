@@ -425,7 +425,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: block;
   z-index: 1;
   transition: opacity 0.3s ease;
-  object-fit: contain;
+  object-fit: cover;
   margin: 0 auto;
   cursor: pointer;
 }
