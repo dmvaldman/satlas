@@ -228,9 +228,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
           <BottomSheet
             open={isOpen && !photoModalIsOpen}
             onDismiss={onClose}
-            snapPoints={({ minHeight }) => [
-              minHeight,
-              Math.min(700, window.innerHeight * 0.8)
+            snapPoints={() => [
+              Math.min(1000, window.innerHeight * .7)
             ]}
             expandOnContentDrag={false}
             defaultSnap={({ minHeight }) => minHeight}

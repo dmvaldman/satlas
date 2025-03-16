@@ -402,7 +402,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .carousel-track.scroll-disabled .carousel-item {
   cursor: pointer; /* Keep the item cursor as pointer for interaction */
 }
-/* Carousel item */
+
 .carousel-item {
   /* Allow items to size based on content */
   flex: 0 0 auto;
@@ -421,46 +421,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   margin-right: 0;
 }
 
-/* Portrait images should take up less horizontal space */
-.carousel-item.portrait {
-  /* Allow portrait images to take their natural width */
-  min-width: 0;
-}
-
-/* Landscape images can take more space */
-.carousel-item.landscape {
-  /* Landscape images can be wider */
-  min-width: 0;
-}
-
-/* Remove the carousel-img-container and aspect-ratio-container styles as they're no longer needed */
-/* Container for the image */
-.carousel-img-container {
-  position: relative;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: auto; /* Allow width to be determined by content */
-}
-
-/* Aspect ratio container */
-.aspect-ratio-container {
-  position: relative; /* Ensure positioned elements inside use this as reference */
-  display: inline-block; /* Use inline-block to make container size to content */
-  height: auto;
-  max-height: 300px;
-  overflow: hidden;
-  background-color: #f5f5f5;
-  width: auto; /* Allow width to be determined by content */
-  max-width: 100%; /* Ensure it doesn't overflow its container */
-}
-
 /* Image styling */
 .carousel-image {
   display: block; /* Remove any extra space below the image */
   max-width: 100%;
-  max-height: 300px; /* Match the carousel height */
+  max-height: 100%; /* Match the carousel height */
   width: auto;
   height: auto;
   z-index: 1;
@@ -478,10 +443,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 300px;
+  height: 100%;
   background-color: #f5f5f5;
   width: calc(300px * var(--aspect-ratio));
   max-width: 100%;
+  /* Add minimum width to prevent collapse during loading */
   z-index: 2;
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -501,6 +467,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   border-radius: 50%;
   border-top-color: black;
   animation: spin 1s ease-in-out infinite;
+  /* Ensure spinner maintains its shape regardless of container */
+  flex-shrink: 0;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 /* Position controls absolutely */
@@ -793,23 +763,14 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* Fix content changes causing re-animation issues */
 [data-rsbs-overlay] {
-  transition-duration: 300ms !important;
-  transition-timing-function: ease-out !important;
-  will-change: transform;
   width: 100% !important;
   max-width: 500px !important;
   justify-self: center !important;
-  height: auto !important; /* Prevent height animations on content change */
 }
 
-/* Disable height animations which might cause the content to affect position */
-[data-rsbs-content] {
-  transition: none !important;
-  height: auto !important;
-  max-height: none !important;
-}
-
+[data-rsbs-overlay],
 [data-rsbs-backdrop] {
+  will-change: transform;
   transition-duration: 300ms !important;
   transition-timing-function: ease-out !important;
 }
