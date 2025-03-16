@@ -23,7 +23,6 @@ interface CarouselState {
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
-  private carouselRef = React.createRef<HTMLDivElement>();
   private containerRef = React.createRef<HTMLDivElement>();
   private imageRefs: React.RefObject<HTMLImageElement>[] = [];
   private resizeObserver: ResizeObserver | null = null;
@@ -143,7 +142,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     else if (imageWidth > containerWidth) {
       // If image width exceeds container width, set to container width and adjust height
       imageWidth = containerWidth;
-      imageHeight = Math.floor(imageWidth / aspectRatio);
     }
 
     return { width: imageWidth, height: imageHeight };
@@ -361,107 +359,105 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const hasMultipleImages = images.length > 1;
 
     return (
-      <div className="carousel" ref={this.carouselRef}>
-        <div className="carousel-content" ref={this.containerRef}>
-          <div
-            className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
-            style={{
-              transform: `translateX(${translateX}px)`
-            }}
-          >
-            {images.map((image, index) => {
-              const status = imageStatuses[index] || 'notLoaded';
-              const isVisible = status === 'loading' || status === 'loaded';
-              const isLoaded = status === 'loaded';
-              const canShowControls = currentUserId && image.userId === currentUserId;
+      <div className="carousel-content" ref={this.containerRef}>
+        <div
+          className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
+          style={{
+            transform: `translateX(${translateX}px)`
+          }}
+        >
+          {images.map((image, index) => {
+            const status = imageStatuses[index] || 'notLoaded';
+            const isVisible = status === 'loading' || status === 'loaded';
+            const isLoaded = status === 'loaded';
+            const canShowControls = currentUserId && image.userId === currentUserId;
 
-              // Calculate dimensions using the helper method
-              const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
-                image,
-                containerWidth,
-                carouselHeight,
-                hasMultipleImages
-              );
+            // Calculate dimensions using the helper method
+            const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
+              image,
+              containerWidth,
+              carouselHeight,
+              hasMultipleImages
+            );
 
-              return (
+            return (
+              <div
+                key={image.id}
+                className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
+                style={{
+                  width: `${Math.floor(imageWidth)}px`,
+                  height: `${carouselHeight}px` // Keep carousel item height consistent
+                }}
+              >
+                {/* Only render image if it should be visible */}
+                {isVisible ? (
+                  <img
+                    ref={this.imageRefs[index]}
+                    src={image.base64Data ?
+                      `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                      `${image.photoURL}?size=med`
+                    }
+                    alt={`Photo by ${image.userName}`}
+                    className="carousel-image"
+                    style={{
+                      opacity: isLoaded ? 1 : 0,
+                      width: `${Math.floor(imageWidth)}px`,
+                      height: `${300}px`
+                    }}
+                    onLoad={() => this.handleImageLoad(index)}
+                    onError={(e) => {
+                      console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
+                    }}
+                  />
+                ) : null}
+
+                {/* Placeholder with explicit dimensions */}
                 <div
-                  key={image.id}
-                  className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
+                  className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
                   style={{
-                    width: `${Math.floor(imageWidth)}px`,
-                    height: `${carouselHeight}px` // Keep carousel item height consistent
+                    width: `${imageWidth}px`,
+                    height: `${imageHeight}px`
                   }}
                 >
-                  {/* Only render image if it should be visible */}
-                  {isVisible ? (
-                    <img
-                      ref={this.imageRefs[index]}
-                      src={image.base64Data ?
-                        `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                        `${image.photoURL}?size=med`
-                      }
-                      alt={`Photo by ${image.userName}`}
-                      className="carousel-image"
-                      style={{
-                        opacity: isLoaded ? 1 : 0,
-                        width: `${Math.floor(imageWidth)}px`,
-                        height: `${imageHeight}px`
-                      }}
-                      onLoad={() => this.handleImageLoad(index)}
-                      onError={(e) => {
-                        console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
-                      }}
-                    />
-                  ) : null}
-
-                  {/* Placeholder with explicit dimensions */}
-                  <div
-                    className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
-                    style={{
-                      width: `${imageWidth}px`,
-                      height: `${imageHeight}px`
-                    }}
-                  >
-                    <div className="spinner"></div>
-                  </div>
-
-                  {/* Only show the uploader info once image is visible */}
-                  {isVisible && (
-                    <div className="image-uploader">
-                      {image.userName}
-                    </div>
-                  )}
-
-                  {canShowControls && (showControlsState || ('ontouchstart' in window)) && (
-                    <div className="image-controls">
-                      <button
-                        className="image-control-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onImageReplace(image.id);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                        </svg>
-                      </button>
-                      <button
-                        className="image-control-button delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onImageDelete(image.id);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+                  <div className="spinner"></div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Only show the uploader info once image is visible */}
+                {isVisible && (
+                  <div className="image-uploader">
+                    {image.userName}
+                  </div>
+                )}
+
+                {canShowControls && (showControlsState || ('ontouchstart' in window)) && (
+                  <div className="image-controls">
+                    <button
+                      className="image-control-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onImageReplace(image.id);
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                      </svg>
+                    </button>
+                    <button
+                      className="image-control-button delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onImageDelete(image.id);
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
