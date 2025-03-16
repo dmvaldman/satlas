@@ -125,31 +125,47 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   }
 
+  // Helper method to calculate image dimensions consistently across the component
+  private calculateImageDimensions(
+    image: Image,
+    containerWidth: number,
+    carouselHeight: number,
+    hasMultipleImages: boolean
+  ): { width: number; height: number } {
+    const aspectRatio = image.width / image.height;
+    let imageWidth = Math.floor(carouselHeight * aspectRatio);
+    let imageHeight = carouselHeight;
+
+    // If multiple images, limit width to 90% of container to show next image
+    if (hasMultipleImages && imageWidth >= containerWidth * 0.9) {
+      imageWidth = Math.floor(containerWidth * 0.9);
+    }
+    else if (imageWidth > containerWidth) {
+      // If image width exceeds container width, set to container width and adjust height
+      imageWidth = containerWidth;
+      imageHeight = Math.floor(imageWidth / aspectRatio);
+    }
+
+    return { width: imageWidth, height: imageHeight };
+  }
+
   private calculateDimensions = () => {
     if (!this.containerRef.current) return;
 
     const containerWidth = this.containerRef.current.clientWidth;
-    const maxHeight = this.containerRef.current.clientHeight; // Maximum height constraint
+    const carouselHeight = this.containerRef.current.clientHeight; // Maximum height constraint
     const hasMultipleImages = this.props.images.length > 1;
 
     // Calculate total width using the known image dimensions
     let totalWidth = 0;
     this.props.images.forEach((image, index) => {
       const padding = index < this.props.images.length - 1 ? this.padding : 0;
-      const aspectRatio = image.width / image.height;
-
-      // Calculate width based on aspect ratio and height
-      let imageWidth = maxHeight * aspectRatio;
-
-      // Apply the same constraints as in render()
-      if (imageWidth > containerWidth) {
-        imageWidth = containerWidth;
-      }
-
-      // If multiple images, limit to 90% of container width
-      if (hasMultipleImages && imageWidth >= containerWidth * 0.9) {
-        imageWidth = containerWidth * 0.9;
-      }
+      const { width: imageWidth } = this.calculateImageDimensions(
+        image,
+        containerWidth,
+        carouselHeight,
+        hasMultipleImages
+      );
 
       totalWidth += imageWidth + padding;
     });
@@ -268,19 +284,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const hasMultipleImages = this.props.images.length > 1;
 
     this.props.images.forEach((image, index) => {
-      // Calculate image width based on aspect ratio
-      const aspectRatio = image.width / image.height;
-      let imageWidth = carouselHeight * aspectRatio;
-
-      // Apply the same constraints as in render()
-      if (imageWidth > containerWidth) {
-        imageWidth = containerWidth;
-      }
-
-      // If multiple images, limit to 90% of container width
-      if (hasMultipleImages && imageWidth >= containerWidth * 0.9) {
-        imageWidth = containerWidth * 0.9;
-      }
+      const { width: imageWidth } = this.calculateImageDimensions(
+        image,
+        containerWidth,
+        carouselHeight,
+        hasMultipleImages
+      );
 
       const imageEnd = currentPosition + imageWidth;
 
@@ -366,19 +375,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               const isLoaded = status === 'loaded';
               const canShowControls = currentUserId && image.userId === currentUserId;
 
-              // Calculate dimensions based on aspect ratio and fixed height
-              const aspectRatio = image.width / image.height;
-              let imageWidth = carouselHeight * aspectRatio;
-              let imageHeight = carouselHeight;
-
-              if (hasMultipleImages && imageWidth >= containerWidth * 0.9) {
-                // If multiple images, limit width to 90% of container to show next image
-                imageWidth = containerWidth * 0.9;
-              }
-              else if (imageWidth > containerWidth) {
-                // If image width exceeds container width, set to container width and adjust height
-                imageWidth = containerWidth;
-              }
+              // Calculate dimensions using the helper method
+              const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
+                image,
+                containerWidth,
+                carouselHeight,
+                hasMultipleImages
+              );
 
               return (
                 <div
@@ -402,7 +405,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       style={{
                         opacity: isLoaded ? 1 : 0,
                         width: `${Math.floor(imageWidth)}px`,
-                        height: `${imageHeight}px`
+                        height: `${imageHeight}px`,
+                        objectFit: imageWidth === containerWidth ? 'cover' : 'contain',
+                        objectPosition: 'center'
                       }}
                       onLoad={() => this.handleImageLoad(index)}
                       onError={(e) => {
