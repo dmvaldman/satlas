@@ -383,6 +383,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   touch-action: pan-y;
   will-change: transform; /* Optimize for animations */
   align-items: center; /* Center items vertically */
+  justify-content: flex-start;
+}
+
+.carousel-track.scroll-disabled{
+  justify-content: center;
 }
 
 .carousel-track.dragging {
@@ -391,7 +396,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 /* Add this to your existing carousel styles */
 .carousel-track.scroll-disabled {
-  justify-content: center; /* Center the content when scrolling is disabled */
   cursor: default; /* Change cursor to indicate no scrolling */
 }
 
@@ -787,11 +791,22 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   --rsbs-z-index: 1000;
 }
 
-/* Only modify the transition properties, not the transform */
+/* Fix content changes causing re-animation issues */
 [data-rsbs-overlay] {
   transition-duration: 300ms !important;
   transition-timing-function: ease-out !important;
   will-change: transform;
+  width: 100% !important;
+  max-width: 500px !important;
+  justify-self: center !important;
+  height: auto !important; /* Prevent height animations on content change */
+}
+
+/* Disable height animations which might cause the content to affect position */
+[data-rsbs-content] {
+  transition: none !important;
+  height: auto !important;
+  max-height: none !important;
 }
 
 [data-rsbs-backdrop] {
@@ -870,6 +885,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  justify-self: center;
 }
 
 .photo-option-button svg {
