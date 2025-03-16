@@ -501,21 +501,6 @@ export class FirebaseService {
   }
 
   /**
-   * Create initial sit object (before saving to Firebase)
-   * @param coordinates Location coordinates
-   * @param userId User ID
-   * @returns Initial sit object
-   */
-  static createInitialSit(coordinates: Coordinates, userId: string): Sit {
-    return {
-      id: `new_${Date.now()}`,
-      location: coordinates,
-      uploadedBy: userId,
-      imageCollectionId: ''
-    };
-  }
-
-  /**
    * Create a sit in Firestore
    * @param coordinates Location coordinates
    * @param imageCollectionId Image collection ID
@@ -761,6 +746,8 @@ export class FirebaseService {
         width: photoResult.dimensions.width,
         height: photoResult.dimensions.height
       });
+
+      console.log(`Added photo to sit at filename ${filename} and id ${imageDoc.id}`);
 
       return {
         id: imageDoc.id,
