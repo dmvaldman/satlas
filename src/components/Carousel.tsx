@@ -250,12 +250,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     let currentPosition = 0;
     const newImageStatuses = [...this.state.imageStatuses];
-    const maxHeight = this.containerRef.current.clientHeight;
+    const carouselHeight = this.containerRef.current.clientHeight;
 
     this.props.images.forEach((image, index) => {
       // Calculate image width based on aspect ratio
       const aspectRatio = image.width / image.height;
-      const imageWidth = maxHeight * aspectRatio;
+      const imageWidth = carouselHeight * aspectRatio;
       const imageEnd = currentPosition + imageWidth;
 
       // If image is visible or within buffer zone, mark for loading
@@ -304,6 +304,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   private handleImageLoad = (index: number) => {
     console.log(`Image ${index} loaded`);
+
     // Update the status of this image to loaded
     this.setState(prevState => {
       const newImageStatuses = [...prevState.imageStatuses];
@@ -321,6 +322,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
 
     const isScrollDisabled = totalWidth <= containerWidth;
+    const carouselHeight = this.containerRef.current?.clientHeight || 300; // Default to 300px if not available
 
     return (
       <div className="carousel" ref={this.carouselRef}>
@@ -337,13 +339,19 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               const isLoaded = status === 'loaded';
               const canShowControls = currentUserId && image.userId === currentUserId;
 
-              // Calculate aspect ratio for styling
+              // Calculate dimensions based on aspect ratio and fixed height
               const aspectRatio = image.width / image.height;
+              const imageWidth = carouselHeight * aspectRatio;
+              const imageHeight = carouselHeight;
 
               return (
                 <div
                   key={image.id}
                   className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
+                  style={{
+                    width: `${imageWidth}px`,
+                    height: `${imageHeight}px`
+                  }}
                 >
                   {/* Only render image if it should be visible */}
                   {isVisible ? (
@@ -355,7 +363,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       }
                       alt={`Photo by ${image.userName}`}
                       className="carousel-image"
-                      style={{ opacity: isLoaded ? 1 : 0 }} // Hide image until fully loaded
+                      style={{
+                        opacity: isLoaded ? 1 : 0,
+                        width: `${imageWidth}px`,
+                        height: `${imageHeight}px`,
+                        objectFit: 'contain'
+                      }}
                       onLoad={() => this.handleImageLoad(index)}
                       onError={(e) => {
                         console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
@@ -363,12 +376,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     />
                   ) : null}
 
-                  {/* Set placeholder with aspect ratio from image dimensions */}
+                  {/* Placeholder with explicit dimensions */}
                   <div
                     className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
                     style={{
-                      '--aspect-ratio': aspectRatio
-                    } as React.CSSProperties}
+                      width: `${imageWidth}px`,
+                      height: `${imageHeight}px`
+                    }}
                   >
                     <div className="spinner"></div>
                   </div>
