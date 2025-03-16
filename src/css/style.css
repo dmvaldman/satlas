@@ -375,27 +375,16 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transition: transform 0.3s ease;
   touch-action: pan-y;
   will-change: transform; /* Optimize for animations */
-  left: 0; /* Explicitly set left edge */
   width: max-content; /* Allow track to be as wide as needed for all content */
 }
 
 .carousel-track.scroll-disabled {
-  /* No need for special centering since we handle it in JS */
-  text-align: center;
   width: 100%; /* Reset width for centered content */
+  cursor: default; /* Change cursor to indicate no scrolling */
 }
 
 .carousel-track.dragging {
   transition: none;
-}
-
-/* Cursor styles */
-.carousel-track.scroll-disabled {
-  cursor: default; /* Change cursor to indicate no scrolling */
-}
-
-.carousel-track.scroll-disabled .carousel-item {
-  cursor: pointer; /* Keep the item cursor as pointer for interaction */
 }
 
 .carousel-item {
