@@ -510,7 +510,8 @@ export class FirebaseService {
     return {
       id: `new_${Date.now()}`,
       location: coordinates,
-      uploadedBy: userId
+      uploadedBy: userId,
+      imageCollectionId: ''
     };
   }
 
