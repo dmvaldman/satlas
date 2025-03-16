@@ -405,9 +405,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       style={{
                         opacity: isLoaded ? 1 : 0,
                         width: `${Math.floor(imageWidth)}px`,
-                        height: `${imageHeight}px`,
-                        objectFit: imageWidth === containerWidth ? 'cover' : 'contain',
-                        objectPosition: 'center'
+                        height: `${imageHeight}px`
                       }}
                       onLoad={() => this.handleImageLoad(index)}
                       onError={(e) => {
