@@ -12,7 +12,6 @@ interface CarouselProps {
 type ImageStatus = 'notLoaded' | 'loading' | 'loaded';
 
 interface CarouselState {
-  activeIndex: number;
   showControls: boolean;
   translateX: number;
   startX: number;
@@ -35,7 +34,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
     this.state = {
-      activeIndex: 0,
       showControls: false,
       translateX: 0,
       startX: 0,
@@ -95,6 +93,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
     // If images array changed (e.g., after deletion or when a new sit is loaded)
+    console.log('Carousel did update', prevProps.images.length, this.props.images.length);
+
     if (prevProps.images !== this.props.images) {
       // Reset image refs array to match new images array
       this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
@@ -111,8 +111,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       // Always reset to the beginning when images change
       this.setState({
         imageStatuses: newImageStatuses,
-        translateX: 0, // Explicitly set to 0 to show first image
-        activeIndex: 0 // Reset active index too
+        translateX: 0 // Explicitly set to 0 to show first image
       }, () => {
         // Recalculate dimensions with the new images
         this.calculateDimensions();
@@ -402,7 +401,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     style={{
                       opacity: isLoaded ? 1 : 0,
                       width: `${Math.floor(imageWidth)}px`,
-                      height: `${300}px`
+                      height: `${imageHeight}px`
                     }}
                     onLoad={() => this.handleImageLoad(index)}
                     onError={(e) => {

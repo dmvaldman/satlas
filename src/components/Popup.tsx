@@ -32,6 +32,11 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     super(props);
   }
 
+  componentDidUpdate(prevProps: PopupProps, prevState: PopupState) {
+    console.log('PopupComponent did update', prevProps.images.length, this.props.images.length);
+    // No logic needed here for now
+  }
+
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
     const { sit, onToggleMark, user, onSignIn } = this.props;
