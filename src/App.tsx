@@ -39,7 +39,8 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      sit: Sit | { sitId: string; imageId: string; } | null;
+      sit?: Sit;
+      replacementImageId?: string;
     };
     profile: {
       isOpen: boolean;
@@ -94,7 +95,7 @@ class App extends React.Component<{}, AppState> {
 
       // Modal state
       modals: {
-        photo: { isOpen: false, sit: null },
+        photo: { isOpen: false },
         profile: { isOpen: false },
         nearbySit: { isOpen: false, sit: null, hasUserContributed: false }
       },
@@ -399,7 +400,7 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: true,
-              sit: sit || null
+              sit: sit
             }
           }
         };
@@ -411,10 +412,7 @@ class App extends React.Component<{}, AppState> {
         return {
           modals: {
             ...prevState.modals,
-            photo: {
-              isOpen: false,
-              sit: null
-            }
+            photo: { isOpen: false }
           }
         };
       }
@@ -569,9 +567,6 @@ class App extends React.Component<{}, AppState> {
     const sit = sits.get(sitId);
     if (!sit) throw new Error('Sit not found');
 
-    // Check if this is a temporary image (starts with 'temp_')
-    const isTemporaryImage = imageId.startsWith('temp_');
-
     // Optimistically update UI first
     if (drawer.sit && drawer.sit.id === sitId) {
       const updatedImages = drawer.images.filter(img => img.id !== imageId);
@@ -605,35 +600,37 @@ class App extends React.Component<{}, AppState> {
         this.state.userPreferences.username
       );
       this.showNotification('Image will be deleted when you\'re back online', 'success');
-      return;
-    }
-
-    if (isTemporaryImage) {
-      this.deleteTemporaryImage(sitId, imageId);
     }
     else {
       this.deleteImage(sitId, imageId);
     }
   };
 
-  private deleteTemporaryImage = (sitId: string, imageId: string) => {
-    const realImageId = this.tempImageMapping.get(imageId);
-    if (!realImageId) {
-      console.error('No real image ID found for temporary image:', imageId);
-      return;
-    }
+  private replaceImage = async (sitId: string, imageId: string) => {
+    const { user, drawer } = this.state;
+    if (!user) return;
 
-    // Remove the mapping from temp ID to real Firebase ID
-    this.tempImageMapping.delete(imageId);
 
-    console.log('Deleting temporary image:', imageId, realImageId);
-    this.deleteImage(sitId, realImageId);
-    return;
   };
 
   private deleteImage = async (sitId: string, imageId: string) => {
     const { user, drawer } = this.state;
     if (!user) return;
+
+    // Check if this is a temporary image (starts with 'temp_')
+    const isTemporaryImage = imageId.startsWith('temp_');
+
+    if (isTemporaryImage) {
+      const realImageId = this.tempImageMapping.get(imageId);
+      if (!realImageId) {
+        console.error('No real image ID found for temporary image:', imageId);
+        return;
+      }
+
+      // Remove the mapping from temp ID to real Firebase ID
+      this.tempImageMapping.delete(imageId);
+      imageId = realImageId;
+    }
 
     try {
       await FirebaseService.deleteImage(imageId, user.uid);
@@ -655,44 +652,24 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleReplaceImage = (sitId: string, imageId: string) => {
-    // Check if this is a temporary image (starts with 'temp_')
-    const isTemporaryImage = imageId.startsWith('temp_');
+  private handleReplaceImage = async (sitId: string, imageId: string) => {
+    const { drawer } = this.state;
 
-    if (isTemporaryImage) {
-      // For temporary images, it's simpler to just delete and add a new one
-      // First, remove the temporary image from the UI
-      const { drawer } = this.state;
-      if (drawer.sit && drawer.sit.id === sitId) {
-        const updatedImages = drawer.images.filter(img => img.id !== imageId);
-        this.setState(prevState => ({
-          drawer: {
-            ...prevState.drawer,
-            images: updatedImages
-          }
-        }));
-      }
-
-      // Then open the photo upload modal to add a new image
-      const sit = this.state.sits.get(sitId);
-      this.togglePhotoUpload(sit || undefined);
-      return;
+    // Get the sit from Firebase only if we don't already have it
+    let sit;
+    if (drawer.sit && drawer.sit.id === sitId) {
+      sit = drawer.sit;
+    } else {
+      sit = await FirebaseService.getSit(sitId);
     }
 
-    // For regular images, proceed with normal replacement
-    const replacementData = {
-      sitId,
-      imageId
-    };
+    if (!sit) throw new Error('Sit not found');
 
     // Open photo upload modal with replacement data
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,
-        photo: {
-          isOpen: true,
-          sit: replacementData
-        }
+        photo: { isOpen: true, sit: sit, replacementImageId: imageId }
       }
     }));
   };
@@ -707,28 +684,14 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit | { sitId: string; imageId: string; }) => {
+  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit, replacementImageId?: string) => {
     const { user, userPreferences, drawer } = this.state;
     if (!user) return;
 
-    console.log('[App] handlePhotoUploadComplete called with existingSit:',
-      existingSit ? ('id' in existingSit ? `sit ${existingSit.id}` : `image ${existingSit.imageId}`) : 'new sit');
-
     try {
       // Case 1: Replacing an existing image
-      if (existingSit && 'imageId' in existingSit) {
-        const sitId = existingSit.sitId;
-        const imageId = existingSit.imageId;
-
-        // Get the sit from Firebase only if we don't already have it
-        let sit;
-        if (drawer.sit && drawer.sit.id === sitId) {
-          sit = drawer.sit;
-        } else {
-          sit = await FirebaseService.getSit(sitId);
-        }
-
-        if (!sit || !sit.imageCollectionId) throw new Error('Sit not found or has no image collection');
+      if (existingSit && replacementImageId) {
+        const sit = existingSit as Sit;
 
         // Create a temporary image with the new data
         const tempImage = this.createTemporaryImage(
@@ -738,45 +701,56 @@ class App extends React.Component<{}, AppState> {
           userPreferences.username
         );
 
-        // Get current images or empty array
-        let currentImages = drawer.sit && drawer.sit.id === sitId ? [...drawer.images] : [];
-
         // Replace the image in the array
-        const updatedImages = currentImages.map(img =>
-          img.id === imageId ? tempImage : img
+        const updatedImages = drawer.images.map(img =>
+          img.id === replacementImageId ? tempImage : img
         );
 
         // Close the photo modal and immediately update the drawer with optimistic data
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, sit: null }
+            photo: { isOpen: false }
           },
           drawer: {
             isOpen: true,
-            sit,
+            sit: sit,
             images: updatedImages
           }
         });
 
         try {
+          const isTemporaryImage = replacementImageId.startsWith('temp_');
+
+          if (isTemporaryImage) {
+            const realImageId = this.tempImageMapping.get(replacementImageId);
+            if (!realImageId) {
+              console.error('No real image ID found for temporary image:', replacementImageId);
+              return;
+            }
+            replacementImageId = realImageId;
+            this.tempImageMapping.delete(replacementImageId);
+          }
+
           // Upload to server in the background
-          await FirebaseService.replaceImage(
+          const replacedImage = await FirebaseService.replaceImage(
             photoResult,
             sit.imageCollectionId,
-            imageId,
+            replacementImageId,
             user.uid,
             userPreferences.username
           );
+
+          this.tempImageMapping.set(tempImage.id, replacedImage.id);
         } catch (error: any) {
           // Show the error message to the user
-          this.showNotification(error.message, 'success');
+          this.showNotification(error.message, 'error');
         }
 
         return;
       }
       // Case 2: Adding to an existing sit
-      else if (existingSit && 'id' in existingSit) {
+      else if (existingSit) {
         const sit = existingSit as Sit;
 
         if (!sit.imageCollectionId) {
@@ -791,19 +765,16 @@ class App extends React.Component<{}, AppState> {
           userPreferences.username
         );
 
-        // Get current images or empty array
-        let currentImages = drawer.sit && drawer.sit.id === sit.id ? [...drawer.images] : [];
-
         // Close the photo modal and immediately update the drawer with optimistic data
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, sit: null }
+            photo: { isOpen: false }
           },
           drawer: {
             isOpen: true,
             sit,
-            images: [...currentImages, tempImage]
+            images: [...drawer.images, tempImage]
           }
         });
 
@@ -817,10 +788,7 @@ class App extends React.Component<{}, AppState> {
           );
 
           // Store mapping from temp ID to real Firebase ID
-          if (uploadedImage && uploadedImage.id) {
-            this.tempImageMapping.set(tempImage.id, uploadedImage.id);
-            console.log(`Mapped temp image ${tempImage.id} to Firebase ID ${uploadedImage.id}`);
-          }
+          this.tempImageMapping.set(tempImage.id, uploadedImage.id);
         } catch (error: any) {
           this.showNotification(error.message, 'error');
         }
@@ -852,7 +820,7 @@ class App extends React.Component<{}, AppState> {
         this.setState({
           modals: {
             ...this.state.modals,
-            photo: { isOpen: false, sit: null }
+            photo: { isOpen: false }
           },
           drawer: {
             isOpen: true,
@@ -864,11 +832,14 @@ class App extends React.Component<{}, AppState> {
 
         try {
           // Create sit with photo using FirebaseService in the background
-          const sit = await FirebaseService.createSitWithPhoto(
+          const { sit, image } = await FirebaseService.createSitWithPhoto(
             photoResult,
             user.uid,
             userPreferences.username
           );
+          this.tempImageMapping.set(tempImage.id, image.id);
+          console.log(`Mapped temp image ${tempImage.id} to Firebase ID ${image.id}`);
+
 
           // Replace initial sit with complete sit
           this.setState(prevState => {
@@ -883,7 +854,6 @@ class App extends React.Component<{}, AppState> {
                 sits: newSits,
                 drawer: {
                   ...prevState.drawer,
-                  isOpen: true,
                   sit,
                   images: sit.imageCollectionId ?
                     prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
@@ -894,8 +864,7 @@ class App extends React.Component<{}, AppState> {
 
             return {
               ...prevState,
-              sits: newSits,
-              drawer: prevState.drawer // Preserve the existing drawer state
+              sits: newSits
             };
           });
         } catch (error: any) {
@@ -908,7 +877,7 @@ class App extends React.Component<{}, AppState> {
       this.setState({
         modals: {
           ...this.state.modals,
-          photo: { isOpen: false, sit: null }
+          photo: { isOpen: false }
         }
       });
 
@@ -1207,7 +1176,8 @@ class App extends React.Component<{}, AppState> {
             isOpen={modals.photo.isOpen}
             onClose={this.togglePhotoUpload}
             onPhotoCapture={this.handlePhotoUploadComplete}
-            sit={modals.photo.sit || undefined}
+            sit={modals.photo.sit}
+            replacementImageId={modals.photo.replacementImageId}
             showNotification={this.showNotification}
           />
         )}

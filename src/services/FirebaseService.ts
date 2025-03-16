@@ -541,7 +541,7 @@ export class FirebaseService {
     photoResult: PhotoResult,
     userId: string,
     userName: string
-  ): Promise<Sit> {
+  ): Promise<{ sit: Sit, image: Image }> {
     // Check if we're online
     if (!this.isOnline()) {
       try {
@@ -596,7 +596,7 @@ export class FirebaseService {
 
       // Create image collection
       const imageCollectionId = `${Date.now()}_${userId}`;
-      await addDoc(collection(db, 'images'), {
+      const imageDoc = await addDoc(collection(db, 'images'), {
         photoURL,
         userId,
         userName,
@@ -606,8 +606,21 @@ export class FirebaseService {
         height: photoResult.dimensions.height
       });
 
+      const image: Image = {
+        id: imageDoc.id,
+        photoURL,
+        userId,
+        userName,
+        collectionId: imageCollectionId,
+        createdAt: new Date(),
+        width: photoResult.dimensions.width,
+        height: photoResult.dimensions.height
+      };
+
       // Create the sit
-      return await this.createSit(photoResult.location, imageCollectionId, userId);
+      const sit = await this.createSit(photoResult.location, imageCollectionId, userId);
+
+      return { sit, image };
     } catch (error: any) {
       console.error('Error creating sit with photo:', error);
 
@@ -1042,7 +1055,7 @@ export class FirebaseService {
     imageId: string,
     userId: string,
     userName: string
-  ): Promise<void> {
+  ): Promise<Image> {
     // Check if we're online
     if (!this.isOnline()) {
       try {
@@ -1112,13 +1125,12 @@ export class FirebaseService {
       await this.deleteImage(imageId, userId);
 
       // Then add a new photo
-      await this.addPhotoToSit(
+      return await this.addPhotoToSit(
         photoResult,
         imageCollectionId,
         userId,
         userName
       );
-
     } catch (error: any) {
       console.error('Error replacing image:', error);
       throw error;
