@@ -97,12 +97,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
     // If images array changed (e.g., after deletion or when a new sit is loaded)
     if (prevProps.images !== this.props.images) {
-      console.log('Images array changed, updating carousel');
-
       // Reset image refs array to match new images array
       this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
-      // New images should have loading state
+      // New images should have loading state, but keep status of existing images
       const newImageStatuses = Array(this.props.images.length).fill('loading');
       this.props.images.forEach((newImage, newIndex) => {
         const oldIndex = prevProps.images.findIndex(oldImage => oldImage.id === newImage.id);
@@ -111,10 +109,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         }
       });
 
-      // Keep position at 0 when images change
+      // Always reset to the beginning when images change
       this.setState({
         imageStatuses: newImageStatuses,
-        translateX: 0 // Reset position when images change
+        translateX: 0, // Explicitly set to 0 to show first image
+        activeIndex: 0 // Reset active index too
       }, () => {
         // Recalculate dimensions with the new images
         this.calculateDimensions();
@@ -328,7 +327,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         <div className="carousel-content" ref={this.containerRef}>
           <div
             className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
-            style={{ transform: `translateX(${translateX}px)` }}
+            style={{
+              transform: `translateX(${translateX}px)`
+            }}
           >
             {images.map((image, index) => {
               const status = imageStatuses[index] || 'notLoaded';
