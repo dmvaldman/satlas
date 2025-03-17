@@ -19,6 +19,9 @@ interface CarouselState {
   containerWidth: number;
   totalWidth: number;
   imageStatuses: ImageStatus[]; // Array instead of Map
+  lastMoveTimestamp: number;
+  velocity: number;
+  isScrollingWithMomentum: boolean;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -26,6 +29,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private imageRefs: React.RefObject<HTMLImageElement>[] = [];
   private resizeObserver: ResizeObserver | null = null;
   private padding = 16;
+  private momentumAnimationId: number | null = null;
 
   constructor(props: CarouselProps) {
     super(props);
@@ -40,7 +44,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       isDragging: false,
       containerWidth: 0,
       totalWidth: 0,
-      imageStatuses: Array(this.props.images.length).fill('notLoaded')
+      imageStatuses: Array(this.props.images.length).fill('notLoaded'),
+      lastMoveTimestamp: 0,
+      velocity: 0,
+      isScrollingWithMomentum: false
     };
   }
 
@@ -89,12 +96,15 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
+
+    // Cancel any ongoing momentum animation
+    if (this.momentumAnimationId !== null) {
+      cancelAnimationFrame(this.momentumAnimationId);
+    }
   }
 
   componentDidUpdate(prevProps: CarouselProps, prevState: CarouselState) {
     // If images array changed (e.g., after deletion or when a new sit is loaded)
-    console.log('Carousel did update', prevProps.images.length, this.props.images.length);
-
     if (prevProps.images !== this.props.images) {
       // Reset image refs array to match new images array
       this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
@@ -108,10 +118,18 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         }
       });
 
+      // Cancel any ongoing momentum animation
+      if (this.momentumAnimationId !== null) {
+        cancelAnimationFrame(this.momentumAnimationId);
+        this.momentumAnimationId = null;
+      }
+
       // Always reset to the beginning when images change
       this.setState({
         imageStatuses: newImageStatuses,
-        translateX: 0 // Explicitly set to 0 to show first image
+        translateX: 0, // Explicitly set to 0 to show first image
+        velocity: 0,
+        isScrollingWithMomentum: false
       }, () => {
         // Recalculate dimensions with the new images
         this.calculateDimensions();
@@ -224,9 +242,18 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
 
+    // Cancel any ongoing momentum animation
+    if (this.momentumAnimationId !== null) {
+      cancelAnimationFrame(this.momentumAnimationId);
+      this.momentumAnimationId = null;
+    }
+
     this.setState({
       startX: clientX,
-      isDragging: true
+      isDragging: true,
+      lastMoveTimestamp: Date.now(),
+      velocity: 0,
+      isScrollingWithMomentum: false
     });
   };
 
@@ -243,6 +270,14 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const deltaX = clientX - this.state.startX;
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - this.state.lastMoveTimestamp;
+
+    // Calculate velocity (pixels per millisecond)
+    let velocity = 0;
+    if (timeElapsed > 0) {
+      velocity = deltaX / timeElapsed;
+    }
 
     // Calculate new translateX with boundaries
     let newTranslateX = this.state.translateX + deltaX;
@@ -258,7 +293,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.setState({
       translateX: newTranslateX,
-      startX: clientX
+      startX: clientX,
+      lastMoveTimestamp: currentTime,
+      velocity: velocity
     });
 
     // Determine which images should be loaded based on visibility
@@ -308,6 +345,47 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   };
 
+  private applyMomentum = () => {
+    if (!this.state.isScrollingWithMomentum) return;
+
+    // Calculate new position based on velocity with deceleration
+    const deceleration = 0.9; // Deceleration factor (0.95 = lose 5% of velocity per frame)
+    const newVelocity = this.state.velocity * deceleration;
+
+    // Calculate distance to move this frame (velocity is px/ms)
+    const frameDelta = newVelocity * 16; // Assuming ~16ms per frame at 60fps
+
+    let newTranslateX = this.state.translateX + frameDelta;
+
+    // Apply boundaries
+    if (newTranslateX > 0) {
+      newTranslateX = 0;
+      this.setState({ isScrollingWithMomentum: false });
+    } else {
+      const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+      if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
+        newTranslateX = maxTranslateX;
+        this.setState({ isScrollingWithMomentum: false });
+      }
+    }
+
+    // Update state
+    this.setState({
+      translateX: newTranslateX,
+      velocity: newVelocity
+    });
+
+    // Stop animation if velocity is very low
+    if (Math.abs(newVelocity) < 0.01) {
+      this.setState({ isScrollingWithMomentum: false });
+      this.momentumAnimationId = null;
+      return;
+    }
+
+    // Continue animation
+    this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
+  };
+
   private handleDragEnd = () => {
     if (!this.state.isDragging) return;
 
@@ -327,10 +405,20 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       finalTranslateX = maxTranslateX;
     }
 
-    // Apply the final position with animation
+    // Check if we should apply momentum scrolling
+    // Only apply momentum if the velocity is significant
+    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.1 &&
+      this.state.totalWidth > this.state.containerWidth;
+
     this.setState({
       translateX: finalTranslateX,
-      isDragging: false
+      isDragging: false,
+      isScrollingWithMomentum: shouldApplyMomentum
+    }, () => {
+      // Start momentum animation if needed
+      if (shouldApplyMomentum) {
+        this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
+      }
     });
   };
 
@@ -347,7 +435,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   render() {
     const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
-    const { showControls: showControlsState, translateX, imageStatuses, isDragging, containerWidth, totalWidth } = this.state;
+    const { showControls: showControlsState, translateX, imageStatuses, isDragging, containerWidth, totalWidth, isScrollingWithMomentum } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
@@ -360,9 +448,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     return (
       <div className="carousel-content" ref={this.containerRef}>
         <div
-          className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
+          className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollingWithMomentum ? 'momentum-scrolling' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
           style={{
-            transform: `translateX(${translateX}px)`
+            transform: `translateX(${translateX}px)`,
+            transition: isDragging || isScrollingWithMomentum ? 'none' : 'transform 0.2s ease-out'
           }}
         >
           {images.map((image, index) => {
