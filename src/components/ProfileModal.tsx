@@ -53,6 +53,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       this.setupKeyboardListeners();
     }
 
+    // Initialize notification service if user is available
+    this.initializeNotificationService();
+
     // Add a safety timeout to prevent infinite loading
     setTimeout(() => {
       if (this.state.isLoading) {
@@ -78,6 +81,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         // Trigger reflow
         void this.contentRef.current.offsetHeight;
         this.contentRef.current.classList.add('active');
+      }
+
+      // Re-initialize notification service when modal opens with a different user
+      if (prevProps.user?.uid !== this.props.user?.uid) {
+        this.initializeNotificationService();
       }
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
@@ -139,8 +147,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       if (preferences) {
         // We have preferences, update state and stop loading
         this.setState({
-          username: preferences.username || '',
-          pushNotifications: preferences.pushNotificationsEnabled || false,
+          username: preferences.username,
+          pushNotifications: preferences.pushNotificationsEnabled,
           isLoading: false
         });
 
@@ -154,7 +162,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       } else {
         // No preferences yet, but we'll use display name as a starting point
         this.setState({
-          username: user.displayName || '',
+          pushNotifications: false,
           isLoading: false // Stop loading even without preferences
         });
 
@@ -271,6 +279,21 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
+  // Add a method to initialize the notification service
+  private initializeNotificationService = async () => {
+    const { user, preferences } = this.props;
+
+    if (user && Capacitor.isNativePlatform()) {
+      try {
+        const notificationService = PushNotificationService.getInstance();
+        console.log('[ProfileModal] Initializing notification service on mount/update');
+        await notificationService.initialize(user.uid, preferences || { username: '', pushNotificationsEnabled: false });
+      } catch (error) {
+        console.error('[ProfileModal] Error initializing notification service:', error);
+      }
+    }
+  }
+
   private handlePushNotificationToggle = async (enabled: boolean) => {
     const { user, showNotification, preferences } = this.props;
     console.log('[ProfileModal] Toggle notifications:', enabled);
@@ -283,10 +306,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     try {
       const notificationService = PushNotificationService.getInstance();
 
-      // Initialize service first
-      console.log('[ProfileModal] Initializing notification service');
-      await notificationService.initialize(user.uid, preferences || { username: '', pushNotificationsEnabled: false });
-
+      // Service should already be initialized, just enable or disable
       let success: boolean;
 
       if (enabled) {
@@ -295,9 +315,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         console.log('[ProfileModal] Enable result:', success);
       } else {
         console.log('[ProfileModal] Attempting to disable notifications');
-        await notificationService.disable();
-        success = true;
-        console.log('[ProfileModal] Disable completed');
+        success = await notificationService.disable();
+        console.log('[ProfileModal] Disable result:', success);
       }
 
       if (success) {

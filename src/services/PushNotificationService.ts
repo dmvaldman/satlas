@@ -98,6 +98,10 @@ export class PushNotificationService {
       // Permission granted, proceed with registration
       console.log('[PushNotificationService] Permission granted, registering...');
       await this.registerPushNotifications();
+
+      // Update the user's preferences in Firestore
+      await FirebaseService.updatePushNotificationSetting(this.userId, true);
+
       this.enabled = true;
       console.log('[PushNotificationService] Successfully enabled notifications');
       return true;
@@ -110,26 +114,33 @@ export class PushNotificationService {
 
   /**
    * Disable push notifications
+   * @returns true if successfully disabled
    */
-  public async disable(): Promise<void> {
+  public async disable(): Promise<boolean> {
     console.log('[PushNotificationService] Attempting to disable notifications');
 
     if (!Capacitor.isNativePlatform()) {
       console.log('[PushNotificationService] Not a native platform, skipping disable');
-      return;
+      return true; // Consider it successful on non-native platforms
     }
     if (!this.userId) {
       console.log('[PushNotificationService] No user ID, skipping disable');
-      return;
+      return true; // Consider it successful if there's no user ID
     }
 
     try {
+      // Unregister push notifications
       await this.unregisterPushNotifications();
+
+      // Update the user's preferences in Firestore
+      await FirebaseService.updatePushNotificationSetting(this.userId, false);
+
       this.enabled = false;
       console.log('[PushNotificationService] Successfully disabled notifications');
+      return true;
     } catch (error) {
       console.error('[PushNotificationService] Error in disable():', error);
-      throw error;
+      return false;
     }
   }
 
@@ -200,18 +211,24 @@ export class PushNotificationService {
     if (!this.userId) return;
 
     try {
+      console.log(`[PushNotificationService] Unregistering push notifications for user ${this.userId}`);
+
       // Get existing tokens
       const tokens = await FirebaseService.getUserPushTokens(this.userId);
+      console.log(`[PushNotificationService] Found ${tokens.length} tokens to delete`);
 
       // Delete all tokens for this user
       for (const token of tokens) {
+        console.log(`[PushNotificationService] Deleting token: ${token.id}`);
         await FirebaseService.deletePushToken(token.id);
       }
 
       // Remove all listeners
       PushNotifications.removeAllListeners();
+      console.log('[PushNotificationService] Removed all push notification listeners');
     } catch (error) {
-      console.error('Error unregistering push notifications:', error);
+      console.error('[PushNotificationService] Error unregistering push notifications:', error);
+      throw error;
     }
   }
 
@@ -249,16 +266,21 @@ export class PushNotificationService {
    * Save the push notification token to Firebase
    */
   private async savePushToken(token: string): Promise<void> {
-    if (!this.userId) return;
+    if (!this.userId) {
+      console.log('[PushNotificationService] No user ID, cannot save push token');
+      return;
+    }
 
     try {
       // Determine platform
       const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
+      console.log(`[PushNotificationService] Saving push token for user ${this.userId} on platform ${platform}`);
 
       // Save the token to Firebase
       await FirebaseService.saveUserPushToken(this.userId, token, platform);
+      console.log('[PushNotificationService] Successfully saved push token to Firebase');
     } catch (error) {
-      console.error('Error saving push token:', error);
+      console.error('[PushNotificationService] Error saving push token:', error);
     }
   }
 
