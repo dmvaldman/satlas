@@ -1397,6 +1397,25 @@ export class FirebaseService {
 
     return uniqueName;
   };
+
+  /**
+   * Update the user's push notification setting in Firestore
+   * @param userId User ID
+   * @param enabled Whether push notifications are enabled
+   */
+  static async updatePushNotificationSetting(userId: string, enabled: boolean): Promise<void> {
+    try {
+      await setDoc(doc(db, 'users', userId), {
+        pushNotificationsEnabled: enabled,
+        updatedAt: new Date()
+      }, { merge: true });
+
+      console.log(`[Firebase] Updated pushNotificationsEnabled to ${enabled} for user ${userId}`);
+    } catch (error) {
+      console.error('[Firebase] Error updating push notification setting:', error);
+      throw error;
+    }
+  }
 }
 
 // Export auth for direct access (moved outside the class)
