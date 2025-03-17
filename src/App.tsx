@@ -1140,12 +1140,12 @@ class App extends React.Component<{}, AppState> {
           <AuthComponent
             user={user}
             isAuthenticated={isAuthenticated}
-            isProfileOpen={modals.profile.isOpen}
             userPreferences={userPreferences}
             onSignIn={this.handleSignIn}
-            onSignOut={this.handleSignOut}
             onToggleProfile={this.toggleProfile}
+            onUpdatePreferences={this.updatePreferences}
             onSavePreferences={this.handleSavePreferences}
+            showNotification={this.showNotification}
           />
         </header>
 
