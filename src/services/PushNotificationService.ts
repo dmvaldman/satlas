@@ -56,6 +56,9 @@ export class PushNotificationService {
         await this.registerPushNotifications();
       }
 
+      // Check actual permission status and update our state
+      await this.syncPermissionStatus();
+
       // Initialize local notifications for in-app handling
       await this.initializeLocalNotifications();
     } else {
@@ -333,5 +336,39 @@ export class PushNotificationService {
       return await this.openNotificationSettings();
     }
     return false;
+  }
+
+  /**
+   * Check the actual device permission status and sync with our internal state
+   * @returns The current permission status (true if granted, false if denied)
+   */
+  public async syncPermissionStatus(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform() || !this.userId) {
+      return this.enabled;
+    }
+
+    try {
+      console.log('[PushNotificationService] Checking actual permission status');
+      const permissionStatus = await PushNotifications.checkPermissions();
+      const isPermissionGranted = permissionStatus.receive === 'granted';
+
+      console.log(`[PushNotificationService] Device permission status: ${isPermissionGranted ? 'granted' : 'denied'}`);
+
+      // If our internal state doesn't match the actual permission, update it
+      if (this.enabled !== isPermissionGranted) {
+        console.log(`[PushNotificationService] Syncing permission status: ${isPermissionGranted}`);
+        this.enabled = isPermissionGranted;
+
+        // Update the database to match the actual permission status
+        if (this.userId) {
+          await FirebaseService.updatePushNotificationSetting(this.userId, isPermissionGranted);
+        }
+      }
+
+      return isPermissionGranted;
+    } catch (error) {
+      console.error('[PushNotificationService] Error checking permission status:', error);
+      return this.enabled;
+    }
   }
 }

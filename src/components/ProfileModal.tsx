@@ -56,6 +56,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // Initialize notification service if user is available
     this.initializeNotificationService();
 
+    // Sync the toggle state with actual device permissions
+    this.syncNotificationToggleState();
+
     // Add a safety timeout to prevent infinite loading
     setTimeout(() => {
       if (this.state.isLoading) {
@@ -87,6 +90,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       if (prevProps.user?.uid !== this.props.user?.uid) {
         this.initializeNotificationService();
       }
+
+      // Sync the toggle state with actual device permissions
+      this.syncNotificationToggleState();
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
       if (this.contentRef.current) {
@@ -294,6 +300,29 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
+  // Add a method to sync the notification toggle state with actual device permissions
+  private syncNotificationToggleState = async () => {
+    const { user } = this.props;
+
+    if (user && Capacitor.isNativePlatform()) {
+      try {
+        const notificationService = PushNotificationService.getInstance();
+        console.log('[ProfileModal] Syncing notification toggle state with device permissions');
+
+        // Get the actual permission status
+        const isPermissionGranted = await notificationService.syncPermissionStatus();
+
+        // Update our UI state to match
+        if (this.state.pushNotifications !== isPermissionGranted) {
+          console.log(`[ProfileModal] Updating toggle state to match device permissions: ${isPermissionGranted}`);
+          this.setState({ pushNotifications: isPermissionGranted });
+        }
+      } catch (error) {
+        console.error('[ProfileModal] Error syncing notification toggle state:', error);
+      }
+    }
+  }
+
   private handlePushNotificationToggle = async (enabled: boolean) => {
     const { user, showNotification, preferences } = this.props;
     console.log('[ProfileModal] Toggle notifications:', enabled);
@@ -313,24 +342,37 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         console.log('[ProfileModal] Attempting to enable notifications');
         success = await notificationService.enable();
         console.log('[ProfileModal] Enable result:', success);
+
+        // Immediately update state if enable was successful
+        if (success) {
+          this.setState({ pushNotifications: true });
+        }
       } else {
         console.log('[ProfileModal] Attempting to disable notifications');
         success = await notificationService.disable();
         console.log('[ProfileModal] Disable result:', success);
+
+        // Immediately update state if disable was successful
+        if (success) {
+          this.setState({ pushNotifications: false });
+        }
       }
 
-      if (success) {
-        console.log('[ProfileModal] Operation successful, updating state and preferences');
-        // Update local state and preferences only after successful operation
-        this.setState({ pushNotifications: enabled });
-        const updatedPreferences = {
-          ...this.props.preferences,
-          pushNotificationsEnabled: enabled
-        };
-        this.props.onUpdatePreferences(updatedPreferences);
-      } else {
-        console.log('[ProfileModal] Operation failed, not updating state');
+      // After enable/disable attempt, sync with actual permission status
+      console.log('[ProfileModal] Syncing toggle state after permission change attempt');
+      const actualStatus = await notificationService.syncPermissionStatus();
+
+      // Update state again to ensure it matches actual permission status
+      if (this.state.pushNotifications !== actualStatus) {
+        this.setState({ pushNotifications: actualStatus });
       }
+
+      // Update preferences to match current state
+      const updatedPreferences = {
+        ...this.props.preferences,
+        pushNotificationsEnabled: actualStatus
+      };
+      this.props.onUpdatePreferences(updatedPreferences);
     } catch (error) {
       console.error('[ProfileModal] Error in handlePushNotificationToggle:', error);
       showNotification('Failed to update push notification settings', 'error');
@@ -422,7 +464,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
               <div className="profile-section">
                 <label className="toggle-label">
-                  <span>Enable Push Notifications</span>
+                  <span>Push Notifications Enabled</span>
                   <input
                     type="checkbox"
                     checked={pushNotifications}
