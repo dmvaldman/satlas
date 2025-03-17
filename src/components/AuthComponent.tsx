@@ -1,12 +1,10 @@
 import React from 'react';
 import { User } from 'firebase/auth';
 import { UserPreferences } from '../types';
-import ProfileModal from './ProfileModal';
 
 interface AuthProps {
   user: User | null;
   isAuthenticated: boolean;
-  isProfileOpen: boolean;
   userPreferences: UserPreferences;
   onSignIn: () => Promise<void>;
   onSignOut: () => Promise<void>;
@@ -17,7 +15,6 @@ interface AuthProps {
 }
 
 interface AuthState {
-  error: string | null;
   isSigningIn: boolean;
 }
 
@@ -27,7 +24,6 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
   constructor(props: AuthProps) {
     super(props);
     this.state = {
-      error: null,
       isSigningIn: false
     };
   }
@@ -50,15 +46,6 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
     } finally {
       // Always reset the signing in state, regardless of success or failure
       this.setState({ isSigningIn: false });
-    }
-  };
-
-  private handleSignOut = async () => {
-    try {
-      await this.props.onSignOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-      this.setState({ error: 'Failed to sign out. Please try again.' });
     }
   };
 
@@ -113,35 +100,16 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
     return (
       this.props.user !== nextProps.user ||
       this.props.isAuthenticated !== nextProps.isAuthenticated ||
-      this.props.isProfileOpen !== nextProps.isProfileOpen ||
-      this.state.error !== nextState.error ||
       this.state.isSigningIn !== nextState.isSigningIn
     );
   }
 
   render() {
-    const { isAuthenticated, isProfileOpen, onToggleProfile, onSavePreferences, user } = this.props;
-    const { error } = this.state;
+    const { isAuthenticated } = this.props;
 
     return (
       <div className="auth-container">
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
         {isAuthenticated ? this.renderProfileButton() : this.renderLoginButton()}
-
-        <ProfileModal
-          isOpen={isProfileOpen}
-          user={user}
-          preferences={this.props.userPreferences}
-          onClose={onToggleProfile}
-          onSignOut={this.handleSignOut}
-          onSave={onSavePreferences}
-          onUpdatePreferences={this.props.onUpdatePreferences}
-          showNotification={this.props.showNotification}
-        />
       </div>
     );
   }
