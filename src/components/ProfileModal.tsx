@@ -22,7 +22,6 @@ interface ProfileModalState {
   username: string;
   pushNotifications: boolean;
   isSubmitting: boolean;
-  error: string | null;
   usernameError: string | null;
   isLoading: boolean;
 }
@@ -42,7 +41,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username: '',
       pushNotifications: false,
       isSubmitting: false,
-      error: null,
       usernameError: null,
       isLoading: !isDataCached && !!props.user
     };
@@ -60,8 +58,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       if (this.state.isLoading) {
         console.log('[ProfileModal] Safety timeout triggered, forcing loading to complete');
         this.setState({
-          isLoading: false,
-          error: this.state.error || 'Could not load profile data. Please try again.'
+          isLoading: false
         });
       }
     }, 5000);
@@ -327,7 +324,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username,
       pushNotifications,
       isSubmitting,
-      error,
       usernameError,
       isLoading
     } = this.state;
@@ -389,12 +385,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </div>
           ) : (
             <>
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
-
               <div className="profile-section">
                 <label htmlFor="username">Username</label>
                 <input
