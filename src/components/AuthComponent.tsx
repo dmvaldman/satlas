@@ -7,7 +7,6 @@ interface AuthProps {
   isAuthenticated: boolean;
   userPreferences: UserPreferences;
   onSignIn: () => Promise<void>;
-  onSignOut: () => Promise<void>;
   onToggleProfile: () => void;
   onSavePreferences: (prefs: UserPreferences) => Promise<void>;
   onUpdatePreferences: (prefs: UserPreferences) => void;
