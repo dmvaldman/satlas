@@ -3,8 +3,8 @@ import { Sit } from '../types';
 
 export class ClusterManager {
   private clusterSourceAdded: boolean = false;
-  private clusterColor: string = '#51bbd6';
-  private clusterRadius: number = 25;
+  private clusterColor: string = '#003f83';
+  private clusterRadius: number = 22;
 
   public setupClusterLayer(map: mapboxgl.Map, sits: Map<string, Sit>): void {
     if (map.loaded()) {

@@ -148,6 +148,8 @@ class App extends React.Component<{}, AppState> {
       }
     });
 
+    console.log('[App.tsx On Mount] auth.currentUser', auth.currentUser);
+
     // 2. Check auth state immediately on mount (workaround)
     const currentUser = auth.currentUser;
     console.log('[App] Direct auth check on mount:', currentUser?.displayName || 'not signed in');
@@ -453,8 +455,13 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleToggleMark = async (sitId: string, type: MarkType) => {
-    const { sits, marks, favoriteCount, user } = this.state;
+    const { sits, marks, favoriteCount, user, isOffline } = this.state;
     if (!user) return;
+
+    if (isOffline) {
+      this.showNotification('You are currently offline. Feature disabled.', 'error');
+      return;
+    }
 
     const sit = sits.get(sitId);
     if (!sit) return;
@@ -1085,13 +1092,6 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div className="app">
-        {/* Add offline banner */}
-        {isOffline && (
-          <div className="offline-banner">
-            You are currently offline. Some features won't work.
-          </div>
-        )}
-
         <header id="app-header">
           <AuthComponent
             user={user}
