@@ -81,12 +81,12 @@ body {
 }
 
 #profile-container {
-  width: 50px;
-  height: 50px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid black;
+  border: 2px solid #3326c3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,12 +121,29 @@ body {
 }
 
 .satlas-marker {
-  width: 25px;
-  height: 25px;
-  background-color: #31d53d;  /* Default green color for other people's sits */
+  width: 20px;
+  height: 20px;
+  background-color: #62bdd9;  /* Default green color for other people's sits */
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
+}
+
+.satlas-marker.own-sit {
+  background-color: #007AFF;  /* Blue for own sits */
+}
+
+.satlas-marker.favorite {
+  background-color: #ff4081;
+}
+
+.satlas-marker.visited {
+  /* color: #003f83; */
+  background-color: #808080;
+}
+
+.satlas-marker.want-to-go {
+  background-color: #9c27b0;
 }
 
 .satlas-popup {
@@ -138,15 +155,50 @@ body {
   font-size: 14px;
 }
 
+.location-marker {
+  position: relative;
+  width: 0;
+  height: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.location-marker::before {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: rgba(66, 133, 244, 0.15);
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.location-marker::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background-color: #3326c3;
+  border: 1px solid white;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 /* Add these styles for the FAB */
 .fab {
   position: fixed;
   bottom: calc(2rem + var(--safe-area-bottom));
   right: calc(2rem + var(--safe-area-right));
-  width: 60px;
-  height: 60px;
+  width: 66px;
+  height: 66px;
   border-radius: 50%;
-  background: #31d53d;
+  background: #3326c3;
   box-shadow: 0 3px 6px rgba(0,0,0,0.16);
   border: none;
   cursor: pointer;
@@ -184,7 +236,6 @@ body {
   z-index: 2000;
   cursor: pointer;
   padding-bottom: var(--safe-area-bottom);
-  /* Ensure modals don't cover system navigation */
   bottom: var(--safe-area-bottom) !important;
   align-items: flex-end;
 }
@@ -317,10 +368,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .profile-button.danger:hover {
   background-color: #ff2d20;
-}
-
-.satlas-marker.own-sit {
-  background-color: #007AFF;  /* Blue for own sits */
 }
 
 .favorite-button {
@@ -490,10 +537,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   pointer-events: auto;
 }
 
-.satlas-marker.uploading {
-  opacity: 0.7;
-}
-
 .mark-buttons {
   display: flex;
   gap: 8px;
@@ -641,18 +684,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   height: 300px;  /* Set the desired height for the image+controls container */
 }
 
-.satlas-marker.favorite {
-  background-color: #ff4081;
-}
-
-.satlas-marker.visited {
-  background-color: #808080;
-}
-
-.satlas-marker.want-to-go {
-  background-color: #9c27b0;
-}
-
 .image-info {
   position: absolute;
   bottom: -30px;
@@ -661,43 +692,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   text-align: center;
   color: white;
   padding: 8px;
-}
-
-/* Add this to your CSS file */
-.location-marker {
-  position: relative;
-  width: 0;
-  height: 0;
-  z-index: 100;
-  pointer-events: none;
-}
-
-.location-marker::before {
-  content: '';
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: rgba(66, 133, 244, 0.15);
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.location-marker::after {
-  content: '';
-  position: absolute;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background-color: #4285F4;
-  border: 2px solid white;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.25);
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
 }
 
 /* Android bottom navigation space */
@@ -935,7 +929,7 @@ body:has(.bottom-nav-space) {
 
   /* Notifications - adjust top padding for Android, but keep notifications at the top */
   .notifications-container {
-    top: calc(20px + var(--safe-area-top)) !important;
+    top: calc(20px + var(--safe-area-top));
   }
 }
 
@@ -947,24 +941,6 @@ body:has(.bottom-nav-space) {
   margin-bottom: 15px;
   text-align: center;
   font-size: 14px;
-}
-
-.offline-banner {
-  position: fixed;
-  top: var(--safe-area-top);
-  left: 0;
-  right: 0;
-  background-color: #f44336;
-  color: white;
-  text-align: center;
-  padding: 8px;
-  z-index: 1000;
-  font-weight: bold;
-}
-
-/* Adjust the header position when offline banner is shown */
-.offline-banner + header#app-header {
-  margin-top: 36px;
 }
 
 .spinner.small {
