@@ -1,14 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const config: CapacitorConfig = {
+const baseConfig: CapacitorConfig = {
   appId: 'com.dmvaldman.Satlas',
   appName: 'Satlas',
   webDir: 'dist',
-  server: {
-    url: 'http://192.168.68.102:5173',
-    cleartext: true,
-    androidScheme: 'http'
-  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
@@ -39,4 +34,12 @@ const config: CapacitorConfig = {
   }
 };
 
-export default config;
+const devConfig = process.env.NODE_ENV === 'development' ? {
+  server: {
+    url: 'http://192.168.68.102:5173',
+    cleartext: true,
+    androidScheme: 'http'
+  }
+} : {};
+
+export default { ...baseConfig, ...devConfig };
