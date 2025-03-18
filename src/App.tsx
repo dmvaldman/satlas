@@ -257,40 +257,8 @@ class App extends React.Component<{}, AppState> {
       })
       .catch(error => {
         console.error('Error getting location or initializing map:', error);
-        this.initializeMapWithDefaultLocation();
+        this.showNotification('Failed to load map.', 'error');
       });
-  };
-
-  // Separate method for fallback initialization
-  private initializeMapWithDefaultLocation = () => {
-    if (!this.mapContainer.current) return;
-
-    const defaultLocation = { latitude: 37.7749, longitude: -122.4194 };
-
-    const map = new mapboxgl.Map({
-      container: this.mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [defaultLocation.longitude, defaultLocation.latitude],
-      zoom: 13
-    });
-
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-    this.setState({
-      map,
-      currentLocation: defaultLocation,
-      isMapLoading: false
-    });
-
-    map.on('load', () => {
-      const mapBounds = map.getBounds();
-      if (mapBounds) {
-        this.handleLoadSits({
-          north: mapBounds.getNorth(),
-          south: mapBounds.getSouth()
-        });
-      }
-    });
   };
 
   private async loadUserData(userId: string) {
@@ -392,9 +360,6 @@ class App extends React.Component<{}, AppState> {
     this.setState(prevState => {
       // If we're opening the photo modal
       if (!prevState.modals.photo.isOpen) {
-        console.log('[App] Opening photo modal, drawer state:',
-          prevState.drawer.isOpen ? `open with sit ${prevState.drawer.sit?.id}` : 'closed');
-
         return {
           modals: {
             ...prevState.modals,
@@ -407,8 +372,6 @@ class App extends React.Component<{}, AppState> {
       }
       // If we're closing the photo modal
       else {
-        console.log('[App] Closing photo modal');
-
         return {
           modals: {
             ...prevState.modals,
@@ -604,13 +567,6 @@ class App extends React.Component<{}, AppState> {
     else {
       this.deleteImage(sitId, imageId);
     }
-  };
-
-  private replaceImage = async (sitId: string, imageId: string) => {
-    const { user, drawer } = this.state;
-    if (!user) return;
-
-
   };
 
   private deleteImage = async (sitId: string, imageId: string) => {
