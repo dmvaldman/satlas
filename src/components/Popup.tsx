@@ -7,14 +7,29 @@ import { formatRelativeTime } from '../utils/dateUtils';
 import { BottomSheet } from 'react-spring-bottom-sheet';
 import 'react-spring-bottom-sheet/dist/style.css';
 
+const markTypes: { type: MarkType; label: string }[] = [
+  {
+    type: 'favorite',
+    label: 'Favorite'
+  },
+  {
+    type: 'visited',
+    label: 'Visited'
+  },
+  {
+    type: 'wantToGo',
+    label: 'Want to Go'
+  }
+];
+
 interface PopupProps {
   isOpen: boolean;
   photoModalIsOpen: boolean;
-  sit: Sit;
-  images: Image[];
   user: User | null;
-  marks: Set<MarkType>;
-  favoriteCount: number;
+  sit?: Sit;
+  images?: Image[];
+  marks?: Set<MarkType>;
+  favoriteCount?: number;
   currentLocation: { latitude: number; longitude: number } | null;
   onClose: () => void;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
@@ -32,11 +47,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     super(props);
   }
 
-  componentDidUpdate(prevProps: PopupProps, prevState: PopupState) {
-    console.log('PopupComponent did update', prevProps.images.length, this.props.images.length);
-    // No logic needed here for now
-  }
-
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
     e.stopPropagation();
     const { sit, onToggleMark, user, onSignIn } = this.props;
@@ -50,6 +60,11 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       } catch (error) {
         console.error('Error signing in:', error);
       }
+      return;
+    }
+
+    if (!sit) {
+      console.error('sit is undefined');
       return;
     }
 
@@ -70,16 +85,29 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     if (!window.confirm('Are you sure you want to delete this photo?')) {
       return;
     }
+    if (!sit) {
+      console.error('sit is undefined');
+      return;
+    }
     await onDeleteImage(sit.id, imageId);
   };
 
   private handleImageReplace = async (imageId: string) => {
     const { sit, onReplaceImage } = this.props;
+    if (!sit) {
+      console.error('sit is undefined');
+      return;
+    }
     onReplaceImage(sit.id, imageId);
   };
 
   private renderCarousel() {
-    const { images, user, sit, isOpen } = this.props;
+    const { images, user } = this.props;
+
+    if (!images) {
+      console.error('images is undefined');
+      return;
+    }
 
     return (
       <Carousel
@@ -93,20 +121,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private renderMarkButtons() {
     const { marks } = this.props;
-    const markTypes: { type: MarkType; label: string }[] = [
-      {
-        type: 'favorite',
-        label: 'Favorite'
-      },
-      {
-        type: 'visited',
-        label: 'Visited'
-      },
-      {
-        type: 'wantToGo',
-        label: 'Want to Go'
-      }
-    ];
 
     return (
       <div className="mark-buttons">
@@ -199,6 +213,10 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         this.props.onOpenProfileModal();
         return;
       }
+      if (!sit) {
+        console.error('sit is undefined');
+        return;
+      }
       if (!sit.imageCollectionId) return;
       this.props.onOpenPhotoModal(sit);
     };
@@ -226,58 +244,58 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       images
     } = this.props;
 
+    if (!sit) {
+      console.error('sit is undefined');
+      return null;
+    }
+
     // Render the BottomSheet that wraps our popup content
     return (
-      <>
-        {sit && (
-          <BottomSheet
-            open={isOpen && !photoModalIsOpen}
-            onDismiss={onClose}
-            snapPoints={() => [
-              Math.min(1000, window.innerHeight * .7)
-            ]}
-            expandOnContentDrag={false}
-            defaultSnap={({ minHeight }) => minHeight}
-            blocking={true}
-            header={
-              <div className="bottom-sheet-header">
-                <span className="header-emoji">🪑</span>
-              </div>
-            }
-          >
-            <div className="satlas-popup">
-              {/* Show carousel if there are images (even for pending uploads with base64 data) */}
-              {(sit.imageCollectionId || images.some(img => img.base64Data)) ? (
-                this.renderCarousel()
-              ) : (
-                <div className="pending-upload">
-                  <p>Uploading new sit...</p>
-                </div>
-              )}
-
-              {this.renderUploadButton()}
-
-              {this.renderMarkButtons()}
-
-              {/* Group metadata elements in a single div */}
-              <div className="sit-metadata-container">
-                {/* Display uploader information */}
-                {sit.uploadedBy && sit.createdAt && (
-                  <div className="sit-uploader-info">
-                    Sit uploaded {formatRelativeTime(sit.createdAt)}
-                  </div>
-                )}
-
-                {/* Only show favorite count for established sits */}
-                {this.renderFavoriteCount()}
-
-                {/* Show Google Maps link */}
-                {this.renderGoogleMapsLink()}
-              </div>
+      <BottomSheet
+        open={isOpen && !photoModalIsOpen}
+        onDismiss={onClose}
+        snapPoints={() => [
+          Math.min(1000, window.innerHeight * .7)
+        ]}
+        expandOnContentDrag={false}
+        defaultSnap={({ minHeight }) => minHeight}
+        blocking={true}
+        header={
+          <div className="bottom-sheet-header">
+            <span className="header-emoji">🪑</span>
+          </div>
+        }
+      >
+        <div className="satlas-popup">
+          {sit.imageCollectionId || (images && images.some(img => img.base64Data)) ? (
+            this.renderCarousel()
+          ) : (
+            <div className="pending-upload">
+              <p>Uploading new sit...</p>
             </div>
-          </BottomSheet>
-        )}
-      </>
+          )}
+
+          {this.renderUploadButton()}
+
+          {this.renderMarkButtons()}
+
+          {/* Group metadata elements in a single div */}
+          <div className="sit-metadata-container">
+            {/* Display uploader information */}
+            {sit.uploadedBy && sit.createdAt && (
+              <div className="sit-uploader-info">
+                Sit uploaded {formatRelativeTime(sit.createdAt)}
+              </div>
+            )}
+
+            {/* Only show favorite count for established sits */}
+            {this.renderFavoriteCount()}
+
+            {/* Show Google Maps link */}
+            {this.renderGoogleMapsLink()}
+          </div>
+        </div>
+      </BottomSheet>
     );
   }
 }

@@ -23,6 +23,7 @@ interface ProfileModalState {
   pushNotifications: boolean;
   isSubmitting: boolean;
   usernameError: string | null;
+  isActive: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
@@ -38,7 +39,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username: '',
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null
+      usernameError: null,
+      isActive: false
     };
   }
 
@@ -55,22 +57,22 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // Sync the toggle state with actual device permissions
     this.syncNotificationToggleState();
 
-    // Initialize animation
-    if (this.contentRef.current) {
-      // Trigger reflow
-      void this.contentRef.current.offsetHeight;
-      this.contentRef.current.classList.add('active');
+    // Add permission change listener
+    if (Capacitor.isNativePlatform() && this.props.user) {
+      PushNotificationService.getInstance().addPermissionChangeListener(this.handlePermissionChange);
+    }
+
+    // Set to active after a small delay to ensure initial transform is applied
+    if (this.props.isOpen) {
+      requestAnimationFrame(() => {
+        this.setState({ isActive: true });
+      });
     }
   }
 
   componentDidUpdate(prevProps: ProfileModalProps) {
     if (!prevProps.isOpen && this.props.isOpen) {
       // Modal is opening
-      if (this.contentRef.current) {
-        // Trigger reflow
-        void this.contentRef.current.offsetHeight;
-        this.contentRef.current.classList.add('active');
-      }
 
       // Re-initialize notification service when modal opens with a different user
       if (prevProps.user?.uid !== this.props.user?.uid) {
@@ -79,11 +81,16 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Sync the toggle state with actual device permissions
       this.syncNotificationToggleState();
+
+      // Set to active after a small delay to ensure initial transform is applied
+      requestAnimationFrame(() => {
+        this.setState({ isActive: true });
+      });
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
-      if (this.contentRef.current) {
-        this.contentRef.current.classList.remove('active');
-      }
+      requestAnimationFrame(() => {
+       this.setState({ isActive: false });
+      });
     }
 
     if (prevProps.user !== this.props.user ||
@@ -95,6 +102,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   componentWillUnmount() {
     if (Capacitor.isNativePlatform() && this.keyboardListenersAdded) {
       this.removeKeyboardListeners();
+    }
+
+    // Remove permission change listener
+    if (Capacitor.isNativePlatform() && this.props.user) {
+      PushNotificationService.getInstance().removePermissionChangeListener(this.handlePermissionChange);
     }
   }
 
@@ -316,36 +328,17 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       const notificationService = PushNotificationService.getInstance();
 
       // Service should already be initialized, just enable or disable
-      let success: boolean;
-
       if (enabled) {
         console.log('[ProfileModal] Attempting to enable notifications');
-        success = await notificationService.enable();
-        console.log('[ProfileModal] Enable result:', success);
-
-        // Immediately update state if enable was successful
-        if (success) {
-          this.setState({ pushNotifications: true });
-        }
+        await notificationService.enable();
       } else {
         console.log('[ProfileModal] Attempting to disable notifications');
-        success = await notificationService.disable();
-        console.log('[ProfileModal] Disable result:', success);
-
-        // Immediately update state if disable was successful
-        if (success) {
-          this.setState({ pushNotifications: false });
-        }
+        await notificationService.disable();
       }
 
-      // After enable/disable attempt, sync with actual permission status
-      console.log('[ProfileModal] Syncing toggle state after permission change attempt');
+      // Force a fresh sync with current permissions
       const actualStatus = await notificationService.syncPermissionStatus();
-
-      // Update state again to ensure it matches actual permission status
-      if (this.state.pushNotifications !== actualStatus) {
-        this.setState({ pushNotifications: actualStatus });
-      }
+      this.setState({ pushNotifications: actualStatus });
 
       // Update preferences to match current state
       const updatedPreferences = {
@@ -359,13 +352,19 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
+  private handlePermissionChange = (isGranted: boolean) => {
+    console.log('[ProfileModal] Permission change detected:', isGranted);
+    this.setState({ pushNotifications: isGranted });
+  }
+
   render() {
     const { isOpen, onClose, onSignOut } = this.props;
     const {
       username,
       pushNotifications,
       isSubmitting,
-      usernameError
+      usernameError,
+      isActive
     } = this.state;
 
     if (!isOpen) return null;
@@ -408,11 +407,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     return (
       <div
-        className="modal-overlay"
+        className={`modal-overlay ${isOpen ? 'active' : ''}`}
+        style={{ display: isOpen ? 'flex' : 'none' }}
         onClick={(e) => handleClose(e)}
       >
         <div
-          className="modal-content profile-content"
+          className={`modal-content profile-content ${isActive ? 'active' : ''}`}
           onClick={e => e.stopPropagation()}
           ref={this.contentRef}
         >
