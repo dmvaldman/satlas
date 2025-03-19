@@ -1,23 +1,17 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed as PushActionPerformed } from '@capacitor/push-notifications';
-import { LocalNotifications, LocalNotificationSchema, ActionPerformed as LocalActionPerformed } from '@capacitor/local-notifications';
 import { FirebaseService } from './FirebaseService';
 import { UserPreferences } from '../types';
 import { AndroidSettings, IOSSettings, NativeSettings } from 'capacitor-native-settings';
 
-// Notification types
-export enum NotificationType {
-  PROXIMITY_ALERT = 'proximity_alert',
-  NEW_SIT_ALERT = 'new_sit_alert'
-}
-
 // Notification listener type
-export type NotificationListener = (notification: LocalNotificationSchema | PushNotificationSchema) => void;
+export type NotificationListener = (notification: PushNotificationSchema) => void;
 
 export class PushNotificationService {
   private static instance: PushNotificationService;
   private initialized = false;
   private listeners: NotificationListener[] = [];
+  private permissionCallbacks: ((isGranted: boolean) => void)[] = [];
   private userId: string | null = null;
   private enabled = false;
 
@@ -58,9 +52,6 @@ export class PushNotificationService {
 
       // Check actual permission status and update our state
       await this.syncPermissionStatus();
-
-      // Initialize local notifications for in-app handling
-      await this.initializeLocalNotifications();
     } else {
       console.log('[PushNotificationService] Not a native platform, skipping native initialization');
     }
@@ -172,6 +163,36 @@ export class PushNotificationService {
   }
 
   /**
+   * Add a listener for permission changes
+   */
+  public addPermissionChangeListener(callback: (isGranted: boolean) => void): void {
+    this.permissionCallbacks.push(callback);
+  }
+
+  /**
+   * Remove a permission change listener
+   */
+  public removePermissionChangeListener(callback: (isGranted: boolean) => void): void {
+    const index = this.permissionCallbacks.indexOf(callback);
+    if (index !== -1) {
+      this.permissionCallbacks.splice(index, 1);
+    }
+  }
+
+  /**
+   * Notify permission change listeners
+   */
+  private notifyPermissionListeners(isGranted: boolean): void {
+    this.permissionCallbacks.forEach(callback => {
+      try {
+        callback(isGranted);
+      } catch (error) {
+        console.error('[PushNotificationService] Error in permission callback:', error);
+      }
+    });
+  }
+
+  /**
    * Register for push notifications
    */
   private async registerPushNotifications(): Promise<void> {
@@ -185,6 +206,9 @@ export class PushNotificationService {
       PushNotifications.addListener('registration', (token: Token) => {
         console.log('[PushNotificationService] Got registration token:', token.value);
         this.savePushToken(token.value);
+
+        // Notification of permission granted - registration only happens when permissions are granted
+        this.notifyPermissionListeners(true);
       });
 
       // Listen for push notification received
@@ -236,36 +260,6 @@ export class PushNotificationService {
   }
 
   /**
-   * Initialize local notifications
-   */
-  private async initializeLocalNotifications(): Promise<void> {
-    try {
-      // Request permission
-      const permission = await LocalNotifications.requestPermissions();
-      if (!permission.display) {
-        console.warn('Local notification permission not granted');
-        return;
-      }
-
-      // Listen for local notification received
-      LocalNotifications.addListener('localNotificationReceived', (notification: LocalNotificationSchema) => {
-        console.log('Local notification received:', notification);
-        this.notifyListeners(notification);
-      });
-
-      // Listen for local notification action performed
-      LocalNotifications.addListener('localNotificationActionPerformed', (action: LocalActionPerformed) => {
-        console.log('Local notification action performed:', action);
-        if (action.notification) {
-          this.notifyListeners(action.notification);
-        }
-      });
-    } catch (error) {
-      console.error('Error initializing local notifications:', error);
-    }
-  }
-
-  /**
    * Save the push notification token to Firebase
    */
   private async savePushToken(token: string): Promise<void> {
@@ -290,7 +284,7 @@ export class PushNotificationService {
   /**
    * Notify all listeners of a notification
    */
-  private notifyListeners(notification: LocalNotificationSchema | PushNotificationSchema): void {
+  private notifyListeners(notification: PushNotificationSchema): void {
     this.listeners.forEach((listener) => {
       try {
         listener(notification);
@@ -358,6 +352,9 @@ export class PushNotificationService {
       if (this.enabled !== isPermissionGranted) {
         console.log(`[PushNotificationService] Syncing permission status: ${isPermissionGranted}`);
         this.enabled = isPermissionGranted;
+
+        // Notify listeners about the permission change
+        this.notifyPermissionListeners(isPermissionGranted);
 
         // Update the database to match the actual permission status
         if (this.userId) {
