@@ -56,7 +56,7 @@ interface AppState {
   // Add drawer state
   drawer: {
     isOpen: boolean;
-    sit: Sit | null;
+    sit?: Sit;
     images: Image[];
   };
 
@@ -107,7 +107,7 @@ class App extends React.Component<{}, AppState> {
       // Initialize drawer state
       drawer: {
         isOpen: false,
-        sit: null,
+        sit: undefined,
         images: []
       },
 
@@ -198,60 +198,69 @@ class App extends React.Component<{}, AppState> {
   };
 
   private initializeMap = async () => {
-    console.log('Initializing map');
-    if (!this.mapContainer.current) return;
-
-    // Create map immediately with default center
-    const map = new mapboxgl.Map({
-      container: this.mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [0, 0], // Temporary center
-      zoom: 1
-    });
-
-    // Set initial map state
-    this.setState({
-      map
-    });
+    console.log('Getting location');
 
     // Get location in background
     this.locationService.getCurrentLocation()
       .then(coordinates => {
-        this.setState({ currentLocation: coordinates });
-        if (map.getCenter().lng === 0 && map.getCenter().lat === 0) {
-          map.setCenter([coordinates.longitude, coordinates.latitude]);
-          map.setZoom(13);
+        if (!this.mapContainer.current) return;
+
+        console.log('Creating map');
+
+        let center: [number, number];
+        let zoom: number;
+
+        if (coordinates){
+          center = [coordinates.longitude, coordinates.latitude];
+          zoom = 13;
         }
+        else {
+          center = [0, 0];
+          zoom = 1;
+        }
+
+        const map: mapboxgl.Map = new mapboxgl.Map({
+          container: this.mapContainer.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: center,
+          zoom: zoom
+        });
+
+        map.on('load', () => {
+          console.log('Map fully loaded');
+          this.locationService.startLocationTracking();
+
+          const bounds = map.getBounds();
+          console.log('Map Bounds:', bounds);
+          if (bounds) {
+            this.handleLoadSits({
+              north: bounds.getNorth(),
+              south: bounds.getSouth()
+            });
+          }
+        });
+
+        // Add moveend handler
+        map.on('moveend', () => {
+          const bounds = map.getBounds();
+          console.log('Map Bounds:', bounds);
+          if (bounds) {
+            this.handleLoadSits({
+              north: bounds.getNorth(),
+              south: bounds.getSouth()
+            });
+          }
+        });
+
+        this.setState({
+          currentLocation: coordinates,
+          map: map
+        });
       })
       .catch(error => {
         console.error('Location error:', error);
         this.showNotification('Using default map view', 'error');
       });
-
-    // Set up map load handler
-    map.on('load', () => {
-      console.log('Map fully loaded');
-      this.locationService.startLocationTracking();
-
-      const bounds = map.getBounds();
-      if (bounds) {
-        this.handleLoadSits({
-          north: bounds.getNorth(),
-          south: bounds.getSouth()
-        });
-      }
-    });
-
-    // Add moveend handler
-    map.on('moveend', () => {
-      const bounds = map.getBounds();
-      if (bounds) {
-        this.handleLoadSits({
-          north: bounds.getNorth(),
-          south: bounds.getSouth()
-        });
-      }
-    });
   };
 
   private initializeOfflineService = async () => {
@@ -592,7 +601,7 @@ class App extends React.Component<{}, AppState> {
         this.setState({
           drawer: {
             isOpen: false,
-            sit: null,
+            sit: undefined,
             images: []
           }
         });
@@ -1114,29 +1123,25 @@ class App extends React.Component<{}, AppState> {
           />
         )}
 
-        {modals.photo.isOpen && (
-          <PhotoUploadComponent
-            isOpen={modals.photo.isOpen}
-            onClose={this.togglePhotoUpload}
-            onPhotoCapture={this.handlePhotoUploadComplete}
-            sit={modals.photo.sit}
-            replacementImageId={modals.photo.replacementImageId}
-            showNotification={this.showNotification}
-          />
-        )}
+        <PhotoUploadComponent
+          isOpen={modals.photo.isOpen}
+          onClose={this.togglePhotoUpload}
+          onPhotoCapture={this.handlePhotoUploadComplete}
+          sit={modals.photo.sit}
+          replacementImageId={modals.photo.replacementImageId}
+          showNotification={this.showNotification}
+        />
 
-        {modals.profile.isOpen && (
-          <ProfileModal
-            isOpen={modals.profile.isOpen}
-            user={user}
-            preferences={userPreferences}
-            onClose={this.toggleProfile}
-            onSignOut={this.handleSignOut}
-            onSave={this.handleSavePreferences}
-            onUpdatePreferences={this.updatePreferences}
-            showNotification={this.showNotification}
-          />
-        )}
+        <ProfileModal
+          isOpen={modals.profile.isOpen}
+          user={user}
+          preferences={userPreferences}
+          onClose={this.toggleProfile}
+          onSignOut={this.handleSignOut}
+          onSave={this.handleSavePreferences}
+          onUpdatePreferences={this.updatePreferences}
+          showNotification={this.showNotification}
+        />
 
         <AddSitButton
           isAuthenticated={isAuthenticated}
@@ -1159,25 +1164,23 @@ class App extends React.Component<{}, AppState> {
 
         <Notification />
 
-        {drawer.sit && (
-          <PopupComponent
-            isOpen={drawer.isOpen}
-            photoModalIsOpen={modals.photo.isOpen}
-            sit={drawer.sit}
-            images={drawer.images}
-            user={user}
-            marks={marks.get(drawer.sit.id) || new Set()}
-            favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
-            currentLocation={currentLocation}
-            onClose={this.closeDrawer}
-            onToggleMark={this.handleToggleMark}
-            onDeleteImage={this.handleDeleteImage}
-            onReplaceImage={this.handleReplaceImage}
-            onOpenPhotoModal={() => drawer.sit ? this.togglePhotoUpload(drawer.sit) : undefined}
-            onOpenProfileModal={this.toggleProfile}
-            onSignIn={this.handleSignIn}
-          />
-        )}
+        <PopupComponent
+          isOpen={drawer.isOpen}
+          photoModalIsOpen={modals.photo.isOpen}
+          sit={drawer.sit}
+          images={drawer.images}
+          user={user}
+          marks={marks.get(drawer.sit?.id || '') || new Set()}
+          favoriteCount={favoriteCount.get(drawer.sit?.id || '') || 0}
+          currentLocation={currentLocation}
+          onClose={this.closeDrawer}
+          onToggleMark={this.handleToggleMark}
+          onDeleteImage={this.handleDeleteImage}
+          onReplaceImage={this.handleReplaceImage}
+          onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
+          onOpenProfileModal={this.toggleProfile}
+          onSignIn={this.handleSignIn}
+        />
 
         {isAndroid && <div className="bottom-nav-space"></div>}
       </div>

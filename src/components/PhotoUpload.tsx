@@ -18,35 +18,38 @@ interface PhotoUploadProps {
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
-class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
+interface PhotoUploadState {
+  isActive: boolean;
+}
+
+class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUploadState> {
   private modalRef = React.createRef<HTMLDivElement>();
 
   constructor(props: PhotoUploadProps) {
     super(props);
+    this.state = {
+      isActive: false
+    };
   }
 
   componentDidMount() {
-    // Force a reflow before adding the active class
-    if (this.modalRef.current) {
-      // Trigger reflow
-      void this.modalRef.current.offsetHeight;
-      this.modalRef.current.classList.add('active');
+    // Set to active after a small delay to ensure initial transform is applied
+    if (this.props.isOpen) {
+      requestAnimationFrame(() => {
+        this.setState({ isActive: true });
+      });
     }
   }
 
   componentDidUpdate(prevProps: PhotoUploadProps) {
     if (!prevProps.isOpen && this.props.isOpen) {
       // Modal is opening
-      if (this.modalRef.current) {
-        // Trigger reflow
-        void this.modalRef.current.offsetHeight;
-        this.modalRef.current.classList.add('active');
-      }
+      requestAnimationFrame(() => {
+        this.setState({ isActive: true });
+      });
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
-      if (this.modalRef.current) {
-        this.modalRef.current.classList.remove('active');
-      }
+      this.setState({ isActive: false });
     }
   }
 
@@ -329,7 +332,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     }
   };
 
-  private async getLocation(): Promise<Coordinates> {
+  private async getLocation(): Promise<Coordinates | null> {
     // Try cached location first
     const cachedLocation = LocationService.getLastKnownLocation();
     if (cachedLocation) {
@@ -343,6 +346,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
   render() {
     const { isOpen, isUploading, onClose } = this.props;
+    const { isActive } = this.state;
     const isOffline = !OfflineService.getInstance().isNetworkOnline();
 
     if (!isOpen) return null;
@@ -350,12 +354,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     // Use React Portal to render at the document root
     return ReactDOM.createPortal(
       <div
-        className="modal-overlay"
+        className={`modal-overlay ${isOpen ? 'active' : ''}`}
+        style={{ display: isOpen ? 'flex' : 'none' }}
         onClick={onClose}
       >
         <div
           ref={this.modalRef}
-          className="modal-content photo-options"
+          className={`modal-content photo-options ${isActive ? 'active' : ''}`}
           onClick={e => e.stopPropagation()}
         >
           {isOffline && (
