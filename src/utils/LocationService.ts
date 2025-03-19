@@ -9,7 +9,6 @@ interface Location {
 type LocationCallback = (location: Location) => void;
 
 const LOCATION_TIMEOUT = 3000; // 3 seconds
-const DEFAULT_LOCATION = { latitude: 37.7749, longitude: -122.4194 }; // San Francisco
 
 export class LocationService {
   private locationWatchId: string | null = null;
@@ -58,7 +57,7 @@ export class LocationService {
   }
 
   // Get current location (one-time)
-  async getCurrentLocation(): Promise<Location> {
+  async getCurrentLocation(): Promise<Location | null> {
     try {
       if (Capacitor.getPlatform() !== 'web') {
         return await this.getLocationNative();
@@ -70,7 +69,7 @@ export class LocationService {
     }
   }
 
-  private async getLocationWeb(): Promise<Location> {
+  private async getLocationWeb(): Promise<Location | null> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by this browser'));
@@ -115,7 +114,7 @@ export class LocationService {
     });
   }
 
-  private async getLocationNative(): Promise<Location> {
+  private async getLocationNative(): Promise<Location | null> {
     if (!this.hasLocationPermission) {
       console.log('Requesting location permissions...');
       const request = await Geolocation.requestPermissions();
@@ -183,8 +182,8 @@ export class LocationService {
     LocationService.lastKnownLocation = location;
   }
 
-  public static getLastKnownLocation(): Location {
-    return LocationService.lastKnownLocation || DEFAULT_LOCATION;
+  public static getLastKnownLocation(): Location | null{
+    return LocationService.lastKnownLocation || null;
   }
 
   // Register a callback to receive location updates
