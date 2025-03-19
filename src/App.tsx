@@ -28,7 +28,6 @@ interface AppState {
   // Map state
   map: mapboxgl.Map | null;
   currentLocation: { latitude: number; longitude: number } | null;
-  isMapLoading: boolean;
 
   // Data state
   sits: Map<string, Sit>;
@@ -86,7 +85,6 @@ class App extends React.Component<{}, AppState> {
       // Map state
       map: null,
       currentLocation: null,
-      isMapLoading: true,
 
       // Data state
       sits: new Map(),
@@ -121,58 +119,23 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
-    // Configure status bar for mobile devices
+    // Run all async initializations in parallel
+    Promise.all([
+      this.initializeAuth(),
+      this.initializeMap(),
+      this.initializeOfflineService()
+    ]).catch(error => {
+      console.error('Initialization error:', error);
+      this.showNotification('Failed to initialize app', 'error');
+    });
+
+    // Configure status bar first since it's fast
     if (Capacitor.isNativePlatform()) {
       this.configureStatusBar();
     }
 
-    // 1. Set up auth listener (which may never fire in Capacitor)
-    this.authUnsubscribe = FirebaseService.onAuthStateChange(async (user) => {
-      console.log('[App] Auth state changed:', user ? user.displayName : 'null');
-
-      if (user) {
-        this.setState({
-          user,
-          isAuthenticated: true,
-          authIsReady: true
-        });
-
-        // Load user preferences when auth state changes
-        this.loadUserData(user.uid);
-      } else {
-        this.setState({
-          user: null,
-          isAuthenticated: false,
-          authIsReady: true
-        });
-      }
-    });
-
-    console.log('[App.tsx On Mount] auth.currentUser', auth.currentUser);
-
-    // 2. Check auth state immediately on mount (workaround)
-    const currentUser = auth.currentUser;
-    console.log('[App] Direct auth check on mount:', currentUser?.displayName || 'not signed in');
-
-    this.setState({
-      user: currentUser,
-      isAuthenticated: !!currentUser,
-      authIsReady: true  // Always make UI available
-    });
-
-    // Load user preferences if user is already authenticated
-    if (currentUser) {
-      this.loadUserData(currentUser.uid);
-    }
-
-    // Initialize map after component is mounted
-    this.initializeMap();
-
-    // Set up location listener
+    // Add location listener before initializations
     this.locationService.addLocationListener(this.handleLocationUpdate);
-
-    // Initialize OfflineService and add listener
-    this.initializeOfflineService();
   }
 
   componentWillUnmount() {
@@ -196,71 +159,154 @@ class App extends React.Component<{}, AppState> {
     }
   }
 
-  private initializeMap = () => {
-    console.log('Initializing map');
+  private initializeAuth = async () => {
+    // 1. Auth setup
+    this.authUnsubscribe = FirebaseService.onAuthStateChange(async (user) => {
+      console.log('[App] Auth state changed:', user ? user.displayName : 'null');
 
-    if (!this.mapContainer.current) {
-      console.error('Map container ref is not available');
-      return;
+      if (user) {
+        this.setState({
+          user,
+          isAuthenticated: true,
+          authIsReady: true
+        });
+
+        await this.loadUserData(user.uid);
+      } else {
+        this.setState({
+          user: null,
+          isAuthenticated: false,
+          authIsReady: true
+        });
+      }
+    });
+
+    // 2. Direct auth check
+    const currentUser = auth.currentUser;
+    console.log('[App] Direct auth check on mount:', currentUser?.displayName || 'not signed in');
+
+    this.setState({
+      user: currentUser,
+      isAuthenticated: !!currentUser,
+      authIsReady: true  // Always make UI available
+    });
+
+    // 3. Load user data if authenticated
+    if (currentUser) {
+      await this.loadUserData(currentUser.uid);
     }
+  };
 
-    // Get location first, then initialize map
-    console.log('Getting location');
+  private initializeMap = async () => {
+    console.log('Initializing map');
+    if (!this.mapContainer.current) return;
+
+    // Create map immediately with default center
+    const map = new mapboxgl.Map({
+      container: this.mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [0, 0], // Temporary center
+      zoom: 1
+    });
+
+    // Set initial map state
+    this.setState({
+      map
+    });
+
+    // Get location in background
     this.locationService.getCurrentLocation()
       .then(coordinates => {
-        console.log('Initial coordinates for map:', coordinates);
-
-        if (!this.mapContainer.current) return;
-
-        // Create map centered on user location
-        const map = new mapboxgl.Map({
-          container: this.mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: [coordinates.longitude, coordinates.latitude],
-          zoom: 13
-        });
-
-        // Set state with map and location
-        this.setState({
-          map,
-          currentLocation: coordinates,
-          isMapLoading: false
-        });
-
-        // When map is fully loaded
-        map.on('load', () => {
-          console.log('Map fully loaded');
-
-          // Start tracking location
-          this.locationService.startLocationTracking();
-
-          // Load sits based on initial map bounds
-          const mapBounds = map.getBounds();
-          if (mapBounds) {
-            this.handleLoadSits({
-              north: mapBounds.getNorth(),
-              south: mapBounds.getSouth()
-            });
-          }
-
-          window.dispatchEvent(new CustomEvent('mapReady'));
-        });
-
-        // Add moveend handler
-        map.on('moveend', () => {
-          const bounds = map.getBounds();
-          if (bounds) {
-            this.handleLoadSits({
-              north: bounds.getNorth(),
-              south: bounds.getSouth()
-            });
-          }
-        });
+        this.setState({ currentLocation: coordinates });
+        if (map.getCenter().lng === 0 && map.getCenter().lat === 0) {
+          map.setCenter([coordinates.longitude, coordinates.latitude]);
+          map.setZoom(13);
+        }
       })
       .catch(error => {
-        console.error('Error getting location or initializing map:', error);
-        this.showNotification('Failed to load map.', 'error');
+        console.error('Location error:', error);
+        this.showNotification('Using default map view', 'error');
       });
+
+    // Set up map load handler
+    map.on('load', () => {
+      console.log('Map fully loaded');
+      this.locationService.startLocationTracking();
+
+      const bounds = map.getBounds();
+      if (bounds) {
+        this.handleLoadSits({
+          north: bounds.getNorth(),
+          south: bounds.getSouth()
+        });
+      }
+    });
+
+    // Add moveend handler
+    map.on('moveend', () => {
+      const bounds = map.getBounds();
+      if (bounds) {
+        this.handleLoadSits({
+          north: bounds.getNorth(),
+          south: bounds.getSouth()
+        });
+      }
+    });
+  };
+
+  private initializeOfflineService = async () => {
+    const offlineService = OfflineService.getInstance();
+    await offlineService.initialize();
+
+    // Keep existing offline service listener logic
+    let lastKnownNetworkState = offlineService.isNetworkOnline();
+    this.offlineServiceUnsubscribe = offlineService.addStatusListener(async (isOnline) => {
+      console.log('[App] Network status changed:', isOnline ? 'online' : 'offline');
+
+      // Check if this is a real network change or just the app coming back to foreground
+      const isRealNetworkChange = (lastKnownNetworkState !== isOnline);
+      lastKnownNetworkState = isOnline;
+
+      if (!isRealNetworkChange) {
+        console.log('[App] Not a real network change, likely app lifecycle event. Ignoring.');
+        return;
+      }
+
+      // If we're going offline, update the UI immediately
+      if (!isOnline) {
+        this.setState({ isOffline: true });
+        return;
+      }
+
+      // If we're coming back online, don't update the UI state immediately
+      // First check authentication state to prevent momentary logout
+      console.log('[App] Back online, checking authentication before updating UI');
+
+      try {
+        // Check if we have a current user in Firebase
+        const currentUser = auth.currentUser;
+
+        if (currentUser) {
+          console.log('[App] Found Firebase user, updating state with user:', currentUser.uid);
+
+          // Update state with the current user and set offline to false in one update
+          // This prevents the momentary logout
+          this.setState({
+            user: currentUser,
+            isAuthenticated: true,
+            isOffline: false
+          }, () => {
+            // Now process uploads with the authenticated user
+            console.log('[App] Processing pending uploads with authenticated user');
+            this.handleProcessPendingUploads();
+          });
+        }
+      } catch (error) {
+        console.error('[App] Error during network status change handling:', error);
+        // Still update offline state even if there was an error
+        this.setState({ isOffline: false });
+      }
+    });
   };
 
   private async loadUserData(userId: string) {
@@ -975,62 +1021,6 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private async initializeOfflineService() {
-    const offlineService = OfflineService.getInstance();
-    await offlineService.initialize();
-
-    // Keep track of the last known network state to detect real changes
-    let lastKnownNetworkState = offlineService.isNetworkOnline();
-
-    this.offlineServiceUnsubscribe = offlineService.addStatusListener(async (isOnline) => {
-      console.log('[App] Network status changed:', isOnline ? 'online' : 'offline');
-
-      // Check if this is a real network change or just the app coming back to foreground
-      const isRealNetworkChange = (lastKnownNetworkState !== isOnline);
-      lastKnownNetworkState = isOnline;
-
-      if (!isRealNetworkChange) {
-        console.log('[App] Not a real network change, likely app lifecycle event. Ignoring.');
-        return;
-      }
-
-      // If we're going offline, update the UI immediately
-      if (!isOnline) {
-        this.setState({ isOffline: true });
-        return;
-      }
-
-      // If we're coming back online, don't update the UI state immediately
-      // First check authentication state to prevent momentary logout
-      console.log('[App] Back online, checking authentication before updating UI');
-
-      try {
-        // Check if we have a current user in Firebase
-        const currentUser = auth.currentUser;
-
-        if (currentUser) {
-          console.log('[App] Found Firebase user, updating state with user:', currentUser.uid);
-
-          // Update state with the current user and set offline to false in one update
-          // This prevents the momentary logout
-          this.setState({
-            user: currentUser,
-            isAuthenticated: true,
-            isOffline: false
-          }, () => {
-            // Now process uploads with the authenticated user
-            console.log('[App] Processing pending uploads with authenticated user');
-            this.handleProcessPendingUploads();
-          });
-        }
-      } catch (error) {
-        console.error('[App] Error during network status change handling:', error);
-        // Still update offline state even if there was an error
-        this.setState({ isOffline: false });
-      }
-    });
-  }
-
   /**
    * Handle processing of pending uploads by showing notifications and refreshing the map
    */
@@ -1068,9 +1058,7 @@ class App extends React.Component<{}, AppState> {
       currentLocation,
       modals,
       userPreferences,
-      isMapLoading,
-      drawer,
-      isOffline
+      drawer
     } = this.state;
 
     const isAndroid = Capacitor.getPlatform() === 'android';
@@ -1112,7 +1100,7 @@ class App extends React.Component<{}, AppState> {
           style={{ width: '100%' }}
         />
 
-        {!isMapLoading && map && (
+        {map && (
           <MapComponent
             ref={this.mapComponentRef}
             map={map}
@@ -1121,7 +1109,6 @@ class App extends React.Component<{}, AppState> {
             favoriteCount={favoriteCount}
             currentLocation={currentLocation}
             user={user}
-            isLoading={isMapLoading}
             onLoadSits={this.handleLoadSits}
             onOpenPopup={this.openPopup}
           />
