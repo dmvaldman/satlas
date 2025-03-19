@@ -63,8 +63,6 @@ export class FirebaseService {
   static db = db;
   static storage = storage;
 
-  private static isResumeListenerSet = false;
-
   /**
    * Check if the app is online
    * @returns true if online, false if offline

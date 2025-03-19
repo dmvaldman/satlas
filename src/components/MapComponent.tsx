@@ -13,7 +13,6 @@ interface MapProps {
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;
   user: User | null;
-  isLoading: boolean;
   currentLocation: { latitude: number; longitude: number } | null;
   onLoadSits: (bounds: { north: number; south: number }) => void;
   onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
@@ -228,16 +227,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   render() {
-    const { isLoading } = this.props;
-
-    if (isLoading) {
-      return (
-        <div className="loading">
-          <p>Loading map...</p>
-        </div>
-      );
-    }
-
     return null;
   }
 }
