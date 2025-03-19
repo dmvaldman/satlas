@@ -23,7 +23,6 @@ interface ProfileModalState {
   pushNotifications: boolean;
   isSubmitting: boolean;
   usernameError: string | null;
-  isLoading: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
@@ -35,14 +34,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   constructor(props: ProfileModalProps) {
     super(props);
 
-    const isDataCached = props.user && ProfileModal.loadedUserIds.has(props.user.uid);
-
     this.state = {
       username: '',
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null,
-      isLoading: !isDataCached && !!props.user
+      usernameError: null
     };
   }
 
@@ -58,16 +54,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // Sync the toggle state with actual device permissions
     this.syncNotificationToggleState();
-
-    // Add a safety timeout to prevent infinite loading
-    setTimeout(() => {
-      if (this.state.isLoading) {
-        console.log('[ProfileModal] Safety timeout triggered, forcing loading to complete');
-        this.setState({
-          isLoading: false
-        });
-      }
-    }, 5000);
 
     // Initialize animation
     if (this.contentRef.current) {
@@ -144,8 +130,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     console.log('[ProfileModal] initializeFromProps:', {
       user: user?.uid,
-      preferences,
-      isLoading: this.state.isLoading
+      preferences
     });
 
     if (user) {
@@ -154,8 +139,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         // We have preferences, update state and stop loading
         this.setState({
           username: preferences.username,
-          pushNotifications: preferences.pushNotificationsEnabled,
-          isLoading: false
+          pushNotifications: preferences.pushNotificationsEnabled
         });
 
         // Cache this user ID as loaded
@@ -168,8 +152,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       } else {
         // No preferences yet, but we'll use display name as a starting point
         this.setState({
-          pushNotifications: false,
-          isLoading: false // Stop loading even without preferences
+          pushNotifications: false
         });
 
         // Try to generate a username from display name
@@ -177,9 +160,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
           this.generateUniqueUsername();
         }
       }
-    } else {
-      // No user, stop loading
-      this.setState({ isLoading: false });
     }
   }
 
@@ -385,8 +365,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       username,
       pushNotifications,
       isSubmitting,
-      usernameError,
-      isLoading
+      usernameError
     } = this.state;
 
     if (!isOpen) return null;
@@ -402,7 +381,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       onClose();
 
       // Don't try to save if there are validation errors or we're submitting
-      if (usernameError || isSubmitting || isLoading) {
+      if (usernameError || isSubmitting) {
         return;
       }
 
@@ -439,43 +418,33 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         >
           <h2>Profile Settings</h2>
 
-          {isLoading ? (
-            <div className="loading-indicator">
-              <div className="spinner"></div>
-              <p>Loading profile data...</p>
+          <div className="profile-section">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              ref={this.inputRef}
+              value={username}
+              onChange={(e) => this.handleUsernameChange(e.target.value)}
+              placeholder="Enter username"
+              className={usernameError ? 'error' : ''}
+            />
+            <div className={`error-message ${usernameError ? 'visible' : 'hidden'}`}>
+              {usernameError || '\u00A0'}
             </div>
-          ) : (
-            <>
-              <div className="profile-section">
-                <label htmlFor="username">Username</label>
-                <input
-                  type="text"
-                  id="username"
-                  ref={this.inputRef}
-                  value={username}
-                  onChange={(e) => this.handleUsernameChange(e.target.value)}
-                  placeholder="Enter username"
-                  className={usernameError ? 'error' : ''}
-                />
-                <div className={`error-message ${usernameError ? 'visible' : 'hidden'}`}>
-                  {usernameError || '\u00A0'}
-                </div>
-              </div>
+          </div>
 
-              <div className="profile-section">
-                <label className="toggle-label">
-                  <span>Push Notifications Enabled</span>
-                  <input
-                    type="checkbox"
-                    checked={pushNotifications}
-                    onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
-
-            </>
-          )}
+          <div className="profile-section">
+            <label className="toggle-label">
+              <span>Push Notifications Enabled</span>
+              <input
+                type="checkbox"
+                checked={pushNotifications}
+                onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
 
           <div className="profile-section">
             <button
