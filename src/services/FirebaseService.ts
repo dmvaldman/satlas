@@ -1033,6 +1033,60 @@ export class FirebaseService {
   }
 
   /**
+   * Records that a user has seen (viewed) a specific sit
+   * @param userId ID of the user who viewed the sit
+   * @param sitId ID of the sit that was viewed
+   */
+  static async markSitAsSeen(userId: string, sitId: string): Promise<void> {
+    if (!userId || !sitId) return;
+
+    try {
+      const seenRef = doc(db, 'seen', `${userId}_${sitId}`);
+
+      // Use a compound ID to ensure uniqueness and easy querying
+      await setDoc(seenRef, {
+        userId,
+        sitId
+      });
+
+      console.log(`Marked sit ${sitId} as seen by user ${userId}`);
+    } catch (error) {
+      console.error('Error marking sit as seen:', error);
+      // We don't throw here because this is a non-critical operation
+      // If it fails, we don't want to interrupt the user experience
+    }
+  }
+
+  /**
+   * Gets all sits that a user has seen
+   * @param userId ID of the user
+   * @returns A Set of sit IDs that the user has seen
+   */
+  static async getUserSeenSits(userId: string): Promise<Set<string>> {
+    if (!userId) return new Set();
+
+    try {
+      const seenQuery = query(
+        collection(db, 'seen'),
+        where('userId', '==', userId)
+      );
+
+      const seenSnapshot = await getDocs(seenQuery);
+      const seenSits = new Set<string>();
+
+      seenSnapshot.forEach(doc => {
+        const data = doc.data();
+        seenSits.add(data.sitId);
+      });
+
+      return seenSits;
+    } catch (error) {
+      console.error('Error getting user seen sits:', error);
+      return new Set();
+    }
+  }
+
+  /**
    * Replace an existing image
    * @param photoResult The photo result containing base64 data
    * @param imageCollectionId The image collection ID

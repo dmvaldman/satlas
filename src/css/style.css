@@ -129,6 +129,7 @@ body {
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
+  opacity: 1;
 }
 
 .satlas-marker.own-sit {
@@ -146,6 +147,10 @@ body {
 
 .satlas-marker.want-to-go {
   background-color: #9c27b0;
+}
+
+.satlas-marker.seen {
+  background-color: #bed1d6 !important; /* Make the marker slightly transparent */
 }
 
 .satlas-popup {

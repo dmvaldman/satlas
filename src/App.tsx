@@ -34,6 +34,7 @@ interface AppState {
   sits: Map<string, Sit>;
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;
+  seenSits: Set<string>;
 
   // Modal state
   modals: {
@@ -91,6 +92,7 @@ class App extends React.Component<{}, AppState> {
       sits: new Map(),
       marks: new Map(),
       favoriteCount: new Map(),
+      seenSits: new Set<string>(),
 
       // Modal state
       modals: {
@@ -364,11 +366,13 @@ class App extends React.Component<{}, AppState> {
       const marksMap = await FirebaseService.loadUserMarks(userId);
       const favoriteCounts = await FirebaseService.loadFavoriteCounts();
       const userData = await FirebaseService.loadUserPreferences(userId);
+      const seenSits = await FirebaseService.getUserSeenSits(userId);
 
       this.setState({
         marks: marksMap,
         favoriteCount: favoriteCounts,
-        userPreferences: userData
+        userPreferences: userData,
+        seenSits: seenSits
       });
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -416,7 +420,8 @@ class App extends React.Component<{}, AppState> {
         user: null,
         isAuthenticated: false,
         marks: new Map(),
-        favoriteCount: new Map()
+        favoriteCount: new Map(),
+        seenSits: new Set()
       }, () => console.log('[App] State manually updated after sign-out'));
 
     } catch (error) {
@@ -1160,6 +1165,7 @@ class App extends React.Component<{}, AppState> {
       sits,
       marks,
       favoriteCount,
+      seenSits,
       currentLocation,
       modals,
       userPreferences,
@@ -1220,6 +1226,7 @@ class App extends React.Component<{}, AppState> {
             favoriteCount={favoriteCount}
             currentLocation={currentLocation}
             user={user}
+            seenSits={seenSits}
             onLoadSits={this.handleLoadSits}
             onOpenPopup={this.openPopup}
           />
