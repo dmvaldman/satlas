@@ -295,7 +295,8 @@ export class FirebaseService {
       await setDoc(doc(db, 'users', userId), {
         username: preferences.username,
         pushNotificationsEnabled: preferences.pushNotificationsEnabled,
-        lastVisit: Date.now()
+        lastVisit: Date.now(),
+        cityCoordinates: preferences.cityCoordinates
       }, { merge: true }); // Use merge to preserve other fields
     } catch (error) {
       console.error('Error saving preferences:', error);
