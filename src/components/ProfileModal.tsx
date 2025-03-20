@@ -5,19 +5,18 @@ import { FirebaseService } from '../services/FirebaseService';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
-import { LocationService } from '../utils/LocationService';
 import mapboxgl from 'mapbox-gl';
 
 interface ProfileModalProps {
   isOpen: boolean;
   user: User | null;
   preferences: UserPreferences;
+  currentLocation?: { latitude: number; longitude: number } | null;
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
   onUpdatePreferences: (preferences: UserPreferences) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
-  currentLocation?: { latitude: number; longitude: number } | null;
 }
 
 interface ProfileModalState {
