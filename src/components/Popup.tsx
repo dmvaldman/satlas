@@ -1,7 +1,7 @@
 import React from 'react';
+import Carousel from './Carousel';
 import { User } from 'firebase/auth';
 import { Sit, Image, MarkType } from '../types';
-import Carousel from './Carousel';
 import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
 import { Share } from '@capacitor/share';
@@ -238,8 +238,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     // 3. User is within 300 feet of the sit
     // 4. User has NOT already uploaded an image to this sit
 
-    // Don't show if user is not logged in or no location available
-    if (!user || !currentLocation) return null;
+    // Don't show if user is not logged in or no location available or if sit is undefined
+    if (!user || !currentLocation || !sit) return null;
 
     // Don't show if user is too far away (more than 300 feet)
     const distance = getDistanceInFeet(currentLocation, sit.location);
@@ -277,6 +277,11 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
   }
 
   private renderShareButton() {
+    // Only show share button on web platforms
+    if (Capacitor.isNativePlatform()) {
+      return null;
+    }
+
     return (
       <button className="share-button" onClick={this.handleShareSit}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
