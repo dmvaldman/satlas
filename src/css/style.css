@@ -470,8 +470,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .carousel-track.scroll-disabled {
-  width: 100%; /* Reset width for centered content */
-  cursor: default; /* Change cursor to indicate no scrolling */
+  width: 100%;
+  cursor: default;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .carousel-track.dragging {
