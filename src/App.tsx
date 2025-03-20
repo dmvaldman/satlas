@@ -1179,6 +1179,7 @@ class App extends React.Component<{}, AppState> {
           isOpen={modals.profile.isOpen}
           user={user}
           preferences={userPreferences}
+          currentLocation={currentLocation}
           onClose={this.toggleProfile}
           onSignOut={this.handleSignOut}
           onSave={this.handleSavePreferences}
