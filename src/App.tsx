@@ -69,9 +69,9 @@ class App extends React.Component<{}, AppState> {
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
   private tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
+  private gpsTimeoutHandle: NodeJS.Timeout | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
-
 
   constructor(props: {}) {
     super(props);
@@ -157,6 +157,11 @@ class App extends React.Component<{}, AppState> {
     if (this.offlineServiceUnsubscribe) {
       this.offlineServiceUnsubscribe();
     }
+
+    // Clean up GPS timeout
+    if (this.gpsTimeoutHandle) {
+      clearTimeout(this.gpsTimeoutHandle);
+    }
   }
 
   private initializeAuth = async () => {
@@ -205,53 +210,8 @@ class App extends React.Component<{}, AppState> {
       .then(coordinates => {
         if (!this.mapContainer.current) return;
 
-        console.log('Creating map');
-
-        let center: [number, number];
-        let zoom: number;
-
-        if (coordinates){
-          center = [coordinates.longitude, coordinates.latitude];
-          zoom = 13;
-        }
-        else {
-          // Center on geographic center of America
-          center = [-98.5795, 39.8283];
-          zoom = 3;
-        }
-
-        const map: mapboxgl.Map = new mapboxgl.Map({
-          container: this.mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: center,
-          zoom: zoom
-        });
-
-        map.on('load', () => {
-          console.log('Map fully loaded');
-          this.locationService.startLocationTracking();
-
-          const bounds = map.getBounds();
-          console.log('Map Bounds:', bounds);
-          if (bounds) {
-            this.handleLoadSits({
-              north: bounds.getNorth(),
-              south: bounds.getSouth()
-            });
-          }
-        });
-
-        // Add moveend handler
-        map.on('moveend', () => {
-          const bounds = map.getBounds();
-          console.log('Map Bounds:', bounds);
-          if (bounds) {
-            this.handleLoadSits({
-              north: bounds.getNorth(),
-              south: bounds.getSouth()
-            });
-          }
-        });
+        const zoom = 13;
+        const map = this.createMap(coordinates, zoom);
 
         this.setState({
           currentLocation: coordinates,
@@ -260,8 +220,84 @@ class App extends React.Component<{}, AppState> {
       })
       .catch(error => {
         console.error('Location error:', error);
-        this.showNotification('Using default map view', 'error');
+        this.showNotification('GPS location not found. Using default map view.', 'error');
+
+        // Center map on geographic center of America
+        const coordinates = { latitude: 39.8283, longitude: -98.5795 };
+        const zoom = 3;
+        const map = this.createMap(coordinates, zoom);
+
+        // poll for GPS location
+        this.pollForGPSLocation();
+
+        this.setState({
+          currentLocation: coordinates,
+          map: map
+        });
       });
+  };
+
+  private pollForGPSLocation = () => {
+    this.gpsTimeoutHandle = setTimeout(() => {
+      this.locationService.getCurrentLocation()
+        .then(coordinates => {
+          this.showNotification('GPS location found', 'success');
+          if (this.gpsTimeoutHandle) {
+            clearTimeout(this.gpsTimeoutHandle);
+          }
+          this.gpsTimeoutHandle = null;
+          this.setState({ currentLocation: coordinates });
+        })
+        .catch(error => {
+          this.pollForGPSLocation();
+        });
+    }, 1000);
+  };
+
+  private createMap = (coordinates: { latitude: number; longitude: number }, zoom: number) => {
+    if (!this.mapContainer.current) return null;
+
+    const map: mapboxgl.Map = new mapboxgl.Map({
+      container: this.mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [coordinates.longitude, coordinates.latitude],
+      zoom: zoom
+    });
+
+    map.on('load', () => {
+        console.log('Map fully loaded');
+        this.locationService.startLocationTracking();
+
+        const bounds = map.getBounds();
+        console.log('Map Bounds:', bounds);
+        if (bounds) {
+          this.handleLoadSits({
+            north: bounds.getNorth(),
+            south: bounds.getSouth()
+          });
+        }
+      });
+
+      // Add moveend handler
+      map.on('moveend', () => {
+        const bounds = map.getBounds();
+        console.log('Map Bounds:', bounds);
+        if (bounds) {
+          this.handleLoadSits({
+            north: bounds.getNorth(),
+            south: bounds.getSouth()
+          });
+        }
+      });
+
+      map.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: {
+          enableHighAccuracy: false
+        },
+        trackUserLocation: true
+      }), 'bottom-left');
+
+    return map;
   };
 
   private initializeOfflineService = async () => {
@@ -333,7 +369,7 @@ class App extends React.Component<{}, AppState> {
     } catch (error) {
       console.error('Error loading user data:', error);
     }
-  }
+  };
 
   // Auth methods
   private handleSignIn = async () => {
@@ -1068,7 +1104,7 @@ class App extends React.Component<{}, AppState> {
       currentLocation,
       modals,
       userPreferences,
-      drawer
+      drawer,
     } = this.state;
 
     const isAndroid = Capacitor.getPlatform() === 'android';
@@ -1109,6 +1145,12 @@ class App extends React.Component<{}, AppState> {
           className={isAndroid ? 'with-bottom-nav' : ''}
           style={{ width: '100%' }}
         />
+
+        {!map && (
+          <div className="map-loading">
+            <div className="spinner"></div>
+          </div>
+        )}
 
         {map && (
           <MapComponent

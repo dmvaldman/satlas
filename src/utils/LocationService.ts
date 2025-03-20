@@ -57,7 +57,7 @@ export class LocationService {
   }
 
   // Get current location (one-time)
-  async getCurrentLocation(): Promise<Location | null> {
+  async getCurrentLocation(): Promise<Location> {
     try {
       if (Capacitor.getPlatform() !== 'web') {
         return await this.getLocationNative();
@@ -65,11 +65,17 @@ export class LocationService {
       return await this.getLocationWeb();
     } catch (error) {
       this.handleLocationError(error);
-      return LocationService.getLastKnownLocation();
+      // Check if we have a fallback location
+      const lastLocation = LocationService.getLastKnownLocation();
+      if (lastLocation) {
+        return lastLocation;
+      }
+      // If no fallback location, throw the error
+      throw new Error('Unable to get current location');
     }
   }
 
-  private async getLocationWeb(): Promise<Location | null> {
+  private async getLocationWeb(): Promise<Location> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by this browser'));
@@ -77,13 +83,8 @@ export class LocationService {
       }
 
       const timeoutId = setTimeout(() => {
-        console.log('Location request timed out, using fallbacks');
-        const location = LocationService.getLastKnownLocation();
-        if (location) {
-          resolve(location);
-        } else {
-          reject(new Error('No location available'));
-        }
+        console.log('Location request timed out');
+        reject(new Error('Location request timed out'));
       }, LOCATION_TIMEOUT);
 
       navigator.geolocation.getCurrentPosition(
@@ -98,12 +99,7 @@ export class LocationService {
         (error) => {
           clearTimeout(timeoutId);
           console.warn('Geolocation error:', error.code, error.message);
-          const location = LocationService.getLastKnownLocation();
-          if (location) {
-            resolve(location);
-          } else {
-            reject(new Error('No location available'));
-          }
+          reject(error);
         },
         {
           enableHighAccuracy: true,
@@ -114,7 +110,7 @@ export class LocationService {
     });
   }
 
-  private async getLocationNative(): Promise<Location | null> {
+  private async getLocationNative(): Promise<Location> {
     if (!this.hasLocationPermission) {
       console.log('Requesting location permissions...');
       const request = await Geolocation.requestPermissions();
@@ -122,7 +118,7 @@ export class LocationService {
 
       if (!this.hasLocationPermission) {
         console.warn('Location permission denied');
-        return LocationService.getLastKnownLocation();
+        throw new Error('Location permission denied');
       }
     }
 
@@ -138,7 +134,7 @@ export class LocationService {
       };
     } catch (error) {
       this.handleLocationError(error);
-      return LocationService.getLastKnownLocation();
+      throw error;
     }
   }
 
