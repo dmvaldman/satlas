@@ -1283,6 +1283,7 @@ class App extends React.Component<{}, AppState> {
           onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
           onOpenProfileModal={this.toggleProfile}
           onSignIn={this.handleSignIn}
+          showNotification={this.showNotification}
         />
 
         {isAndroid && <div className="bottom-nav-space"></div>}

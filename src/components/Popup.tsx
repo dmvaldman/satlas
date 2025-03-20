@@ -4,6 +4,8 @@ import { Sit, Image, MarkType } from '../types';
 import Carousel from './Carousel';
 import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 import { BottomSheet } from 'react-spring-bottom-sheet';
 import 'react-spring-bottom-sheet/dist/style.css';
 
@@ -38,6 +40,7 @@ interface PopupProps {
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   onSignIn?: () => Promise<void>;
+  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
 interface PopupState {}
@@ -99,6 +102,32 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       return;
     }
     onReplaceImage(sit.id, imageId);
+  };
+
+  private handleShareSit = async () => {
+    const { sit } = this.props;
+    if (!sit) return;
+
+    // Create both app deep link and web fallback URL
+    const webFallbackUrl = `http://localhost:5173?sitId=${sit.id}`;
+
+    // On mobile, use the Share API
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Share.share({
+          title: 'Check out this place to sit.',
+          text: 'I found an interesting place to sit.',
+          url: webFallbackUrl,
+          dialogTitle: 'Share this sit'
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // For web, copy to clipboard or use Web Share API if available
+      navigator.clipboard.writeText(webFallbackUrl);
+      this.props.showNotification('Link copied to clipboard', 'success');
+    }
   };
 
   private renderCarousel() {
@@ -235,6 +264,16 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     );
   }
 
+  private renderShareButton() {
+    return (
+      <button className="share-button" onClick={this.handleShareSit}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92zM18 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM6 13c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm12 7.02c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
+        </svg>
+      </button>
+    );
+  }
+
   render() {
     const {
       sit,
@@ -262,6 +301,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         header={
           <div className="bottom-sheet-header">
             <span className="header-emoji">🪑</span>
+            {this.renderShareButton()}
           </div>
         }
       >
@@ -293,6 +333,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
             {/* Show Google Maps link */}
             {this.renderGoogleMapsLink()}
           </div>
+
         </div>
       </BottomSheet>
     );
