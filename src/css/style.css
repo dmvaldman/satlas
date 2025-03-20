@@ -116,9 +116,11 @@ body {
   height: 100%;
 }
 
-.mapboxgl-control-container {
-  display: none;
-}
+/* .mapboxgl-ctrl { */
+  /* position: relative; */
+  /* left: calc(var(--safe-area-left) + 2em) !important; */
+/* } */
+
 
 .satlas-marker {
   width: 20px;
@@ -603,16 +605,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.map-loading p {
-  margin: 0;
-  font-size: 14px;
-  color: #666;
 }
 
 /* React app styles */

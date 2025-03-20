@@ -245,7 +245,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     } = this.props;
 
     if (!sit) {
-      console.error('sit is undefined');
       return null;
     }
 
