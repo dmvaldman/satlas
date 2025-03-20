@@ -193,27 +193,20 @@ export class FirebaseService {
       FirebaseAuthentication.addListener('authStateChange', (event) => {
         console.log('[Firebase] Auth state change from plugin:', event);
 
-        // Add debug statement for current auth state
         const currentUser = auth.currentUser;
-        console.log('[Firebase] JS SDK current user:', currentUser?.uid || 'null');
 
-        // Only trigger the callback if there's a real change in auth state
-        // This prevents camera/photo activities from triggering unwanted logouts
+        if (currentUser && event.user && currentUser.uid === event.user.uid) {
+          console.log('[Firebase] Auth state unchanged');
+          return;
+        }
+
         if (event.user) {
           // User is signed in
-          if (!currentUser || currentUser.uid !== event.user.uid) {
-            console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
-            // The callback expects a Firebase User object
-            callback(auth.currentUser);
-          } else {
-            console.log('[Firebase] Auth state unchanged, still signed in as:', currentUser.uid);
-          }
-        } else if (!event.user && currentUser) {
-          // Only trigger logout if we were previously logged in
-          console.log('[Firebase] Auth state changed to signed out');
-          callback(null);
-        } else {
-          console.log('[Firebase] Auth state unchanged, still signed out');
+          console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
+
+          // hack because I used the wrong capitalization
+          const userClone = { photoURL: event.user.photoUrl, ...event.user };
+          callback(userClone as unknown as User);
         }
       });
 
