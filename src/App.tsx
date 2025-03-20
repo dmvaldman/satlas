@@ -18,6 +18,7 @@ import PopupComponent from './components/Popup';
 import { OfflineService } from './services/OfflineService';
 import { ValidationUtils } from './utils/ValidationUtils';
 import Notification from './components/Notification';
+import { App as CapacitorApp } from '@capacitor/app';
 
 interface AppState {
   // Auth state
@@ -136,6 +137,9 @@ class App extends React.Component<{}, AppState> {
 
     // Add location listener before initializations
     this.locationService.addLocationListener(this.handleLocationUpdate);
+
+    // Setup deep links for web/mobile
+    this.setupDeepLinks();
   }
 
   componentWillUnmount() {
@@ -1089,6 +1093,61 @@ class App extends React.Component<{}, AppState> {
       this.showNotification('Finished processing pending uploads', 'success');
     } catch (error) {
       console.error('[App] Error during pending uploads processing:', error);
+    }
+  }
+
+  private setupDeepLinks() {
+    // Check URL parameters on web
+    if (!Capacitor.isNativePlatform()) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sitId = urlParams.get('sitId');
+      if (sitId) {
+        this.openSitById(sitId);
+      }
+    }
+    else {
+      CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+        console.log('App opened with URL:', url);
+
+        // Parse the URL to extract the sit ID
+        // Example URL format: yourapp://sit/123456
+        try {
+          const urlObj = new URL(url);
+          const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+
+          if (pathSegments[0] === 'sit' && pathSegments[1]) {
+            const sitId = pathSegments[1];
+            this.openSitById(sitId);
+          }
+        } catch (error) {
+          console.error('Error handling deep link:', error);
+        }
+      });
+    }
+  }
+
+  private async openSitById(sitId: string) {
+    try {
+      // Fetch the sit data from Firebase
+      const sit = await FirebaseService.getSit(sitId);
+
+      if (sit) {
+        // If the sit was found, open its popup
+        this.openPopup(sit);
+
+        // If the map is loaded, center it on the sit
+        if (this.state.map) {
+          this.state.map.flyTo({
+            center: [sit.location.longitude, sit.location.latitude],
+            zoom: 15
+          });
+        }
+      } else {
+        this.showNotification('Sit not found', 'error');
+      }
+    } catch (error) {
+      console.error('Error opening sit by ID:', error);
+      this.showNotification('Failed to load sit', 'error');
     }
   }
 
