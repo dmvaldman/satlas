@@ -215,8 +215,9 @@ class App extends React.Component<{}, AppState> {
           zoom = 13;
         }
         else {
-          center = [0, 0];
-          zoom = 1;
+          // Center on geographic center of America
+          center = [-98.5795, 39.8283];
+          zoom = 3;
         }
 
         const map: mapboxgl.Map = new mapboxgl.Map({
