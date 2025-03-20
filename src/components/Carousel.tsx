@@ -6,13 +6,13 @@ interface CarouselProps {
   currentUserId: string | null;
   onImageDelete: (imageId: string) => void;
   onImageReplace: (imageId: string) => void;
+  onOpenFullscreenImage: (image: Image) => void;
 }
 
 // Define image status types
 type ImageStatus = 'notLoaded' | 'loading' | 'loaded';
 
 interface CarouselState {
-  showControls: boolean;
   translateX: number;
   startX: number;
   isDragging: boolean;
@@ -21,7 +21,6 @@ interface CarouselState {
   imageStatuses: ImageStatus[]; // Array instead of Map
   lastMoveTimestamp: number;
   velocity: number;
-  isScrollingWithMomentum: boolean;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -38,7 +37,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.imageRefs = this.props.images.map(() => React.createRef<HTMLImageElement>());
 
     this.state = {
-      showControls: false,
       translateX: 0,
       startX: 0,
       isDragging: false,
@@ -46,8 +44,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       totalWidth: 0,
       imageStatuses: Array(this.props.images.length).fill('notLoaded'),
       lastMoveTimestamp: 0,
-      velocity: 0,
-      isScrollingWithMomentum: false
+      velocity: 0
     };
   }
 
@@ -128,8 +125,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       this.setState({
         imageStatuses: newImageStatuses,
         translateX: 0, // Explicitly set to 0 to show first image
-        velocity: 0,
-        isScrollingWithMomentum: false
+        velocity: 0
       }, () => {
         // Recalculate dimensions with the new images
         this.calculateDimensions();
@@ -252,8 +248,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       startX: clientX,
       isDragging: true,
       lastMoveTimestamp: Date.now(),
-      velocity: 0,
-      isScrollingWithMomentum: false
+      velocity: 0
     });
   };
 
@@ -346,8 +341,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   private applyMomentum = () => {
-    if (!this.state.isScrollingWithMomentum) return;
-
     // Calculate new position based on velocity with deceleration
     const deceleration = 0.9; // Deceleration factor (0.95 = lose 5% of velocity per frame)
     const newVelocity = this.state.velocity * deceleration;
@@ -360,12 +353,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     // Apply boundaries
     if (newTranslateX > 0) {
       newTranslateX = 0;
-      this.setState({ isScrollingWithMomentum: false });
     } else {
       const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
       if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
         newTranslateX = maxTranslateX;
-        this.setState({ isScrollingWithMomentum: false });
       }
     }
 
@@ -377,7 +368,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Stop animation if velocity is very low
     if (Math.abs(newVelocity) < 0.01) {
-      this.setState({ isScrollingWithMomentum: false });
       this.momentumAnimationId = null;
       return;
     }
@@ -413,7 +403,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.setState({
       translateX: finalTranslateX,
       isDragging: false,
-      isScrollingWithMomentum: shouldApplyMomentum
     }, () => {
       // Start momentum animation if needed
       if (shouldApplyMomentum) {
@@ -433,9 +422,24 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     });
   };
 
+
+
+
+  private handleImageClick = (image: Image, e: React.MouseEvent) => {
+    console.log('handleImageClick', image);
+    e.stopPropagation();
+    this.props.onOpenFullscreenImage(image);
+  };
+
   render() {
     const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
-    const { showControls: showControlsState, translateX, imageStatuses, isDragging, containerWidth, totalWidth, isScrollingWithMomentum } = this.state;
+    const {
+      translateX,
+      imageStatuses,
+      isDragging,
+      containerWidth,
+      totalWidth
+    } = this.state;
 
     if (images.length === 0) {
       return <div className="no-images">No images available</div>;
@@ -446,108 +450,110 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const hasMultipleImages = images.length > 1;
 
     return (
-      <div className="carousel-content" ref={this.containerRef}>
-        <div
-          className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollingWithMomentum ? 'momentum-scrolling' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
-          style={{
-            transform: `translateX(${translateX}px)`,
-            transition: isDragging || isScrollingWithMomentum ? 'none' : 'transform 0.2s ease-out'
-          }}
-        >
-          {images.map((image, index) => {
-            const status = imageStatuses[index] || 'notLoaded';
-            const isVisible = status === 'loading' || status === 'loaded';
-            const isLoaded = status === 'loaded';
-            const canShowControls = currentUserId && image.userId === currentUserId;
+      <>
+        <div className="carousel-content" ref={this.containerRef}>
+          <div
+            className={`carousel-track ${isDragging ? 'dragging' : ''} ${isScrollDisabled ? 'scroll-disabled' : ''}`}
+            style={{
+              transform: `translateX(${translateX}px)`
+            }}
+          >
+            {images.map((image, index) => {
+              const status = imageStatuses[index] || 'notLoaded';
+              const isVisible = status === 'loading' || status === 'loaded';
+              const isLoaded = status === 'loaded';
+              const canShowControls = currentUserId && image.userId === currentUserId;
 
-            // Calculate dimensions using the helper method
-            const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
-              image,
-              containerWidth,
-              carouselHeight,
-              hasMultipleImages
-            );
+              // Calculate dimensions using the helper method
+              const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
+                image,
+                containerWidth,
+                carouselHeight,
+                hasMultipleImages
+              );
 
-            return (
-              <div
-                key={image.id}
-                className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
-                style={{
-                  width: `${Math.floor(imageWidth)}px`,
-                  height: `${carouselHeight}px` // Keep carousel item height consistent
-                }}
-              >
-                {/* Only render image if it should be visible */}
-                {isVisible ? (
-                  <img
-                    ref={this.imageRefs[index]}
-                    src={image.base64Data ?
-                      `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                      `${image.photoURL}?size=med`
-                    }
-                    alt={`Photo by ${image.userName}`}
-                    className="carousel-image"
-                    style={{
-                      opacity: isLoaded ? 1 : 0,
-                      width: `${Math.floor(imageWidth)}px`,
-                      height: `${imageHeight}px`
-                    }}
-                    onLoad={() => this.handleImageLoad(index)}
-                    onError={(e) => {
-                      console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
-                    }}
-                  />
-                ) : null}
-
-                {/* Placeholder with explicit dimensions */}
+              return (
                 <div
-                  className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
+                  key={image.id}
+                  className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
                   style={{
-                    width: `${imageWidth}px`,
-                    height: `${imageHeight}px`
+                    width: `${Math.floor(imageWidth)}px`,
+                    height: `${carouselHeight}px` // Keep carousel item height consistent
                   }}
                 >
-                  <div className="spinner"></div>
+                  {/* Only render image if it should be visible */}
+                  {isVisible ? (
+                    <img
+                      ref={this.imageRefs[index]}
+                      src={image.base64Data ?
+                        `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                        `${image.photoURL}?size=med`
+                      }
+                      alt={`Photo by ${image.userName}`}
+                      className="carousel-image"
+                      style={{
+                        opacity: isLoaded ? 1 : 0,
+                        width: `${Math.floor(imageWidth)}px`,
+                        height: `${imageHeight}px`
+                      }}
+                      onLoad={() => this.handleImageLoad(index)}
+                      onError={(e) => {
+                        console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
+                      }}
+                      onClick={(e) => this.handleImageClick(image, e)}
+                    />
+                  ) : null}
+
+                  {/* Placeholder with explicit dimensions */}
+                  <div
+                    className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
+                    style={{
+                      width: `${imageWidth}px`,
+                      height: `${imageHeight}px`
+                    }}
+                  >
+                    <div className="spinner"></div>
+                  </div>
+
+                  {/* Only show the uploader info once image is visible */}
+                  {isVisible && (
+                    <div className="image-uploader">
+                      {image.userName}
+                    </div>
+                  )}
+
+                  {canShowControls && (
+                    <div className="image-controls">
+                      <button
+                        className="image-control-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageReplace(image.id);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                        </svg>
+                      </button>
+                      <button
+                        className="image-control-button delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onImageDelete(image.id);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
-
-                {/* Only show the uploader info once image is visible */}
-                {isVisible && (
-                  <div className="image-uploader">
-                    {image.userName}
-                  </div>
-                )}
-
-                {canShowControls && (showControlsState || ('ontouchstart' in window)) && (
-                  <div className="image-controls">
-                    <button
-                      className="image-control-button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onImageReplace(image.id);
-                      }}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                      </svg>
-                    </button>
-                    <button
-                      className="image-control-button delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onImageDelete(image.id);
-                      }}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 }

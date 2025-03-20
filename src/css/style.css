@@ -524,6 +524,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   opacity: 1;
   transition: opacity 0.3s ease;
   text-align: center;
+  pointer-events: none;
 }
 
 /* Center spinner within placeholder */
@@ -984,6 +985,11 @@ body:has(.bottom-nav-space) {
   .notifications-container {
     top: calc(20px + var(--safe-area-top));
   }
+
+  /* Fullscreen image modal */
+  .fullscreen-image-overlay {
+    bottom: calc(48px + var(--safe-area-bottom)) !important;
+  }
 }
 
 .offline-notice {
@@ -1003,4 +1009,72 @@ body:has(.bottom-nav-space) {
   border-radius: 50%;
   border-top-color: white;
   animation: spin 1s ease-in-out infinite;
+}
+
+/* Fullscreen Image Component */
+.fullscreen-image-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  cursor: pointer;
+  padding-bottom: var(--safe-area-bottom);
+  bottom: var(--safe-area-bottom) !important;
+}
+
+.fullscreen-image-container {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+  will-change: opacity;
+}
+
+.fullscreen-image-container.active {
+  opacity: 1;
+}
+
+.fullscreen-image {
+  max-width: 100%;
+  max-height: calc(100vh - 40px);
+  object-fit: contain;
+  cursor: default;
+}
+
+.fullscreen-close-button {
+  position: fixed;
+  top: calc(20px + var(--safe-area-top));
+  right: calc(20px + var(--safe-area-right));
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2001;
+  transition: background-color 0.2s;
+}
+
+.fullscreen-close-button:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.fullscreen-close-button svg {
+  width: 24px;
+  height: 24px;
+  fill: white;
 }
