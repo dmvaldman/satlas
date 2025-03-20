@@ -19,6 +19,7 @@ import { OfflineService } from './services/OfflineService';
 import { ValidationUtils } from './utils/ValidationUtils';
 import Notification from './components/Notification';
 import { App as CapacitorApp } from '@capacitor/app';
+import FullscreenImage from './components/FullscreenImage';
 
 interface AppState {
   // Auth state
@@ -50,6 +51,10 @@ interface AppState {
       isOpen: boolean;
       sit: Sit | null;
       hasUserContributed: boolean;
+    };
+    fullscreenImage: {
+      isOpen: boolean;
+      image: Image | null;
     };
   };
 
@@ -98,7 +103,8 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false },
         profile: { isOpen: false },
-        nearbySit: { isOpen: false, sit: null, hasUserContributed: false }
+        nearbySit: { isOpen: false, sit: null, hasUserContributed: false },
+        fullscreenImage: { isOpen: false, image: null }
       },
 
       userPreferences: {
@@ -1168,6 +1174,19 @@ class App extends React.Component<{}, AppState> {
     }
   }
 
+  private toggleFullscreenImage = (image?: Image) => {
+    console.log('toggleFullscreenImage', image);
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        fullscreenImage: {
+          isOpen: !!image,
+          image: image || null
+        }
+      }
+    }));
+  };
+
   render() {
     const {
       user,
@@ -1302,7 +1321,14 @@ class App extends React.Component<{}, AppState> {
           onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
           onOpenProfileModal={this.toggleProfile}
           onSignIn={this.handleSignIn}
+          onOpenFullscreenImage={this.toggleFullscreenImage}
           showNotification={this.showNotification}
+        />
+
+        <FullscreenImage
+          isOpen={modals.fullscreenImage.isOpen}
+          image={modals.fullscreenImage.image}
+          onClose={this.toggleFullscreenImage}
         />
 
         {isAndroid && <div className="bottom-nav-space"></div>}

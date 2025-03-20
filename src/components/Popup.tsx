@@ -41,6 +41,7 @@ interface PopupProps {
   onOpenPhotoModal: (sit: Sit) => void;
   onOpenProfileModal: () => void;
   onSignIn?: () => Promise<void>;
+  onOpenFullscreenImage: (image: Image) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -154,6 +155,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         currentUserId={user?.uid || null}
         onImageDelete={this.handleImageDelete}
         onImageReplace={this.handleImageReplace}
+        onOpenFullscreenImage={this.props.onOpenFullscreenImage}
       />
     );
   }
