@@ -228,9 +228,18 @@ class App extends React.Component<{}, AppState> {
         console.error('Location error:', error);
         this.showNotification('GPS location not found. Using default map view.', 'error');
 
-        // Center map on geographic center of America
-        const coordinates = { latitude: 39.8283, longitude: -98.5795 };
-        const zoom = 3;
+        let coordinates: { latitude: number; longitude: number };
+        let zoom: number;
+
+        if (this.state.userPreferences.cityCoordinates) {
+          coordinates = this.state.userPreferences.cityCoordinates;
+          zoom = 4;
+        } else {
+          // Center map on geographic center of America
+          coordinates = { latitude: 39.8283, longitude: -98.5795 };
+          zoom = 3;
+        }
+
         const map = this.createMap(coordinates, zoom);
 
         // poll for GPS location
@@ -247,7 +256,10 @@ class App extends React.Component<{}, AppState> {
     this.gpsTimeoutHandle = setTimeout(() => {
       this.locationService.getCurrentLocation()
         .then(coordinates => {
-          this.showNotification('GPS location found', 'success');
+          // move map to new location
+          if (this.state.map) {
+            this.state.map.setCenter([coordinates.longitude, coordinates.latitude]);
+          }
           if (this.gpsTimeoutHandle) {
             clearTimeout(this.gpsTimeoutHandle);
           }
