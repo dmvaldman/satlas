@@ -24,6 +24,7 @@ interface ProfileModalState {
   username: string;
   pushNotifications: boolean;
   city: string;
+  cityCoordinates: { latitude: number; longitude: number } | null;
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
@@ -43,6 +44,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     this.state = {
       username: '',
       city: '',
+      cityCoordinates: null,
       cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
@@ -76,11 +78,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       });
     }
 
-    // If no city is set but we have a location, try to get the city from coordinates
-    if (!this.state.city && this.props.currentLocation) {
+    // If we have coordinates, resolve them to a city name
+    if (this.props.preferences?.cityCoordinates) {
       this.getCityFromCoordinates(
-        this.props.currentLocation.latitude,
-        this.props.currentLocation.longitude
+        this.props.preferences.cityCoordinates.latitude,
+        this.props.preferences.cityCoordinates.longitude
       );
     }
   }
@@ -102,11 +104,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         this.setState({ isActive: true });
       });
 
-      // If no city is set but we have a location, try to get the city from coordinates
-      if (!this.state.city && this.props.currentLocation) {
+      // If we have coordinates, resolve them to a city name
+      if (this.props.preferences?.cityCoordinates && !this.state.city) {
         this.getCityFromCoordinates(
-          this.props.currentLocation.latitude,
-          this.props.currentLocation.longitude
+          this.props.preferences.cityCoordinates.latitude,
+          this.props.preferences.cityCoordinates.longitude
         );
       }
     } else if (prevProps.isOpen && !this.props.isOpen) {
@@ -121,11 +123,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       this.initializeFromProps();
     }
 
-    // If currentLocation just became available and we don't have a city set
-    if (!prevProps.currentLocation && this.props.currentLocation && !this.state.city) {
+    // If preferences changed and we have coordinates, resolve them to a city name
+    if (prevProps.preferences !== this.props.preferences &&
+        this.props.preferences?.cityCoordinates &&
+        !this.state.city) {
       this.getCityFromCoordinates(
-        this.props.currentLocation.latitude,
-        this.props.currentLocation.longitude
+        this.props.preferences.cityCoordinates.latitude,
+        this.props.preferences.cityCoordinates.longitude
       );
     }
   }
@@ -187,7 +191,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         this.setState({
           username: preferences.username,
           pushNotifications: preferences.pushNotificationsEnabled,
-          city: preferences.city || ''
+          cityCoordinates: preferences.cityCoordinates || null
         });
 
         // Cache this user ID as loaded
@@ -197,11 +201,19 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         if (!preferences.username && user.displayName) {
           this.generateUniqueUsername();
         }
+
+        // If we have coordinates, resolve them to a city name
+        if (preferences.cityCoordinates) {
+          this.getCityFromCoordinates(
+            preferences.cityCoordinates.latitude,
+            preferences.cityCoordinates.longitude
+          );
+        }
       } else {
         // No preferences yet, but we'll use display name as a starting point
         this.setState({
           pushNotifications: false,
-          city: ''
+          cityCoordinates: null
         });
 
         // Try to generate a username from display name
@@ -296,8 +308,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Extract only the top result
       if (data.features && data.features.length > 0) {
-        const topResult = data.features[0].place_name;
-        this.setState({ cityTopResult: topResult });
+        const feature = data.features[0];
+        const topResult = feature.place_name;
+
+        this.setState({
+          cityTopResult: topResult
+        });
       } else {
         this.setState({ cityTopResult: null });
       }
@@ -314,10 +330,39 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (e.key === 'Tab' && cityTopResult &&
         cityTopResult.toLowerCase().startsWith(city.toLowerCase())) {
       e.preventDefault(); // Prevent default tab behavior
+
+      // First update the UI with the selected city name
       this.setState({
         city: cityTopResult,
         cityTopResult: null
       });
+
+      // Then get coordinates for this city name
+      this.getCoordinatesFromCity(cityTopResult);
+    }
+  };
+
+  // New method to get coordinates from a city name
+  private getCoordinatesFromCity = async (cityName: string) => {
+    try {
+      // Use Mapbox geocoding API to get coordinates from city name
+      const accessToken = mapboxgl.accessToken;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cityName)}.json?access_token=${accessToken}&types=place&limit=1`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.features && data.features.length > 0) {
+        const coordinates = data.features[0].center; // [longitude, latitude]
+        this.setState({
+          cityCoordinates: {
+            latitude: coordinates[1],
+            longitude: coordinates[0]
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error getting coordinates from city:', error);
     }
   };
 
@@ -343,10 +388,10 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   private saveInBackground = async (data: {
     username: string;
     pushNotifications: boolean;
-    city: string;
+    cityCoordinates: { latitude: number; longitude: number } | null;
     preferences: UserPreferences | undefined;
   }) => {
-    const { username, pushNotifications, city, preferences } = data;
+    const { username, pushNotifications, cityCoordinates, preferences } = data;
     const { user, showNotification } = this.props;
 
     try {
@@ -370,7 +415,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         username,
         pushNotificationsEnabled: pushNotifications,
         lastVisit: Date.now(),
-        city
+        cityCoordinates: cityCoordinates || undefined
       };
 
       // Save to Firebase
@@ -473,6 +518,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       pushNotifications,
       city,
       cityTopResult,
+      cityCoordinates,
       isSubmitting,
       usernameError,
       isActive
@@ -504,7 +550,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       const { preferences } = this.props;
       const usernameChanged = username !== (preferences?.username || '');
       const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
-      const cityChanged = city !== (preferences?.city || '');
+      const cityChanged = JSON.stringify(cityCoordinates) !== JSON.stringify(preferences?.cityCoordinates);
 
       // Only save if something changed
       if (usernameChanged || notificationsChanged || cityChanged) {
@@ -512,7 +558,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         this.saveInBackground({
           username,
           pushNotifications,
-          city,
+          cityCoordinates,
           preferences
         });
       }
@@ -564,7 +610,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 value={city}
                 onChange={(e) => this.handleCityChange(e.target.value)}
                 onKeyDown={this.handleCityKeyDown}
-                placeholder="Enter your city (press Tab to autocomplete)"
+                placeholder="Your city"
                 autoComplete="off"
               />
               {suggestion && (

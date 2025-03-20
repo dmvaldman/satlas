@@ -34,7 +34,10 @@ export interface UserPreferences {
   username: string;
   pushNotificationsEnabled: boolean;
   lastVisit: number;
-  city?: string;
+  cityCoordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export type MarkType = 'favorite' | 'wantToGo' | 'visited';
