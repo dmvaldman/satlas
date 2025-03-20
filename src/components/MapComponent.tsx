@@ -14,6 +14,7 @@ interface MapProps {
   favoriteCount: Map<string, number>;
   user: User | null;
   currentLocation: { latitude: number; longitude: number } | null;
+  seenSits: Set<string>;
   onLoadSits: (bounds: { north: number; south: number }) => void;
   onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
   onOpenPopup: (sit: Sit) => void;
@@ -166,14 +167,14 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private updateVisibleMarkers = () => {
-    const { map, sits, user } = this.props;
+    const { map, sits, user, seenSits } = this.props;
     const { marks } = this.state;
     if (!map || !this.clusterManager.isClusterSourceAdded()) return;
 
     // Check if cluster layers are ready before proceeding
     if (!this.clusterManager.areClusterLayersReady(map)) {
       // Cluster layers aren't ready yet, just show markers for now
-      this.markerManager.showMarkers(map, sits, marks, user);
+      this.markerManager.showMarkers(map, sits, marks, user, seenSits);
       return;
     }
 
@@ -188,7 +189,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
       map.setLayoutProperty('cluster-count', 'visibility', 'none');
 
       // Show individual markers
-      this.markerManager.showMarkers(map, sits, marks, user);
+      this.markerManager.showMarkers(map, sits, marks, user, seenSits);
     } else {
       // Show cluster layers
       map.setLayoutProperty('clusters', 'visibility', 'visible');
@@ -214,7 +215,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
       // Show markers only for unclustered points
       this.markerManager.removeAllMarkers();
       if (unclusteredSits.size > 0) {
-        this.markerManager.showMarkers(map, unclusteredSits, marks, user);
+        this.markerManager.showMarkers(map, unclusteredSits, marks, user, seenSits);
       }
     }
   };

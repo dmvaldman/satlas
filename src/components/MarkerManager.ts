@@ -13,7 +13,8 @@ export class MarkerManager {
     map: mapboxgl.Map,
     sits: Map<string, Sit>,
     marks: Map<string, Set<MarkType>>,
-    user: User | null
+    user: User | null,
+    seenSits: Set<string> = new Set()
   ): void {
     Array.from(sits.values()).forEach(sit => {
       const sitMarks = marks.get(sit.id) || new Set();
@@ -21,7 +22,7 @@ export class MarkerManager {
       if (!this.markers.has(sit.id)) {
         // Create new marker
         const el = document.createElement('div');
-        el.className = this.getMarkerClasses(sit, user, sitMarks).join(' ');
+        el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           this.onMarkerClick(sit);
@@ -39,7 +40,7 @@ export class MarkerManager {
 
         // Update classes
         el.className = 'mapboxgl-marker';
-        this.getMarkerClasses(sit, user, sitMarks).forEach(className => {
+        this.getMarkerClasses(sit, user, sitMarks, seenSits).forEach(className => {
           el.classList.add(className);
         });
 
@@ -68,17 +69,17 @@ export class MarkerManager {
     sitId: string,
     sit: Sit,
     marks: Set<MarkType>,
-    user: User | null
+    user: User | null,
+    seenSits: Set<string> = new Set()
   ): void {
     if (this.markers.has(sitId)) {
       const marker = this.markers.get(sitId)!;
       const el = marker.getElement();
       el.className = 'mapboxgl-marker';
-      this.getMarkerClasses(sit, user, marks).forEach(className => {
+      this.getMarkerClasses(sit, user, marks, seenSits).forEach(className => {
         el.classList.add(className);
       });
     }
-
   }
 
   public removeAllMarkers(): void {
@@ -92,13 +93,22 @@ export class MarkerManager {
     return this.markers.has(sitId);
   }
 
-  private getMarkerClasses(sit: Sit, user: User | null, marks: Set<MarkType>): string[] {
+  private getMarkerClasses(
+    sit: Sit,
+    user: User | null,
+    marks: Set<MarkType>,
+    seenSits: Set<string> = new Set()
+  ): string[] {
     const classes = ['satlas-marker'];
 
-    if (user && sit.uploadedBy && sit.uploadedBy === user.uid) {
+    // Check if this is the user's own sit
+    const isOwnSit = user && sit.uploadedBy && sit.uploadedBy === user.uid;
+    if (isOwnSit) {
       classes.push('own-sit');
     }
 
+    // Add classes for marked sits
+    const hasMarks = marks.size > 0;
     if (marks.has('favorite')) {
       classes.push('favorite');
     }
@@ -109,6 +119,12 @@ export class MarkerManager {
 
     if (marks.has('wantToGo')) {
       classes.push('want-to-go');
+    }
+
+    // Add seen class only if the sit isn't already marked
+    // and isn't the user's own sit
+    if (seenSits.has(sit.id) && !isOwnSit && !hasMarks) {
+      classes.push('seen');
     }
 
     return classes;

@@ -6,6 +6,7 @@ import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
+import { FirebaseService } from '../services/FirebaseService';
 import { BottomSheet } from 'react-spring-bottom-sheet';
 import 'react-spring-bottom-sheet/dist/style.css';
 
@@ -48,6 +49,15 @@ interface PopupState {}
 class PopupComponent extends React.Component<PopupProps, PopupState> {
   constructor(props: PopupProps) {
     super(props);
+  }
+
+  componentDidUpdate(prevProps: PopupProps) {
+    const { sit, user, isOpen } = this.props;
+
+    // Mark the sit as seen when the popup is opened
+    if (isOpen && !prevProps.isOpen && sit && user) {
+      FirebaseService.markSitAsSeen(user.uid, sit.id);
+    }
   }
 
   private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
@@ -156,7 +166,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
         {markTypes.map(({ type, label }) => (
           <button
             key={type}
-            className={`mark-button ${type}${marks.has(type) ? ' active' : ''}`}
+            className={`mark-button ${type}${marks && marks.has(type) ? ' active' : ''}`}
             onClick={(e) => this.handleMarkClick(e, type)}
           >
             <svg className="mark-icon" viewBox="0 0 24 24">
@@ -190,6 +200,8 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
 
   private renderGoogleMapsLink() {
     const { sit } = this.props;
+    if (!sit) return null;
+
     // Use geo: URI scheme which will open default maps app
     const mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}`;
     // Fallback to Google Maps on desktop
@@ -234,7 +246,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     if (distance > 300) return null;
 
     // Don't show if user has already contributed an image to this sit
-    const hasUserUploadedImage = images.some(image => image.userId === user.uid);
+    const hasUserUploadedImage = images && images.some(image => image.userId === user.uid);
     if (hasUserUploadedImage) return null;
 
     const handleClick = async () => {
