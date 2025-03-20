@@ -33,8 +33,8 @@ export interface ImageCollection {
 export interface UserPreferences {
   username: string;
   pushNotificationsEnabled: boolean;
-  lastVisit?: number;
-  homeLocation?: Coordinates;
+  lastVisit: number;
+  city?: string;
 }
 
 export type MarkType = 'favorite' | 'wantToGo' | 'visited';

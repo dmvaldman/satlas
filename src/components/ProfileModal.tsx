@@ -5,7 +5,8 @@ import { FirebaseService } from '../services/FirebaseService';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
-
+import { LocationService } from '../utils/LocationService';
+import mapboxgl from 'mapbox-gl';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -16,11 +17,14 @@ interface ProfileModalProps {
   onSave: (preferences: UserPreferences) => Promise<void>;
   onUpdatePreferences: (preferences: UserPreferences) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
+  currentLocation?: { latitude: number; longitude: number } | null;
 }
 
 interface ProfileModalState {
   username: string;
   pushNotifications: boolean;
+  city: string;
+  cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
   isActive: boolean;
@@ -29,6 +33,7 @@ interface ProfileModalState {
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
   private static loadedUserIds = new Set<string>();
   private inputRef = React.createRef<HTMLInputElement>();
+  private cityInputRef = React.createRef<HTMLInputElement>();
   private contentRef = React.createRef<HTMLDivElement>();
   private keyboardListenersAdded = false;
 
@@ -37,6 +42,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     this.state = {
       username: '',
+      city: '',
+      cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
       usernameError: null,
@@ -68,6 +75,14 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         this.setState({ isActive: true });
       });
     }
+
+    // If no city is set but we have a location, try to get the city from coordinates
+    if (!this.state.city && this.props.currentLocation) {
+      this.getCityFromCoordinates(
+        this.props.currentLocation.latitude,
+        this.props.currentLocation.longitude
+      );
+    }
   }
 
   componentDidUpdate(prevProps: ProfileModalProps) {
@@ -86,6 +101,14 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       requestAnimationFrame(() => {
         this.setState({ isActive: true });
       });
+
+      // If no city is set but we have a location, try to get the city from coordinates
+      if (!this.state.city && this.props.currentLocation) {
+        this.getCityFromCoordinates(
+          this.props.currentLocation.latitude,
+          this.props.currentLocation.longitude
+        );
+      }
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
       requestAnimationFrame(() => {
@@ -96,6 +119,14 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (prevProps.user !== this.props.user ||
         prevProps.preferences !== this.props.preferences) {
       this.initializeFromProps();
+    }
+
+    // If currentLocation just became available and we don't have a city set
+    if (!prevProps.currentLocation && this.props.currentLocation && !this.state.city) {
+      this.getCityFromCoordinates(
+        this.props.currentLocation.latitude,
+        this.props.currentLocation.longitude
+      );
     }
   }
 
@@ -126,7 +157,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       this.contentRef.current.classList.add('keyboard-visible');
 
       setTimeout(() => {
-        this.inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Determine which input is active and scroll to it
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement === this.inputRef.current || activeElement === this.cityInputRef.current)) {
+          activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       }, 100);
     }
   };
@@ -151,7 +186,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         // We have preferences, update state and stop loading
         this.setState({
           username: preferences.username,
-          pushNotifications: preferences.pushNotificationsEnabled
+          pushNotifications: preferences.pushNotificationsEnabled,
+          city: preferences.city || ''
         });
 
         // Cache this user ID as loaded
@@ -164,7 +200,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       } else {
         // No preferences yet, but we'll use display name as a starting point
         this.setState({
-          pushNotifications: false
+          pushNotifications: false,
+          city: ''
         });
 
         // Try to generate a username from display name
@@ -233,12 +270,83 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     return { isValid: true };
   };
 
+  private handleCityChange = (city: string) => {
+    this.setState({ city });
+
+    // Only search if there's at least 3 characters
+    if (city.length >= 3) {
+      this.searchCities(city);
+    } else {
+      this.setState({ cityTopResult: null });
+    }
+  };
+
+  private searchCities = async (query: string) => {
+    try {
+      // Use Mapbox geocoding API to search for cities
+      const accessToken = mapboxgl.accessToken;
+      const types = 'place'; // Limit to places (cities, towns)
+      const country = 'us'; // Prefer US results
+      const limit = 1; // We only need the top result
+
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${accessToken}&types=${types}&country=${country}&limit=${limit}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      // Extract only the top result
+      if (data.features && data.features.length > 0) {
+        const topResult = data.features[0].place_name;
+        this.setState({ cityTopResult: topResult });
+      } else {
+        this.setState({ cityTopResult: null });
+      }
+    } catch (error) {
+      console.error('Error searching cities:', error);
+      this.setState({ cityTopResult: null });
+    }
+  };
+
+  private handleCityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const { city, cityTopResult } = this.state;
+
+    // If Tab is pressed and we have a top result that starts with what the user typed
+    if (e.key === 'Tab' && cityTopResult &&
+        cityTopResult.toLowerCase().startsWith(city.toLowerCase())) {
+      e.preventDefault(); // Prevent default tab behavior
+      this.setState({
+        city: cityTopResult,
+        cityTopResult: null
+      });
+    }
+  };
+
+  private getCityFromCoordinates = async (latitude: number, longitude: number) => {
+    try {
+      // Use Mapbox reverse geocoding to get city name from coordinates
+      const accessToken = mapboxgl.accessToken;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${accessToken}&types=place`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.features && data.features.length > 0) {
+        // Get the first place result
+        const city = data.features[0].place_name;
+        this.setState({ city });
+      }
+    } catch (error) {
+      console.error('Error getting city from coordinates:', error);
+    }
+  };
+
   private saveInBackground = async (data: {
     username: string;
     pushNotifications: boolean;
+    city: string;
     preferences: UserPreferences | undefined;
   }) => {
-    const { username, pushNotifications, preferences } = data;
+    const { username, pushNotifications, city, preferences } = data;
     const { user, showNotification } = this.props;
 
     try {
@@ -261,7 +369,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       const updatedPreferences: UserPreferences = {
         username,
         pushNotificationsEnabled: pushNotifications,
-        lastVisit: Date.now()
+        lastVisit: Date.now(),
+        city
       };
 
       // Save to Firebase
@@ -362,6 +471,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const {
       username,
       pushNotifications,
+      city,
+      cityTopResult,
       isSubmitting,
       usernameError,
       isActive
@@ -393,17 +504,26 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       const { preferences } = this.props;
       const usernameChanged = username !== (preferences?.username || '');
       const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
+      const cityChanged = city !== (preferences?.city || '');
 
       // Only save if something changed
-      if (usernameChanged || notificationsChanged) {
+      if (usernameChanged || notificationsChanged || cityChanged) {
         // Save in the background - modal is already closed
         this.saveInBackground({
           username,
           pushNotifications,
+          city,
           preferences
         });
       }
     };
+
+    // Calculate suggestion - only if the top result starts with what the user typed
+    let suggestion = '';
+    if (cityTopResult && city.length > 0 &&
+        cityTopResult.toLowerCase().startsWith(city.toLowerCase())) {
+      suggestion = cityTopResult;
+    }
 
     return (
       <div
@@ -431,6 +551,27 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             />
             <div className={`error-message ${usernameError ? 'visible' : 'hidden'}`}>
               {usernameError || '\u00A0'}
+            </div>
+          </div>
+
+          <div className="profile-section">
+            <label htmlFor="city">Home City</label>
+            <div className="city-input-container">
+              <input
+                type="text"
+                id="city"
+                ref={this.cityInputRef}
+                value={city}
+                onChange={(e) => this.handleCityChange(e.target.value)}
+                onKeyDown={this.handleCityKeyDown}
+                placeholder="Enter your city (press Tab to autocomplete)"
+                autoComplete="off"
+              />
+              {suggestion && (
+                <div className="city-suggestion">
+                  {suggestion}
+                </div>
+              )}
             </div>
           </div>
 
