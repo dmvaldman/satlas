@@ -402,7 +402,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.setState({
       translateX: finalTranslateX,
-      isDragging: false,
+      isDragging: false
     }, () => {
       // Start momentum animation if needed
       if (shouldApplyMomentum) {
@@ -422,10 +422,12 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     });
   };
 
-
-
-
   private handleImageClick = (image: Image, e: React.MouseEvent) => {
+    // Ignore clicks while dragging
+    if (this.state.isDragging) {
+      return;
+    }
+
     console.log('handleImageClick', image);
     e.stopPropagation();
     this.props.onOpenFullscreenImage(image);
