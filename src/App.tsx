@@ -264,7 +264,12 @@ class App extends React.Component<{}, AppState> {
         .then(coordinates => {
           // move map to new location
           if (this.state.map) {
-            this.state.map.setCenter([coordinates.longitude, coordinates.latitude]);
+            // animate to new location and zoom
+            this.state.map.flyTo({
+              center: [coordinates.longitude, coordinates.latitude],
+              zoom: 13,
+              essential: true
+            });
           }
           if (this.gpsTimeoutHandle) {
             clearTimeout(this.gpsTimeoutHandle);
