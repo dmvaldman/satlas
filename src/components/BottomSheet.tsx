@@ -7,7 +7,7 @@ interface BottomSheetProps {
   header?: React.ReactNode;
   children: React.ReactNode;
   snapPoints: number[] | (() => number[]); // Array of heights from bottom in pixels
-  onDismiss: () => void;
+  onClose: () => void;
 }
 
 interface BottomSheetState {
@@ -51,19 +51,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
     // If the sheet is open on mount, animate it in
     if (this.props.open) {
-      requestAnimationFrame(() => {
-        this.animateToPosition('-100%');
-      });
+      this.open();
+    }
 
-      // Add mouse/touch event listeners when mounted with open={true}
-      if (this.sheetContainerRef.current) {
+    // Add mouse/touch event listeners when mounted with open={true}
+    if (this.sheetContainerRef.current) {
         this.sheetContainerRef.current.addEventListener('mousedown', this.handleDragStart, { passive: true });
         this.sheetContainerRef.current.addEventListener('mousemove', this.handleDragMove, { passive: false });
         this.sheetContainerRef.current.addEventListener('mouseup', this.handleDragEnd, { passive: true });
         this.sheetContainerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: true });
         this.sheetContainerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
         this.sheetContainerRef.current.addEventListener('touchend', this.handleDragEnd, { passive: true });
-      }
     }
   }
 
@@ -74,13 +72,11 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       const initialSnapPoint = 0;
 
       this.setState({
-        translateY: '100%',
+        translateY: '0',
         sheetHeight: snapPoints[initialSnapPoint],
         currentSnapPoint: initialSnapPoint
       }, () => {
-        requestAnimationFrame(() => {
-          this.animateToPosition('-100%');
-        });
+        this.open();
       });
     }
 
@@ -129,9 +125,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   };
 
   private close = () => {
-    this.setState({ translateY: '100%' });
+    this.setState({ translateY: '0' });
     if (this.overlayRef.current) {
       this.overlayRef.current.style.opacity = '0';
+    }
+    this.props.onClose();
+  };
+
+  private open = () => {
+    this.setState({ translateY: '-100%' });
+    if (this.overlayRef.current) {
+      this.overlayRef.current.style.opacity = '1';
     }
   };
 
@@ -196,7 +200,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       if (targetSnapIndex > 0) {
         targetSnapIndex--;
       } else {
-        this.props.onDismiss();
+        this.close();
         return;
       }
     } else if (currentPositionPx < -this.state.sheetHeight * 1.2 && targetSnapIndex < snapPoints.length - 1) {
@@ -207,7 +211,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       currentSnapPoint: targetSnapIndex,
       sheetHeight: snapPoints[targetSnapIndex]
     }, () => {
-      this.animateToPosition('-100%');
+      this.open();
     });
   };
 
@@ -222,7 +226,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
   private handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === this.overlayRef.current) {
-      this.props.onDismiss();
+      this.props.onClose();
     }
   };
 
