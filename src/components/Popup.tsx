@@ -7,8 +7,7 @@ import { formatRelativeTime } from '../utils/dateUtils';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseService } from '../services/FirebaseService';
-import { BottomSheet } from 'react-spring-bottom-sheet';
-import 'react-spring-bottom-sheet/dist/style.css';
+import BottomSheet from './BottomSheet';
 
 const markTypes: { type: MarkType; label: string }[] = [
   {
@@ -306,17 +305,15 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       return null;
     }
 
-    // Render the BottomSheet that wraps our popup content
+    // Render our custom BottomSheet component instead of react-spring-bottom-sheet
     return (
       <BottomSheet
         open={isOpen && !photoModalIsOpen}
         onDismiss={onClose}
-        snapPoints={() => [
-          Math.min(1000, window.innerHeight * .7)
+        snapPoints={[
+          Math.min(400, window.innerHeight * .6), // 60% of screen height
+          Math.min(600, window.innerHeight * .8), // 80% of screen height
         ]}
-        expandOnContentDrag={false}
-        defaultSnap={({ minHeight }) => minHeight}
-        blocking={true}
         header={
           <div className="bottom-sheet-header">
             <span className="header-emoji">🪑</span>
