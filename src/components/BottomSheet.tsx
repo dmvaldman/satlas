@@ -4,10 +4,10 @@ import '../css/bottom-sheet.css';
 
 interface BottomSheetProps {
   open: boolean;
-  onDismiss: () => void;
   header?: React.ReactNode;
   children: React.ReactNode;
   snapPoints: number[] | (() => number[]); // Array of heights from bottom in pixels
+  onDismiss: () => void;
 }
 
 interface BottomSheetState {
@@ -55,11 +55,14 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
         this.animateToPosition('-100%');
       });
 
-      // Add touch event listeners when mounted with open={true}
+      // Add mouse/touch event listeners when mounted with open={true}
       if (this.sheetContainerRef.current) {
-        this.sheetContainerRef.current.addEventListener('touchstart', this.handleTouchStartDirect, { passive: true });
-        this.sheetContainerRef.current.addEventListener('touchmove', this.handleTouchMoveDirect, { passive: false });
-        this.sheetContainerRef.current.addEventListener('touchend', this.handleTouchEndDirect, { passive: true });
+        this.sheetContainerRef.current.addEventListener('mousedown', this.handleDragStart, { passive: true });
+        this.sheetContainerRef.current.addEventListener('mousemove', this.handleDragMove, { passive: false });
+        this.sheetContainerRef.current.addEventListener('mouseup', this.handleDragEnd, { passive: true });
+        this.sheetContainerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: true });
+        this.sheetContainerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
+        this.sheetContainerRef.current.addEventListener('touchend', this.handleDragEnd, { passive: true });
       }
     }
   }
@@ -79,36 +82,25 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
           this.animateToPosition('-100%');
         });
       });
-
-      // Add touch event listeners when opening
-      if (this.sheetContainerRef.current) {
-        this.sheetContainerRef.current.addEventListener('touchstart', this.handleTouchStartDirect, { passive: true });
-        this.sheetContainerRef.current.addEventListener('touchmove', this.handleTouchMoveDirect, { passive: false });
-        this.sheetContainerRef.current.addEventListener('touchend', this.handleTouchEndDirect, { passive: true });
-      }
     }
 
     // When the sheet closes
     if (!this.props.open && prevProps.open) {
       this.close();
-
-      // Remove touch event listeners when closing
-      if (this.sheetContainerRef.current) {
-        this.sheetContainerRef.current.removeEventListener('touchstart', this.handleTouchStartDirect);
-        this.sheetContainerRef.current.removeEventListener('touchmove', this.handleTouchMoveDirect);
-        this.sheetContainerRef.current.removeEventListener('touchend', this.handleTouchEndDirect);
-      }
     }
   }
 
   componentWillUnmount() {
     window.removeEventListener('resize', this.handleResize);
 
-    // Remove touch event listeners
+    // Remove mouse/touch event listeners
     if (this.sheetContainerRef.current) {
-      this.sheetContainerRef.current.removeEventListener('touchstart', this.handleTouchStartDirect);
-      this.sheetContainerRef.current.removeEventListener('touchmove', this.handleTouchMoveDirect);
-      this.sheetContainerRef.current.removeEventListener('touchend', this.handleTouchEndDirect);
+      this.sheetContainerRef.current.removeEventListener('mousedown', this.handleDragStart);
+      this.sheetContainerRef.current.removeEventListener('mousemove', this.handleDragMove);
+      this.sheetContainerRef.current.removeEventListener('mouseup', this.handleDragEnd);
+      this.sheetContainerRef.current.removeEventListener('touchstart', this.handleDragStart);
+      this.sheetContainerRef.current.removeEventListener('touchmove', this.handleDragMove);
+      this.sheetContainerRef.current.removeEventListener('touchend', this.handleDragEnd);
     }
   }
 
@@ -143,7 +135,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     }
   };
 
-  private handleTouchStartDirect = (e: TouchEvent) => {
+  private handleDragStart = (e: TouchEvent | MouseEvent) => {
     // Don't handle drag if originated in content container (to allow scrolling of content)
     if (this.contentContainerRef.current &&
         this.contentContainerRef.current.contains(e.target as Node) &&
@@ -153,17 +145,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     }
 
     this.setState({
-      startDragY: e.touches[0].clientY,
+      startDragY: 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY,
       isDragging: true
     });
   };
 
-  private handleTouchMoveDirect = (e: TouchEvent) => {
+  private handleDragMove = (e: TouchEvent | MouseEvent) => {
     if (!this.state.isDragging || this.state.startDragY === null) return;
 
     e.preventDefault();
 
-    const clientY = e.touches[0].clientY;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
     const deltaY = clientY - this.state.startDragY;
     const currentTranslateYPx = this.getCurrentTranslateYInPixels();
     let newTranslateYPx = currentTranslateYPx + deltaY;
@@ -190,7 +182,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     }
   };
 
-  private handleTouchEndDirect = () => {
+  private handleDragEnd = () => {
     if (!this.state.isDragging) return;
 
     this.setState({ isDragging: false, startDragY: null });
@@ -234,67 +226,9 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     }
   };
 
-  private preventTouchPropagation = (e: React.TouchEvent) => {
-    // Remove scroll prevention since we're not scrolling anymore
-  };
-
-  private handleMouseDown = (e: React.MouseEvent) => {
-    // Don't handle drag if originated in content container (to allow scrolling of content)
-    if (this.contentContainerRef.current &&
-        this.contentContainerRef.current.contains(e.target as Node) &&
-        this.contentContainerRef.current !== e.target) {
-      return;
-    }
-
-    this.setState({
-      startDragY: e.clientY,
-      isDragging: true
-    });
-  };
-
-  private handleMouseMove = (e: React.MouseEvent) => {
-    if (!this.state.isDragging || this.state.startDragY === null) return;
-
-    const clientY = e.clientY;
-    const deltaY = clientY - this.state.startDragY;
-    const currentTranslateYPx = this.getCurrentTranslateYInPixels();
-    let newTranslateYPx = currentTranslateYPx + deltaY;
-
-    // Apply resistance when dragging beyond limits
-    if (newTranslateYPx > 0) {
-      newTranslateYPx = newTranslateYPx * 0.2;
-    } else if (newTranslateYPx < -window.innerHeight) {
-      newTranslateYPx = -window.innerHeight + (newTranslateYPx + window.innerHeight) * 0.2;
-    }
-
-    const newTranslateYPercentage = `${(newTranslateYPx / this.state.sheetHeight) * 100}%`;
-
-    this.setState({
-      translateY: newTranslateYPercentage,
-      startDragY: clientY
-    });
-
-    // Update overlay opacity based on sheet position
-    if (this.overlayRef.current) {
-      const percentValue = parseFloat(newTranslateYPercentage);
-      const opacity = 0.5 * (-percentValue / 100);
-      this.overlayRef.current.style.backgroundColor = `rgba(0, 0, 0, ${opacity})`;
-    }
-  };
-
-  private handleMouseUp = () => {
-    this.handleTouchEndDirect();
-  };
-
-  private handleMouseLeave = () => {
-    if (this.state.isDragging) {
-      this.handleTouchEndDirect();
-    }
-  };
-
   render() {
     const { open, header, children } = this.props;
-    const { translateY, isDragging, sheetHeight } = this.state;
+    const { translateY, isDragging } = this.state;
 
     return (
       <div className={`satlas-bottom-sheet ${!open ? 'closed' : ''}`}>
@@ -306,10 +240,6 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
         <div
           ref={this.sheetContainerRef}
           className={`sheet-container ${isDragging ? 'dragging' : ''}`}
-          onMouseDown={this.handleMouseDown}
-          onMouseMove={this.handleMouseMove}
-          onMouseUp={this.handleMouseUp}
-          onMouseLeave={this.handleMouseLeave}
           style={{
             transform: `translateY(${translateY})`,
           }}
