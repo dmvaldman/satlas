@@ -768,55 +768,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   to { transform: rotate(360deg); }
 }
 
-/* Update bottom sheet styling with more specific selectors */
-.react-spring-bottom-sheet {
-  --rsbs-bg: white;
-  --rsbs-handle-bg: #ddd;
-  --rsbs-ml: auto;
-  --rsbs-mr: auto;
-  --rsbs-overlay-rounded: 16px;
-  --rsbs-z-index: 1000;
-}
-
-/* Fix content changes causing re-animation issues */
-[data-rsbs-overlay] {
-  width: 100% !important;
-  max-width: 500px !important;
-  justify-self: center !important;
-}
-
-[data-rsbs-overlay],
-[data-rsbs-backdrop] {
-  will-change: transform;
-  transition-duration: 300ms !important;
-  transition-timing-function: ease-out !important;
-}
-
-/* Fix header styling */
-[data-rsbs-header] {
-  box-shadow: none !important;
-  border-bottom: 1px solid #eee;
-  padding-top: 30px !important;
-}
-
-[data-rsbs-header]::before {
-  width: 60px !important;
-  top: 8px !important;
-}
-
-/* Force higher z-index for bottom sheet with !important */
-[data-rsbs-root],
-[data-rsbs-overlay],
-[data-rsbs-backdrop] {
-  z-index: 1000 !important;
-}
-
-/* Bottom sheet header styles */
-.bottom-sheet-header {
-  display: flex;
-  align-items: center;
-}
-
 .header-emoji {
   font-size: 24px;
   margin: 0 auto;
