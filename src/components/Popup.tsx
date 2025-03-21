@@ -309,7 +309,7 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
     return (
       <BottomSheet
         open={isOpen && !photoModalIsOpen}
-        onDismiss={onClose}
+        onClose={onClose}
         snapPoints={[
           Math.min(400, window.innerHeight * .6), // 60% of screen height
           Math.min(600, window.innerHeight * .8), // 80% of screen height

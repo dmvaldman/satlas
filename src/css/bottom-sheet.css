@@ -14,7 +14,6 @@
 
 .satlas-bottom-sheet.closed .sheet-container {
   transform: translateY(100%);
-  transition: transform 0.3s ease-in;
 }
 
 /* Overlay styles */
@@ -26,7 +25,10 @@
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 1000;
-  transition: opacity 0.3s ease-in;
+}
+
+.satlas-bottom-sheet .overlay, .satlas-bottom-sheet .sheet-container {
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 /* Sheet container styles */
@@ -44,7 +46,6 @@
   flex-direction: column;
   z-index: 1001;
   will-change: transform;
-  transition: transform 0.3s ease-in;
 }
 
 .satlas-bottom-sheet .sheet-container.dragging {
