@@ -12,9 +12,9 @@
   pointer-events: none;
 }
 
-.satlas-bottom-sheet.closed .sheet-container {
+/* .satlas-bottom-sheet.closed .sheet-container {
   transform: translateY(100%);
-}
+} */
 
 /* Overlay styles */
 .satlas-bottom-sheet .overlay {
@@ -34,7 +34,7 @@
 /* Sheet container styles */
 .satlas-bottom-sheet .sheet-container {
   position: fixed;
-  top: 100vh;
+  bottom: 0;
   left: 0;
   right: 0;
   max-width: 500px;
@@ -46,6 +46,8 @@
   flex-direction: column;
   z-index: 1001;
   will-change: transform;
+  transform: translateY(100%);
+  padding-bottom: 100px;
 }
 
 .satlas-bottom-sheet .sheet-container.dragging {
