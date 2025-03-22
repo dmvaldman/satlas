@@ -319,12 +319,12 @@ class App extends React.Component<{}, AppState> {
         }
       });
 
-      map.addControl(new mapboxgl.GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: false
-        },
-        trackUserLocation: true
-      }), 'bottom-left');
+      // map.addControl(new mapboxgl.GeolocateControl({
+      //   positionOptions: {
+      //     enableHighAccuracy: false
+      //   },
+      //   trackUserLocation: true
+      // }), 'bottom-left');
 
     return map;
   };
