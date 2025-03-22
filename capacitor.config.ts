@@ -6,11 +6,14 @@ const baseConfig: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: "#FFFFFF",
-      showSpinner: true,
+      launchShowDuration: 1000,
+      backgroundColor: "#000000",
+      androidSplashResourceName: "splash",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: false,
       androidSpinnerStyle: 'large',
-      spinnerColor: '#3880ff',
+      spinnerColor: '#FFFFFF',
+      launchFadeOutDuration: 200,
     },
     Permissions: {
       camera: true,
