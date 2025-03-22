@@ -56,12 +56,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
     // Add mouse/touch event listeners when mounted with open={true}
     if (this.sheetContainerRef.current) {
-        this.sheetContainerRef.current.addEventListener('mousedown', this.handleDragStart, { passive: true });
-        this.sheetContainerRef.current.addEventListener('mousemove', this.handleDragMove, { passive: false });
-        this.sheetContainerRef.current.addEventListener('mouseup', this.handleDragEnd, { passive: true });
-        this.sheetContainerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: true });
-        this.sheetContainerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
-        this.sheetContainerRef.current.addEventListener('touchend', this.handleDragEnd, { passive: true });
+        // Check if touch events are supported
+        if ('maxTouchPoints' in navigator) {
+            const isTouchSupported = navigator.maxTouchPoints > 0;
+            this.sheetContainerRef.current.addEventListener('touchstart', this.handleDragStart, { passive: true });
+            this.sheetContainerRef.current.addEventListener('touchmove', this.handleDragMove, { passive: false });
+            this.sheetContainerRef.current.addEventListener('touchend', this.handleDragEnd, { passive: true });
+        } else {
+            this.sheetContainerRef.current.addEventListener('mousedown', this.handleDragStart, { passive: true });
+            this.sheetContainerRef.current.addEventListener('mousemove', this.handleDragMove, { passive: false });
+            this.sheetContainerRef.current.addEventListener('mouseup', this.handleDragEnd, { passive: true });
+        }
     }
   }
 
@@ -91,12 +96,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
     // Remove mouse/touch event listeners
     if (this.sheetContainerRef.current) {
-      this.sheetContainerRef.current.removeEventListener('mousedown', this.handleDragStart);
-      this.sheetContainerRef.current.removeEventListener('mousemove', this.handleDragMove);
-      this.sheetContainerRef.current.removeEventListener('mouseup', this.handleDragEnd);
-      this.sheetContainerRef.current.removeEventListener('touchstart', this.handleDragStart);
-      this.sheetContainerRef.current.removeEventListener('touchmove', this.handleDragMove);
-      this.sheetContainerRef.current.removeEventListener('touchend', this.handleDragEnd);
+        // Check if touch events are supported
+        if ('maxTouchPoints' in navigator) {
+            const isTouchSupported = navigator.maxTouchPoints > 0;
+            this.sheetContainerRef.current.removeEventListener('touchstart', this.handleDragStart);
+            this.sheetContainerRef.current.removeEventListener('touchmove', this.handleDragMove);
+            this.sheetContainerRef.current.removeEventListener('touchend', this.handleDragEnd);
+        } else {
+            this.sheetContainerRef.current.removeEventListener('mousedown', this.handleDragStart);
+            this.sheetContainerRef.current.removeEventListener('mousemove', this.handleDragMove);
+            this.sheetContainerRef.current.removeEventListener('mouseup', this.handleDragEnd);
+        }
     }
   }
 
@@ -111,16 +121,6 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       this.setState({
         sheetHeight: snapPoints[this.state.currentSnapPoint]
       });
-    }
-  };
-
-  private animateToPosition = (targetPosition: string) => {
-    this.setState({ translateY: targetPosition });
-
-    // Update overlay opacity based on position
-    if (this.overlayRef.current) {
-      const opacity = targetPosition === '-100%' ? 1 : 0;
-      this.overlayRef.current.style.opacity = opacity.toString();
     }
   };
 
@@ -161,26 +161,26 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
     const deltaY = clientY - this.state.startDragY;
-    const currentTranslateYPx = this.getCurrentTranslateYInPixels();
-    let newTranslateYPx = currentTranslateYPx + deltaY;
+    const currentTranslate = this.getCurrentTranslateInPixels();
+    let newTranslate = currentTranslate + deltaY;
 
     // Apply resistance when dragging beyond limits
-    if (newTranslateYPx > 0) {
-      newTranslateYPx = newTranslateYPx * 0.2;
-    } else if (newTranslateYPx < -window.innerHeight) {
-      newTranslateYPx = -window.innerHeight + (newTranslateYPx + window.innerHeight) * 0.2;
+    if (newTranslate > 0) {
+      newTranslate = newTranslate * 0.2;
+    } else if (newTranslate < -window.innerHeight) {
+      newTranslate = -window.innerHeight + (newTranslate + window.innerHeight) * 0.2;
     }
 
-    const newTranslateYPercentage = `${(newTranslateYPx / this.state.sheetHeight) * 100}%`;
+    const newTranslatePercentage = `${(newTranslate / this.state.sheetHeight) * 100}%`;
 
     this.setState({
-      translateY: newTranslateYPercentage,
+      translateY: newTranslatePercentage,
       startDragY: clientY
     });
 
     // Update overlay opacity based on sheet position
     if (this.overlayRef.current) {
-      const percentValue = parseFloat(newTranslateYPercentage);
+      const percentValue = parseFloat(newTranslatePercentage);
       const opacity = -percentValue / 100;
       this.overlayRef.current.style.opacity = opacity.toString();
     }
@@ -192,18 +192,18 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     this.setState({ isDragging: false, startDragY: null });
 
     const snapPoints = this.getSnapPoints();
-    const currentPositionPx = this.getCurrentTranslateYInPixels();
+    const currentPosition = this.getCurrentTranslateInPixels();
     let targetSnapIndex = this.state.currentSnapPoint;
 
     // Handle snap point changes based on drag position
-    if (currentPositionPx > -this.state.sheetHeight * 0.8) {
+    if (currentPosition > -this.state.sheetHeight * 0.8) {
       if (targetSnapIndex > 0) {
         targetSnapIndex--;
       } else {
         this.close();
         return;
       }
-    } else if (currentPositionPx < -this.state.sheetHeight * 1.2 && targetSnapIndex < snapPoints.length - 1) {
+    } else if (currentPosition < -this.state.sheetHeight * 1.2 && targetSnapIndex < snapPoints.length - 1) {
       targetSnapIndex++;
     }
 
@@ -215,7 +215,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     });
   };
 
-  private getCurrentTranslateYInPixels = (): number => {
+  private getCurrentTranslateInPixels = (): number => {
     const translateY = this.state.translateY;
     if (translateY.endsWith('%')) {
       const percentage = parseFloat(translateY);
