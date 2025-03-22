@@ -297,6 +297,77 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.updateVisibleImages(newTranslateX);
   };
 
+  private handleDragEnd = () => {
+    if (!this.state.isDragging) return;
+
+    // Just ensure we're within boundaries
+    let finalTranslateX = this.state.translateX;
+
+    // Don't allow dragging past the start
+    if (finalTranslateX > 0) {
+      finalTranslateX = 0;
+    }
+
+    // Don't allow dragging past the end
+    const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+
+    // Only apply max boundary if there's actually content that extends beyond the container
+    if (this.state.totalWidth > this.state.containerWidth && finalTranslateX < maxTranslateX) {
+      finalTranslateX = maxTranslateX;
+    }
+
+    // Check if we should apply momentum scrolling
+    // Only apply momentum if the velocity is significant
+    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.1 &&
+      this.state.totalWidth > this.state.containerWidth;
+
+    this.setState({
+      translateX: finalTranslateX,
+      isDragging: false
+    }, () => {
+      // Start momentum animation if needed
+      if (shouldApplyMomentum) {
+        this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
+      }
+    });
+  };
+
+  private applyMomentum = () => {
+    // Calculate new position based on velocity with deceleration
+    const deceleration = 0.9; // Deceleration factor (0.95 = lose 5% of velocity per frame)
+    const newVelocity = this.state.velocity * deceleration;
+
+    // Calculate distance to move this frame (velocity is px/ms)
+    const frameDelta = newVelocity * 16; // Assuming ~16ms per frame at 60fps
+
+    let newTranslateX = this.state.translateX + frameDelta;
+
+    // Apply boundaries
+    if (newTranslateX > 0) {
+      newTranslateX = 0;
+    } else {
+      const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
+      if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
+        newTranslateX = maxTranslateX;
+      }
+    }
+
+    // Update state
+    this.setState({
+      translateX: newTranslateX,
+      velocity: newVelocity
+    });
+
+    // Stop animation if velocity is very low
+    if (Math.abs(newVelocity) < 0.01) {
+      this.momentumAnimationId = null;
+      return;
+    }
+
+    // Continue animation
+    this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
+  };
+
   private updateVisibleImages = (translateX: number) => {
     if (!this.containerRef.current) return;
 
@@ -338,77 +409,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     if (newImageStatuses.some((status, i) => status !== this.state.imageStatuses[i])) {
       this.setState({ imageStatuses: newImageStatuses });
     }
-  };
-
-  private applyMomentum = () => {
-    // Calculate new position based on velocity with deceleration
-    const deceleration = 0.9; // Deceleration factor (0.95 = lose 5% of velocity per frame)
-    const newVelocity = this.state.velocity * deceleration;
-
-    // Calculate distance to move this frame (velocity is px/ms)
-    const frameDelta = newVelocity * 16; // Assuming ~16ms per frame at 60fps
-
-    let newTranslateX = this.state.translateX + frameDelta;
-
-    // Apply boundaries
-    if (newTranslateX > 0) {
-      newTranslateX = 0;
-    } else {
-      const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
-      if (this.state.totalWidth > this.state.containerWidth && newTranslateX < maxTranslateX) {
-        newTranslateX = maxTranslateX;
-      }
-    }
-
-    // Update state
-    this.setState({
-      translateX: newTranslateX,
-      velocity: newVelocity
-    });
-
-    // Stop animation if velocity is very low
-    if (Math.abs(newVelocity) < 0.01) {
-      this.momentumAnimationId = null;
-      return;
-    }
-
-    // Continue animation
-    this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
-  };
-
-  private handleDragEnd = () => {
-    if (!this.state.isDragging) return;
-
-    // Just ensure we're within boundaries
-    let finalTranslateX = this.state.translateX;
-
-    // Don't allow dragging past the start
-    if (finalTranslateX > 0) {
-      finalTranslateX = 0;
-    }
-
-    // Don't allow dragging past the end
-    const maxTranslateX = -(this.state.totalWidth - this.state.containerWidth);
-
-    // Only apply max boundary if there's actually content that extends beyond the container
-    if (this.state.totalWidth > this.state.containerWidth && finalTranslateX < maxTranslateX) {
-      finalTranslateX = maxTranslateX;
-    }
-
-    // Check if we should apply momentum scrolling
-    // Only apply momentum if the velocity is significant
-    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.1 &&
-      this.state.totalWidth > this.state.containerWidth;
-
-    this.setState({
-      translateX: finalTranslateX,
-      isDragging: false
-    }, () => {
-      // Start momentum animation if needed
-      if (shouldApplyMomentum) {
-        this.momentumAnimationId = requestAnimationFrame(this.applyMomentum);
-      }
-    });
   };
 
   private handleImageLoad = (index: number) => {
