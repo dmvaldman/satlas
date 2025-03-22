@@ -310,10 +310,6 @@ class PopupComponent extends React.Component<PopupProps, PopupState> {
       <BottomSheet
         open={isOpen && !photoModalIsOpen}
         onClose={onClose}
-        snapPoints={[
-          Math.min(400, window.innerHeight * .6), // 60% of screen height
-          Math.min(600, window.innerHeight * .8), // 80% of screen height
-        ]}
         header={
           <div className="bottom-sheet-header">
             <span className="header-emoji">🪑</span>
