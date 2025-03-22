@@ -12,11 +12,12 @@
     "android:build": "NODE_ENV=production npm run build && npx cap sync && npx cap run android",
     "android:clean-build": "NODE_ENV=production npm run build && npx cap sync && cd android && ./gradlew clean && cd .. && npx cap run android",
     "android:release": "cd android && ./gradlew assembleRelease && cd .. && adb install android/app/build/outputs/apk/release/app-release.apk",
-    "ios:build": "NODE_ENV=production npm run build && npx cap sync && npxcap run ios",
+    "ios:build": "NODE_ENV=production npm run build && npx cap sync && npx cap run ios",
     "ios:clean-build": "NODE_ENV=production npm run build && npx cap sync && cd ios && xcodebuild clean && cd .. && cap run ios",
     "dev:android": "NODE_ENV=development npx cap run android --live-reload --port=5173",
     "dev:android-build": "NODE_ENV=development npx cap sync android && cd android && ./gradlew assembleDebug && cd ..",
-    "dev:android-bundle": "NODE_ENV=development npx cap run android"
+    "dev:android-bundle": "NODE_ENV=development npx cap run android",
+    "dev:ios": "NODE_ENV=development npx cap run ios --live-reload --port=5173"
   },
   "main": "index.js",
   "dependencies": {
