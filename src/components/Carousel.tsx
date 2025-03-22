@@ -20,6 +20,7 @@ interface CarouselState {
   totalWidth: number;
   imageStatuses: ImageStatus[]; // Array instead of Map
   lastMoveTimestamp: number;
+  lastPosition: number;
   velocity: number;
 }
 
@@ -44,6 +45,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       totalWidth: 0,
       imageStatuses: Array(this.props.images.length).fill('notLoaded'),
       lastMoveTimestamp: 0,
+      lastPosition: 0,
       velocity: 0
     };
   }
@@ -246,8 +248,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.setState({
       startX: clientX,
+      lastPosition: clientX,
       isDragging: true,
-      lastMoveTimestamp: Date.now(),
+      lastMoveTimestamp: performance.now(),
       velocity: 0
     });
   };
@@ -264,9 +267,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     e.preventDefault();
 
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const deltaX = clientX - this.state.startX;
-    const currentTime = Date.now();
+    const currentTime = performance.now();
     const timeElapsed = currentTime - this.state.lastMoveTimestamp;
+    const deltaX = clientX - this.state.lastPosition;
 
     // Calculate velocity (pixels per millisecond)
     let velocity = 0;
@@ -288,7 +291,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.setState({
       translateX: newTranslateX,
-      startX: clientX,
+      lastPosition: clientX,
       lastMoveTimestamp: currentTime,
       velocity: velocity
     });
@@ -318,7 +321,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Check if we should apply momentum scrolling
     // Only apply momentum if the velocity is significant
-    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.1 &&
+    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.01 &&
       this.state.totalWidth > this.state.containerWidth;
 
     this.setState({
@@ -334,7 +337,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   private applyMomentum = () => {
     // Calculate new position based on velocity with deceleration
-    const deceleration = 0.9; // Deceleration factor (0.95 = lose 5% of velocity per frame)
+    const deceleration = 0.9; // Slower deceleration for smoother feel
     const newVelocity = this.state.velocity * deceleration;
 
     // Calculate distance to move this frame (velocity is px/ms)
@@ -358,8 +361,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       velocity: newVelocity
     });
 
-    // Stop animation if velocity is very low
-    if (Math.abs(newVelocity) < 0.01) {
+    // Stop animation if velocity is very low or we've hit a boundary
+    if (Math.abs(newVelocity) < 0.001 ||
+        newTranslateX === 0 ||
+        (this.state.totalWidth > this.state.containerWidth &&
+         newTranslateX === -(this.state.totalWidth - this.state.containerWidth))) {
       this.momentumAnimationId = null;
       return;
     }
