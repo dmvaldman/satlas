@@ -10,7 +10,7 @@ import { UserPreferences } from './types';
 import AddSitButton from './components/AddSitButton';
 import NearbyExistingSitModal from './components/NearbyExistingSitModal';
 import { FirebaseService } from './services/FirebaseService';
-import { LocationService } from './utils/LocationService';
+import { LocationService } from './services/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
@@ -1034,7 +1034,7 @@ class App extends React.Component<{}, AppState> {
 
   private configureStatusBar = async () => {
     try {
-      // Configure dark system bars (light icons on transparent background)
+      // Configure system bars (dark icons on transparent background)
       await StatusBar.setOverlaysWebView({ overlay: true });
       await StatusBar.setStyle({ style: Style.Light });
       await StatusBar.setBackgroundColor({ color: '#000000' });
