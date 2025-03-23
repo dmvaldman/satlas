@@ -108,7 +108,7 @@ body {
   bottom: 0;
   width: 100%;
   min-height: 0; /* Important for flex container */
-  height: calc(100vh - var(--safe-area-bottom)) !important;
+  height: calc(100vh) !important;
 }
 
 .mapboxgl-map {
@@ -242,8 +242,6 @@ body {
   justify-content: center;
   z-index: 2000;
   cursor: pointer;
-  padding-bottom: var(--safe-area-bottom);
-  bottom: var(--safe-area-bottom) !important;
   align-items: flex-end;
 }
 
@@ -254,8 +252,8 @@ body {
   border-radius: 8px 8px 0 0;
   padding: 20px;
   cursor: default;
-  padding-bottom: calc(20px + var(--safe-area-bottom));
-  max-height: calc(80vh - 48px - var(--safe-area-bottom));
+  padding-bottom: var(--safe-area-bottom);
+  max-height: 80vh;
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
   will-change: transform;
@@ -747,12 +745,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 10000;
 }
 
-/* Non-Android adjustments (apply to all platforms) */
-.modal-overlay {
-  padding-bottom: var(--safe-area-bottom);
-  bottom: var(--safe-area-bottom) !important;
-}
-
 .loading-indicator {
   position: absolute;
   width: 100%;
@@ -969,21 +961,21 @@ body:has(.bottom-nav-space) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.95);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 2000;
   cursor: pointer;
-  padding-bottom: var(--safe-area-bottom);
-  bottom: var(--safe-area-bottom) !important;
+  padding-bottom: 0;
+  bottom: 0;
 }
 
 .fullscreen-image-container {
   position: relative;
   max-width: 100%;
   max-height: 100%;
-  padding: 20px;
+  padding: 10px;
   display: flex;
   justify-content: center;
   align-items: center;
