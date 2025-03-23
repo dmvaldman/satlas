@@ -53,12 +53,10 @@ class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState>
   };
 
   render() {
-    const isAndroid = Capacitor.getPlatform() === 'android';
-
     return (
       <>
         <button
-          className={`fab ${isAndroid ? 'fab-android' : ''}`}
+          className="fab"
           id="add-satlas-btn"
           aria-label="Add new Satlas"
           onClick={this.handleClick}
