@@ -123,6 +123,25 @@ export class PushNotificationService {
     }
 
     try {
+      // Check current permission status
+      const permissionStatus = await PushNotifications.checkPermissions();
+      const isPermissionGranted = permissionStatus.receive === 'granted';
+
+      if (isPermissionGranted) {
+        console.log('[PushNotificationService] Notifications are currently enabled, showing settings prompt');
+        // Show settings prompt to disable notifications
+        if (confirm('Would you like to disable push notifications in settings?')) {
+          const settingsOpened = await this.openNotificationSettings();
+          if (!settingsOpened) {
+            console.log('[PushNotificationService] Failed to open settings');
+            return false;
+          }
+        } else {
+          console.log('[PushNotificationService] User cancelled disabling notifications');
+          return false;
+        }
+      }
+
       // Unregister push notifications
       await this.unregisterPushNotifications();
 
@@ -326,7 +345,8 @@ export class PushNotificationService {
    * @returns true if user was prompted to open settings
    */
   private async handlePermissionError(): Promise<boolean> {
-    if (confirm('Push notifications are disabled. Would you like to enable them in settings?')) {
+    const action = this.enabled ? 'disable' : 'enable';
+    if (confirm(`Would you like to ${action} push notifications in settings?`)) {
       return await this.openNotificationSettings();
     }
     return false;
