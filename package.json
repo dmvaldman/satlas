@@ -17,7 +17,7 @@
     "dev:android": "NODE_ENV=development npx cap run android --live-reload --port=5173",
     "dev:android-build": "NODE_ENV=development npx cap sync android && cd android && ./gradlew assembleDebug && cd ..",
     "dev:android-bundle": "NODE_ENV=development npx cap run android",
-    "dev:ios": "NODE_ENV=development npx cap run ios --live-reload --port=5173"
+    "dev:ios": "NODE_ENV=development npx cap run ios --live-reload --port=5173 --target=32A43D71-9B39-45B8-98FF-3CA1B7E2A013"
   },
   "main": "index.js",
   "dependencies": {
@@ -29,7 +29,7 @@
     "@capacitor/core": "^7.0.1",
     "@capacitor/filesystem": "^7.0.0",
     "@capacitor/geolocation": "^7.1.1",
-    "@capacitor/ios": "^7.0.1",
+    "@capacitor/ios": "^7.1.0",
     "@capacitor/keyboard": "^7.0.0",
     "@capacitor/network": "^7.0.0",
     "@capacitor/push-notifications": "^7.0.0",

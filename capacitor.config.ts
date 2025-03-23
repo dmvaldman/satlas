@@ -34,7 +34,7 @@ const baseConfig: CapacitorConfig = {
 
 const devConfig = process.env.NODE_ENV === 'development' ? {
   server: {
-    url: 'http://192.168.68.102:5173',
+    url: 'http://localhost:5173',
     cleartext: true,
     androidScheme: 'http'
   }
