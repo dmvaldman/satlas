@@ -48,7 +48,7 @@ export class ClusterManager {
       return map.getLayer('clusters') !== undefined &&
              map.getLayer('cluster-count') !== undefined &&
              map.getLayer('unclustered-point') !== undefined;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -170,7 +170,7 @@ export class ClusterManager {
   private sourceExists(map: mapboxgl.Map, sourceId: string): boolean {
     try {
       return !!map.getSource(sourceId);
-    } catch (error) {
+    } catch {
       return false;
     }
   }

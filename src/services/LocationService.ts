@@ -16,7 +16,7 @@ export class LocationService {
   private hasLocationPermission: boolean = false;
   private static lastKnownLocation: Location | null = null;
 
-  constructor(storage: Storage = localStorage) {
+  constructor() {
     this.addLocationListener(LocationService.setLastKnownLocation);
   }
 

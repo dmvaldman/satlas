@@ -294,7 +294,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       let location: Coordinates | null = null;
       try {
         location = await this.getLocation();
-        console.log('[PhotoUpload] Location:', location.latitude, location.longitude);
+        if (!location) {
+          console.error('[PhotoUpload] No location data received');
+          this.props.showNotification('No location data received', 'error');
+          throw new Error('No location data received');
+        }
       } catch (locationError) {
         console.error('[PhotoUpload] Error getting location:', locationError);
         this.props.showNotification('Error getting location', 'error');
@@ -364,9 +368,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           onClick={e => e.stopPropagation()}
         >
           {isOffline && (
-            <div className="offline-notice">
-              You're offline. Photos will upload when you're back online.
-            </div>
+            <div className="offline-notice">You're offline. Photos will upload when you're back online.</div>
           )}
 
           <button

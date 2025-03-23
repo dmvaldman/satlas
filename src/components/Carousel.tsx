@@ -148,7 +148,6 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   ): { width: number; height: number } {
     const aspectRatio = image.width / image.height;
     let imageWidth = Math.floor(carouselHeight * aspectRatio);
-    let imageHeight = carouselHeight;
 
     // If multiple images, limit width to 90% of container to show next image
     if (hasMultipleImages && imageWidth >= containerWidth * 0.9) {
@@ -159,7 +158,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       imageWidth = containerWidth;
     }
 
-    return { width: imageWidth, height: imageHeight };
+    return { width: imageWidth, height: carouselHeight };
   }
 
   private calculateDimensions = () => {
@@ -506,7 +505,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       }}
                       onLoad={() => this.handleImageLoad(index)}
                       onError={(e) => {
-                        console.error(`Error loading image: ${image.photoURL}, ${image.id}`);
+                        console.error(`Error loading image: ${image.photoURL}, ${image.id}, ${e}`);
                       }}
                       onClick={(e) => this.handleImageClick(image, e)}
                     />

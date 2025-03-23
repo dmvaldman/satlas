@@ -1,7 +1,7 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { debounce } from '../utils/debounce';
-import { Sit, MarkType, User, Image } from '../types';
+import { Sit, MarkType, User } from '../types';
 import { MarkerManager } from './MarkerManager';
 import { ClusterManager } from './ClusterManager';
 
@@ -196,7 +196,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
       map.setLayoutProperty('cluster-count', 'visibility', 'visible');
 
       // Get the IDs of points that are in clusters
-      const clusteredFeatures = map.queryRenderedFeatures({ layers: ['clusters'] });
       const unclusteredFeatures = map.queryRenderedFeatures({ layers: ['unclustered-point'] });
 
       // Extract the sit IDs from unclustered features

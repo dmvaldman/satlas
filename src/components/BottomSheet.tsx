@@ -1,5 +1,4 @@
 import React from 'react';
-import { Capacitor } from '@capacitor/core';
 import '../css/bottom-sheet.css';
 
 interface BottomSheetProps {
@@ -79,7 +78,6 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     if (this.sheetContainerRef.current) {
         // Check if touch events are supported
         if ('maxTouchPoints' in navigator) {
-            const isTouchSupported = navigator.maxTouchPoints > 0;
             this.sheetContainerRef.current.removeEventListener('touchstart', this.handleDragStart);
             this.sheetContainerRef.current.removeEventListener('touchmove', this.handleDragMove);
             this.sheetContainerRef.current.removeEventListener('touchend', this.handleDragEnd);
@@ -137,7 +135,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       deltaY = (currentTranslate) / this.state.paddingBottom * deltaY;
     }
 
-    let newTranslate = currentTranslate + deltaY;
+    const newTranslate = currentTranslate + deltaY;
 
     this.setState({
       translateY: newTranslate,
