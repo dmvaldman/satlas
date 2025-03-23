@@ -4,7 +4,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Coordinates, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { OfflineService } from '../services/OfflineService';
-import { LocationService } from '../utils/LocationService';
+import { LocationService } from '../services/LocationService';
 import { convertDMSToDD } from '../utils/geo';
 
 
