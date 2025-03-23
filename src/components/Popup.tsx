@@ -44,9 +44,7 @@ interface PopupProps {
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
-interface PopupState {}
-
-class PopupComponent extends React.Component<PopupProps, PopupState> {
+class PopupComponent extends React.Component<PopupProps> {
   constructor(props: PopupProps) {
     super(props);
   }

@@ -155,7 +155,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     this.keyboardListenersAdded = false;
   }
 
-  private handleKeyboardShow = (info: { keyboardHeight: number }) => {
+  private handleKeyboardShow = () => {
     if (this.contentRef.current) {
       this.contentRef.current.classList.add('keyboard-visible');
 
@@ -469,7 +469,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   private handlePushNotificationToggle = async (enabled: boolean) => {
-    const { user, showNotification, preferences } = this.props;
+    const { user, showNotification } = this.props;
     console.log('[ProfileModal] Toggle notifications:', enabled);
 
     if (!user) {

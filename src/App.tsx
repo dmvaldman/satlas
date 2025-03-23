@@ -277,7 +277,7 @@ class App extends React.Component<{}, AppState> {
           this.gpsTimeoutHandle = null;
           this.setState({ currentLocation: coordinates });
         })
-        .catch(error => {
+        .catch(() => {
           this.pollForGPSLocation();
         });
     }, 1000);

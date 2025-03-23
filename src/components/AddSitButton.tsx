@@ -1,6 +1,5 @@
 import React from 'react';
 import { Coordinates, User, Sit } from '../types';
-import { Capacitor } from '@capacitor/core';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;
@@ -13,9 +12,7 @@ interface AddSitButtonProps {
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
-interface AddSitButtonState {}
-
-class AddSitButton extends React.Component<AddSitButtonProps, AddSitButtonState> {
+class AddSitButton extends React.Component<AddSitButtonProps> {
   constructor(props: AddSitButtonProps) {
     super(props);
   }

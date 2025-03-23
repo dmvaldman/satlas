@@ -28,36 +28,16 @@ class Notification extends React.Component<{}, { notifications: NotificationItem
   /**
    * Show a notification
    */
-  public showNotification = (messageOrNotification: string | { message: string, type: NotificationType }, type?: NotificationType) => {
-    // Handle both formats: (message, type) and ({ message, type })
-    let message: string;
-    let notificationType: NotificationType;
-
-    if (typeof messageOrNotification === 'string') {
-      // Old format: (message, type)
-      message = messageOrNotification;
-      notificationType = type || 'error'; // Default to error if type is not provided
-    } else {
-      // New format: ({ message, type })
-      message = messageOrNotification.message;
-      notificationType = messageOrNotification.type;
-    }
-
-    // Create a new notification
-    const newNotification: NotificationItem = {
-      message,
-      type: notificationType
-    };
-
+  public showNotification = (notification: { message: string, type: NotificationType }) => {
     // Add the new notification to the list
     this.setState(prevState => ({
-      notifications: [...prevState.notifications, newNotification]
+      notifications: [...prevState.notifications, notification]
     }));
 
     // Set a timeout to automatically remove this notification
     setTimeout(() => {
       this.setState(prevState => ({
-        notifications: prevState.notifications.filter(n => n !== newNotification)
+        notifications: prevState.notifications.filter(n => n !== notification)
       }));
     }, this.timeout);
   };
