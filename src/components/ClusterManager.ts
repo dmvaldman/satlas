@@ -156,7 +156,8 @@ export class ClusterManager {
       properties: {
         id: sit.id,
         // Include any other properties you want to access in the cluster
-        uploadedBy: sit.uploadedBy
+        uploadedBy: sit.uploadedBy,
+        uploadedByUsername: sit.uploadedByUsername
       },
       geometry: {
         type: 'Point' as const,

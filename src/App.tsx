@@ -894,6 +894,7 @@ class App extends React.Component<{}, AppState> {
           id: `new_${Date.now()}`,
           location: location,
           uploadedBy: user.uid,
+          uploadedByUsername: userPreferences.username,
           imageCollectionId: ''
         };
 

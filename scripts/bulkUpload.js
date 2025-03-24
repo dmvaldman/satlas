@@ -210,7 +210,8 @@ async function bulkUploadImages(directoryPath, userId, userName) {
         },
         imageCollectionId,
         createdAt: new Date(),
-        uploadedBy: userId
+        uploadedBy: userId,
+        uploadedByUsername: userName
       });
 
       results.push({

@@ -23,6 +23,7 @@ export interface Sit {
   imageCollectionId: string;
   createdAt?: Date;
   uploadedBy?: string;
+  uploadedByUsername?: string;
 }
 
 export interface ImageCollection {
