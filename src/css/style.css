@@ -112,8 +112,8 @@ body {
 .satlas-marker {
   width: 26px;
   height: 26px;
-  background-color: #62bdd9;  /* Default green color */
-  border: 2px solid white;
+  background-color: #3fa3c1;  /* Default green color */
+  border: 1px solid black;
   border-radius: 50%;
   cursor: pointer;
   opacity: 1;
@@ -122,6 +122,10 @@ body {
   justify-content: center;
   position: relative;
 }
+
+/* .satlas-marker.seen {
+  background-color: #63acc1;
+} */
 
 /* Add marker container styles */
 .marker-container {
@@ -137,10 +141,6 @@ body {
 
 .satlas-marker.own-sit {
   background-color: #007AFF;  /* Blue for own sits */
-}
-
-.satlas-marker.seen {
-  background-color: #bed1d6; /* Lighter green for seen sits */
 }
 
 /* Icon styles */
@@ -166,36 +166,13 @@ body {
 
 .location-marker {
   position: relative;
-  width: 0;
-  height: 0;
-  z-index: 100;
+  width: 24px;
+  height: 24px;
+  z-index: 0;
   pointer-events: none;
 }
 
-.location-marker::before {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: rgba(180, 180, 180, 0.15);
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.location-marker::after {
-  content: '';
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  border: 1px solid #3326c3;
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
+.location-marker svg {
   pointer-events: none;
 }
 
