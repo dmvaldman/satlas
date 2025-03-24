@@ -6,14 +6,19 @@ const baseConfig: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1000,
       backgroundColor: "#000000",
-      androidSplashResourceName: "splash",
-      androidScaleType: "CENTER_CROP",
       showSpinner: false,
-      androidSpinnerStyle: 'large',
       spinnerColor: '#FFFFFF',
       launchFadeOutDuration: 200,
+      launchAutoHide: false,
+      androidSplashResourceName: "splash",
+      androidScaleType: "FIT_CENTER",
+      androidSpinnerStyle: 'large'
+    },
+    StatusBar: {
+      style: 'LIGHT',
+      overlaysWebView: true,
+      backgroundColor: '#00000000'
     },
     Permissions: {
       camera: true,
