@@ -4,7 +4,7 @@ import { Sit } from '../types';
 export class ClusterManager {
   private clusterSourceAdded: boolean = false;
   private clusterColor: string = '#003f83';
-  private clusterRadius: number = 22;
+  private clusterRadius: number = 24;
 
   public setupClusterLayer(map: mapboxgl.Map, sits: Map<string, Sit>): void {
     if (map.loaded()) {
@@ -59,9 +59,9 @@ export class ClusterManager {
       type: 'geojson',
       data: this.createGeoJSONFromSits(sits),
       cluster: true,
-      clusterMaxZoom: 13, // Max zoom to cluster points on
+      clusterMaxZoom: 12, // Max zoom to cluster points on
       clusterMinPoints: 2, // Minimum points to form a cluster
-      clusterRadius: 50 // Radius of each cluster when clustering points
+      clusterRadius: 40 // Radius of each cluster when clustering points
     });
 
     // Add a layer for the clusters
@@ -72,7 +72,9 @@ export class ClusterManager {
       filter: ['has', 'point_count'],
       paint: {
         'circle-color': this.clusterColor,
-        'circle-radius': this.clusterRadius
+        'circle-radius': this.clusterRadius,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#000000'
       }
     });
 
@@ -85,10 +87,12 @@ export class ClusterManager {
       layout: {
         'text-field': '{point_count_abbreviated}',
         'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 12
+        'text-size': 16,
       },
       paint: {
-        'text-color': '#ffffff'
+        'text-color': '#fff',
+        'text-halo-color': '#000',
+        'text-halo-width': 1
       }
     });
 
