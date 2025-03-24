@@ -112,11 +112,15 @@ body {
 .satlas-marker {
   width: 26px;
   height: 26px;
-  background-color: #62bdd9;  /* Default green color for other people's sits */
+  background-color: #62bdd9;  /* Default green color */
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
   opacity: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 /* Add marker container styles */
@@ -127,29 +131,28 @@ body {
   align-items: center;
   justify-content: center;
   position: absolute;
-  /* background: red; */
   border-radius: 50%;
 }
+
 
 .satlas-marker.own-sit {
   background-color: #007AFF;  /* Blue for own sits */
 }
 
-.satlas-marker.favorite {
-  background-color: #ff4081;
-}
-
-.satlas-marker.visited {
-  /* color: #003f83; */
-  background-color: #808080;
-}
-
-.satlas-marker.want-to-go {
-  background-color: #9c27b0;
-}
-
 .satlas-marker.seen {
-  background-color: #bed1d6 !important; /* Make the marker slightly transparent */
+  background-color: #bed1d6; /* Lighter green for seen sits */
+}
+
+/* Icon styles */
+.marker-icon {
+  width: 14px;
+  height: 14px;
+  fill: #000000;
+  opacity: 0.8;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .satlas-popup {
@@ -1021,3 +1024,4 @@ body:has(.bottom-nav-space) {
   height: 24px;
   fill: white;
 }
+

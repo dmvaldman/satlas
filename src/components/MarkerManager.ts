@@ -9,6 +9,34 @@ export class MarkerManager {
     private onMarkerClick: (sit: Sit) => void
   ) {}
 
+
+  private createIconElement(marks: Set<MarkType>): SVGElement {
+    let iconPath = '';  // Default empty string
+
+    if (marks.has('favorite')) {
+      iconPath = 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z';
+    } else if (marks.has('visited')) {
+      iconPath = 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z';
+    } else if (marks.has('wantToGo')) {
+      iconPath = 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
+    }
+
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('class', 'marker-icon');
+    icon.setAttribute('viewBox', '0 0 24 24');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', iconPath);
+
+    if (!marks.has('favorite')) {
+      path.setAttribute('stroke-width', '3');
+      path.setAttribute('stroke', '#000000');
+    }
+
+    icon.appendChild(path);
+    return icon;
+  }
+
   private createMarker(sit: Sit, marks: Set<MarkType>, user: User | null, seenSits: Set<string>): mapboxgl.Marker {
     // Create container for larger hit area
     const container = document.createElement('div');
@@ -17,6 +45,11 @@ export class MarkerManager {
     // Create the actual marker element
     const el = document.createElement('div');
     el.className = this.getMarkerClasses(sit, user, marks, seenSits).join(' ');
+
+    // Add icon based on marks
+    if (marks.size > 0) {
+      el.appendChild(this.createIconElement(marks));
+    }
 
     // Add click handler to container for larger hit area
     container.addEventListener('click', (e) => {
@@ -54,6 +87,17 @@ export class MarkerManager {
 
         const el = container.firstElementChild as HTMLElement;
         el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
+
+        // Clear existing icon
+        const existingIcon = el.querySelector('.marker-icon');
+        if (existingIcon) {
+          existingIcon.remove();
+        }
+
+        // Add new icon if needed
+        if (sitMarks.size > 0) {
+          el.appendChild(this.createIconElement(sitMarks));
+        }
 
         // Update position if needed
         marker.setLngLat([sit.location.longitude, sit.location.latitude]);
