@@ -103,9 +103,8 @@ export class FirebaseService {
       if (Capacitor.isNativePlatform()) {
         console.log('[Firebase] Using native authentication');
         try {
-          // First check if we already have credentials
-          const signInState = await FirebaseAuthentication.getCurrentUser();
-          console.log('[Firebase] Current sign-in state:', signInState?.user ? 'signed in' : 'not signed in');
+          // First ensure we're signed out
+          await this.signOut();
 
           // Use the native plugin
           const result = await FirebaseAuthentication.signInWithGoogle({
@@ -171,10 +170,17 @@ export class FirebaseService {
    */
   static async signOut(): Promise<void> {
     try {
+      console.log('[Firebase] Starting sign out process');
       if (Capacitor.isNativePlatform()) {
+        console.log('[Firebase] Native platform - current user before sign out:', auth.currentUser?.uid);
         await FirebaseAuthentication.signOut();
-      } else {
+        console.log('[Firebase] Native sign out complete - current user:', auth.currentUser?.uid);
         await firebaseSignOut(auth);
+        console.log('[Firebase] Web sign out complete - current user:', auth.currentUser?.uid);
+      } else {
+        console.log('[Firebase] Web platform - current user before sign out:', auth.currentUser?.uid);
+        await firebaseSignOut(auth);
+        console.log('[Firebase] Web sign out complete - current user:', auth.currentUser?.uid);
       }
     } catch (error) {
       console.error('Error signing out:', error);
@@ -189,34 +195,49 @@ export class FirebaseService {
    */
   static onAuthStateChange(callback: (user: User | null) => void): () => void {
     if (Capacitor.isNativePlatform()) {
+      console.log('[Firebase] Setting up native auth state listener');
       // For native platforms, we need to listen to the plugin's auth state changes
       FirebaseAuthentication.addListener('authStateChange', (event) => {
-        console.log('[Firebase] Auth state change from plugin:', event);
+        console.log('[Firebase] Native auth state change event:', {
+          eventUser: event.user?.uid,
+          currentUser: auth.currentUser?.uid,
+          eventType: event.type
+        });
 
         const currentUser = auth.currentUser;
 
         if (currentUser && event.user && currentUser.uid === event.user.uid) {
-          console.log('[Firebase] Auth state unchanged');
+          console.log('[Firebase] Auth state unchanged - same user');
           return;
         }
 
         if (event.user) {
           // User is signed in
           console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
-
           // hack because I used the wrong capitalization
           const userClone = { photoURL: event.user.photoUrl, ...event.user };
           callback(userClone as unknown as User);
+        } else {
+          console.log('[Firebase] Auth state changed to signed out');
+          callback(null);
         }
       });
 
       // Return a function to remove the listener
       return () => {
+        console.log('[Firebase] Removing native auth state listener');
         FirebaseAuthentication.removeAllListeners();
       };
     } else {
+      console.log('[Firebase] Setting up web auth state listener');
       // For web, use the standard Firebase auth state change
-      return onAuthStateChanged(auth, callback);
+      return onAuthStateChanged(auth, (user) => {
+        console.log('[Firebase] Web auth state change:', {
+          newUser: user?.uid,
+          currentUser: auth.currentUser?.uid
+        });
+        callback(user);
+      });
     }
   }
 
