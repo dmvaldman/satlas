@@ -232,7 +232,6 @@ class App extends React.Component<{}, AppState> {
       })
       .catch(error => {
         console.error('Location error:', error);
-        this.showNotification('GPS location not found. Using default map view.', 'error');
 
         let coordinates: { latitude: number; longitude: number };
         let zoom: number;
