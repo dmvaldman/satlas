@@ -10,7 +10,6 @@ interface AuthProps {
   onToggleProfile: () => void;
   onSavePreferences: (prefs: UserPreferences) => Promise<void>;
   onUpdatePreferences: (prefs: UserPreferences) => void;
-  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
 interface AuthState {

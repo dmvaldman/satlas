@@ -1028,7 +1028,7 @@ class App extends React.Component<{}, AppState> {
   ) => {
     const notification = Notification.getInstance();
     if (notification) {
-      notification.showNotification(message, type);
+      notification.showNotification({ message, type });
     }
   };
 
@@ -1236,7 +1236,6 @@ class App extends React.Component<{}, AppState> {
             onToggleProfile={this.toggleProfile}
             onUpdatePreferences={this.updatePreferences}
             onSavePreferences={this.handleSavePreferences}
-            showNotification={this.showNotification}
           />
         </header>
 

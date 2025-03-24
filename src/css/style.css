@@ -5,24 +5,11 @@
   --safe-area-right: env(safe-area-inset-right, 0px);
 }
 
-/* Remove focus outline from all buttons and interactive elements */
-button,
-a,
-input,
-select,
-textarea,
-[role="button"],
-#profile-container,
-.toggle-slider,
-.toggle-label,
-.image-control-button,
-.photo-option-button {
-  outline: none !important;
-  -webkit-tap-highlight-color: transparent !important; /* Prevent tap highlight on mobile */
-  -webkit-touch-callout: none !important; /* Prevent callout to copy image, etc when tap to hold */
-  -webkit-user-select: none !important; /* Prevent text selection */
-  user-select: none !important; /* Prevent text selection */
-  outline: none !important; /* Remove outline */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 html,
@@ -836,7 +823,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 /* Update notification styles - move from bottom to top */
 .notifications-container {
   position: fixed;
-  top: 20px; /* Place below the header */
+  top: calc(20px + var(--safe-area-top)); /* Place below the header */
   left: 50%;
   transform: translateX(-50%);
   z-index: 5000;
@@ -846,18 +833,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 90%;
   max-width: 400px;
   pointer-events: auto !important;
-}
-
-/* Update animation for top notifications */
-@keyframes slideDown {
-  from {
-    transform: translateY(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 .notification {
@@ -894,6 +869,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .notification.error {
   background-color: #f44336;
 }
+
+/* Update animation for top notifications */
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 
 /* Android UI adjustments */
 body:has(.bottom-nav-space) {
