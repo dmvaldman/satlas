@@ -9,6 +9,29 @@ export class MarkerManager {
     private onMarkerClick: (sit: Sit) => void
   ) {}
 
+  private createMarker(sit: Sit, marks: Set<MarkType>, user: User | null, seenSits: Set<string>): mapboxgl.Marker {
+    // Create container for larger hit area
+    const container = document.createElement('div');
+    container.className = 'mapboxgl-marker marker-container';
+
+    // Create the actual marker element
+    const el = document.createElement('div');
+    el.className = this.getMarkerClasses(sit, user, marks, seenSits).join(' ');
+
+    // Add click handler to container for larger hit area
+    container.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onMarkerClick(sit);
+    });
+
+    container.appendChild(el);
+
+    return new mapboxgl.Marker({
+      element: container,
+      anchor: 'center'
+    }).setLngLat([sit.location.longitude, sit.location.latitude]);
+  }
+
   public showMarkers(
     map: mapboxgl.Map,
     sits: Map<string, Sit>,
@@ -20,29 +43,17 @@ export class MarkerManager {
       const sitMarks = marks.get(sit.id) || new Set();
 
       if (!this.markers.has(sit.id)) {
-        // Create new marker
-        const el = document.createElement('div');
-        el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onMarkerClick(sit);
-        });
-
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([sit.location.longitude, sit.location.latitude])
-          .addTo(map);
-
+        const marker = this.createMarker(sit, sitMarks, user, seenSits);
+        marker.addTo(map);
         this.markers.set(sit.id, marker);
       } else {
         // Update existing marker
         const marker = this.markers.get(sit.id)!;
-        const el = marker.getElement();
+        const container = marker.getElement();
+        container.className = 'mapboxgl-marker marker-container';
 
-        // Update classes
-        el.className = 'mapboxgl-marker';
-        this.getMarkerClasses(sit, user, sitMarks, seenSits).forEach(className => {
-          el.classList.add(className);
-        });
+        const el = container.firstElementChild as HTMLElement;
+        el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
 
         // Update position if needed
         marker.setLngLat([sit.location.longitude, sit.location.latitude]);
