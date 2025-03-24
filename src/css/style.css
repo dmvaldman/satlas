@@ -3,6 +3,23 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
+
+  --primary-color: #3326c3;
+  --sit-color: #4cb4d4;
+  --sit-mine-color: #8bdf91;
+  --action-green: #31d53d;
+  --action-red: #ff3b30;
+  --white: #ffffff;
+  --light-gray: rgb(245, 245, 245);
+  --medium-gray: #bbb;
+  --dark-gray: #555;
+  --black: #000000;
+  --light-blue: #bdefff;
+  --dark-blue: #007AFF;
+  --light-green: #b3ffb8;
+  --dark-green: #279b44;
+  --light-red: #fab7b3;
+  --dark-red: #b52a23;
 }
 
 * {
@@ -54,17 +71,16 @@ body {
   padding: 8px 16px;
   border: none;
   border-radius: 20px;
-  background: #626262;
+  background: var(--dark-gray);
+  color: var(--white);
   cursor: pointer;
   font-size: 14px;
-  color: #ffffff;
-  transition: background-color 0.2s;
 }
 
 .auth-button svg {
   width: 20px;
   height: 20px;
-  fill: #ffffff;
+  fill: var(--white);
 }
 
 #profile-container {
@@ -73,7 +89,7 @@ body {
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid #3326c3;
+  border: 2px solid var(--primary-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -112,8 +128,8 @@ body {
 .satlas-marker {
   width: 26px;
   height: 26px;
-  background-color: #3fa3c1;  /* Default green color */
-  border: 1px solid black;
+  background-color: var(--sit-color);  /* Default green color */
+  border: 1px solid var(--black);
   border-radius: 50%;
   cursor: pointer;
   opacity: 1;
@@ -140,14 +156,13 @@ body {
 
 
 .satlas-marker.own-sit {
-  background-color: #007AFF;  /* Blue for own sits */
+  background-color: var(--sit-mine-color);  /* Blue for own sits */
 }
 
 /* Icon styles */
 .marker-icon {
   width: 14px;
   height: 14px;
-  fill: #000000;
   opacity: 0.8;
   position: absolute;
   top: 50%;
@@ -184,7 +199,7 @@ body {
   width: 66px;
   height: 66px;
   border-radius: 50%;
-  background: #3326c3;
+  background: var(--primary-color);
   box-shadow: 0px 0px 4px 0px rgba(0,0,0,.5);
   border: none;
   cursor: pointer;
@@ -226,12 +241,12 @@ body {
 
 /* Base modal content styles */
 .modal-content {
-  background: white;
+  background: var(--white);
   width: 100%;
   border-radius: 8px 8px 0 0;
-  padding: 20px;
+  padding: 16px;
   cursor: default;
-  padding-bottom: var(--safe-area-bottom);
+  padding-bottom: calc(var(--safe-area-bottom) + 16px);
   max-height: 80vh;
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
@@ -254,6 +269,10 @@ body {
   margin-bottom: 1.5rem;
 }
 
+.profile-section:last-child {
+  margin-bottom: 0;
+}
+
 .profile-section label {
   display: block;
   margin-bottom: 0.5rem;
@@ -263,15 +282,16 @@ body {
 .profile-section input[type="text"] {
   width: calc(100% - 24px);
   padding: 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--dark-gray);
   border-radius: 4px;
   font-size: 16px;
   font-family: 'Helvetica Neue', sans-serif;
   line-height: 1.2;
+  color: var(--black);
 }
 
 .profile-section input[type="text"]:focus {
-  border-color: #3326c3;
+  border-color: var(--primary-color);
   outline: none;
 }
 
@@ -284,33 +304,33 @@ body {
   top: 0;
   left: 0;
   padding: 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--dark-gray);
   border-radius: 4px;
   position: relative;
   background: transparent;
   z-index: 2;
-  color: #000;
+  color: var(--black);
 }
 
 #city:focus {
-  border-color: #3326c3;
+  border-color: var(--primary-color);
   outline: none;
 }
 
 .city-suggestion {
   width: calc(100% - 24px);
-  border: 1px solid #ccc;
+  border: 1px solid var(--medium-gray);
   border-radius: 4px;
   position: absolute;
   top: 0;
   padding: 12px;
   pointer-events: none;
   z-index: 1;
-  color: #aaa;
+  color: var(--dark-gray);
 }
 
 .profile-section .error-message {
-  color: gray;
+  color: var(--dark-gray);
   font-size: 12px;
   margin-bottom: 8px;
 }
@@ -334,7 +354,7 @@ body {
   height: 24px;
   border-radius: 12px;
   transition: 0.4s;
-  background-color: #ccc;
+  background-color: var(--medium-gray);
   vertical-align: middle;
   cursor: pointer;
   margin-left: 20px;
@@ -347,7 +367,7 @@ body {
   width: 20px;
   left: 2px;
   bottom: 2px;
-  background-color: white;
+  background-color: var(--white);
   border-radius: 50%;
   transition: 0.4s;
 }
@@ -358,7 +378,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:checked + .toggle-slider {
-  background-color: #31d53d;
+  background-color: var(--dark-green);
 }
 
 input[type="checkbox"]:checked + .toggle-slider:before {
@@ -366,16 +386,16 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .profile-button {
-  padding: 0.5rem 1rem;
+  padding: 0.65rem 1rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
 
 .profile-button.primary {
-  background-color: #31d53d;
-  color: white;
+  background-color: var(--action-green);
+  color: var(--white);
 }
 
 .profile-actions {
@@ -386,44 +406,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .profile-button.danger {
-  background-color: #ff3b30;
-  color: white;
+  background-color: var(--action-red);
+  color: var(--white);
   width: 100%;
 }
 
 .profile-button.danger:hover {
-  background-color: #ff2d20;
-}
-
-.favorite-button {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 14px;
-  margin-top: 8px;
-  transition: all 0.2s;
-  color: #666;
-}
-
-.favorite-button svg {
-  width: 16px;
-  height: 16px;
-  fill: #ccc;
-  transition: fill 0.2s;
-}
-
-.favorite-button.active {
-  border-color: #ff3b30;
-  color: #ff3b30;
-}
-
-.favorite-button.active svg {
-  fill: #ff3b30;
+  background-color: var(--dark-red);
 }
 
 .image-carousel {
@@ -482,6 +471,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   object-position: center;
   margin: 0 auto;
   cursor: pointer;
+  border-radius: 10px;
 }
 
 .placeholder-loader {
@@ -565,7 +555,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   color: rgb(213, 212, 212);
   padding: 8px 12px;
-  border-radius: 4px 0 0 0;
+  border-radius: 10px 0 10px 0;
   font-size: 14px;
   max-width: 100%;
   overflow: hidden;
@@ -596,13 +586,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   justify-content: center;
   gap: 4px;
   padding: 4px 4px;
-  border: 2px solid #ccc;
+  border: 1px solid var(--medium-gray);
   border-radius: 4px;
-  background: rgb(245, 245, 245);
+  background: var(--light-gray);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
-  color: #666;
+  color: var(--medium-gray);
   height: 40px;
   flex: 1; /* Make all buttons take equal width */
   min-width: 0; /* Allow buttons to shrink if needed */
@@ -612,51 +602,50 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .mark-button .mark-icon {
   width: 16px;
   height: 16px;
-  fill: #666;
+  fill: var(--medium-gray);
   transition: fill 0.2s;
 }
 
 .mark-button.visited .mark-icon {
   stroke-width: 2;
-  stroke: #666;
+  stroke: var(--medium-gray);
 }
 
 .mark-button.wantToGo .mark-icon {
   stroke-width: 2;
-  stroke: #666;
+  stroke: var(--medium-gray);
 }
 
 .mark-button.favorite.active {
-  border-color: #ff3b30;
-  color: #b52a23;
-  background: #fbd9d8;
+  border-color: var(--dark-red);
+  color: var(--dark-red);
+  background: var(--light-red);
 }
 
 .mark-button.favorite.active .mark-icon {
-  fill: #b52a23;
-  stroke: #b52a23;
+  fill: var(--dark-red);
 }
 
 .mark-button.visited.active {
-  border-color: #279b44;
-  color: #279b44;
-  background: #d9fbd8;
+  border-color: var(--dark-green);
+  color: var(--dark-green);
+  background: var(--light-green);
 }
 
 .mark-button.visited.active .mark-icon {
-  fill: #34C759;
-  stroke: #279b44;
+  fill: var(--dark-green);
+  stroke: var(--dark-green);
 }
 
 .mark-button.wantToGo.active {
-  border-color: #0168d6;
-  color: #0168d6;
-  background: #b3d5f9;
+  border-color: var(--dark-blue);
+  color: var(--dark-blue);
+  background: var(--light-blue);
 }
 
 .mark-button.wantToGo.active .mark-icon {
-  fill: #007AFF;
-  stroke: #007AFF;
+  fill: var(--dark-blue);
+  stroke: var(--dark-blue);
 }
 
 .map-loading {
@@ -693,18 +682,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 1;
 }
 
-.pending-upload {
-  padding: 1rem;
-  text-align: center;
-  color: #666;
-}
-
-.sit-status {
-  font-style: italic;
-  color: #666;
-  text-align: center;
-}
-
 /* New wrapper for the carousel image and its overlay controls */
 .carousel-img-wrapper {
   position: relative;
@@ -717,7 +694,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   left: 0;
   right: 0;
   text-align: center;
-  color: white;
+  color: var(--white);
   padding: 8px;
 }
 
@@ -732,40 +709,30 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 10000;
 }
 
-.loading-indicator {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  background-color: rgba(245, 245, 245, 0.7);
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
 .popup-icon {
   width: 54px;
+  fill: var(--dark-gray);
 }
 
 .sit-metadata-container {
+  color: var(--dark-gray);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 12px;  padding-bottom: 10px;
+  margin-top: 12px;
+  padding-bottom: 10px;
 }
 
 .favorite-count {
-  color: #666;
   margin: 8px 0;
 }
 
 /* Add styling for the sit uploader info */
 .sit-uploader-info {
-  color: #666;
   margin: 8px 0;
   text-align: left;
   border-radius: 4px;
@@ -773,7 +740,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .maps-link {
   display: block;
-  color: #4285f4;
+  color: var(--dark-blue);
   text-decoration: none;
   margin: 8px 0;
   transition: background-color 0.2s;
@@ -786,18 +753,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 36px;
   height: 36px;
   border-radius: 4px;
-  background: #ebebeb;
-  border: 1px solid #dedede;
+  background: rgb(250, 250, 250);
+  border: 1px solid var(--medium-gray);
   cursor: pointer;
-  fill: #2f2f2f;
+  fill: var(--dark-gray);
 }
 
 .photo-option-button {
   width: 100%;
-  padding: 16px;
-  margin: 8px 0;
+  padding: 14px;
+  margin: 14px 0;
   border: none;
-  background: #f5f5f5;
+  background: var(--light-gray);
+  border: 1px solid var(--medium-gray);
   border-radius: 8px;
   font-size: 16px;
   display: flex;
@@ -810,13 +778,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .photo-option-button svg {
   width: 24px;
   height: 24px;
-  fill: #31d53d;
-}
-
-.cancel-button {
-  background: white;
-  color: #ff3b30;
-  font-weight: bold;
+  fill: var(--action-green);
 }
 
 /* Update notification styles - move from bottom to top */
@@ -838,7 +800,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   position: relative;
   padding: 12px 16px;
   border-radius: 8px;
-  color: white;
+  color: var(--white);
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -854,7 +816,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .notification-close {
   background: none;
   border: none;
-  color: white;
+  color: var(--white);
   font-size: 20px;
   cursor: pointer;
   padding: 0 4px;
@@ -862,11 +824,11 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .notification.success {
-  background-color: #4caf50;
+  background-color: var(--action-green);
 }
 
 .notification.error {
-  background-color: #f44336;
+  background-color: var(--action-red);
 }
 
 /* Update animation for top notifications */
@@ -923,8 +885,8 @@ body:has(.bottom-nav-space) {
 }
 
 .offline-notice {
-  background-color: #8a8a8a;
-  color: white;
+  background-color: var(--medium-gray);
+  color: var(--white);
   padding: 10px;
   border-radius: 4px;
   margin-bottom: 15px;
@@ -937,7 +899,7 @@ body:has(.bottom-nav-space) {
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  border-top-color: white;
+  border-top-color: var(--white);
   animation: spin 1s ease-in-out infinite;
 }
 
@@ -1006,6 +968,6 @@ body:has(.bottom-nav-space) {
 .fullscreen-close-button svg {
   width: 24px;
   height: 24px;
-  fill: white;
+  fill: var(--white);
 }
 
