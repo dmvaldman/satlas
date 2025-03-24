@@ -3,6 +3,7 @@ import { PushNotifications, Token, PushNotificationSchema, ActionPerformed as Pu
 import { FirebaseService } from './FirebaseService';
 import { UserPreferences } from '../types';
 import { AndroidSettings, IOSSettings, NativeSettings } from 'capacitor-native-settings';
+import { App } from '@capacitor/app';
 
 // Notification listener type
 export type NotificationListener = (notification: PushNotificationSchema) => void;
@@ -14,6 +15,7 @@ export class PushNotificationService {
   private permissionCallbacks: ((isGranted: boolean) => void)[] = [];
   private userId: string | null = null;
   private enabled = false;
+  private appStateListener: any = null;
 
   /**
    * Get the singleton instance
@@ -52,12 +54,50 @@ export class PushNotificationService {
 
       // Check actual permission status and update our state
       await this.syncPermissionStatus();
+
+      // Set up app state listener
+      this.setupAppStateListener();
     } else {
       console.log('[PushNotificationService] Not a native platform, skipping native initialization');
     }
 
     this.initialized = true;
     console.log('[PushNotificationService] Initialization complete');
+  }
+
+  private setupAppStateListener() {
+    console.log('[PushNotificationService] Setting up app state listener');
+
+    // Clean up existing listener if any
+    if (this.appStateListener) {
+      console.log('[PushNotificationService] Removing existing app state listener');
+      App.removeAllListeners();
+    }
+
+    // Create new listener
+    this.appStateListener = async ({ isActive }: { isActive: boolean }) => {
+      console.log('[PushNotificationService] App state changed:', isActive ? 'active' : 'background');
+      if (isActive) {
+        console.log('[PushNotificationService] App became active, syncing permission status');
+        await this.syncPermissionStatus();
+      }
+    };
+
+    // Add the listener
+    App.addListener('appStateChange', this.appStateListener);
+    console.log('[PushNotificationService] App state listener setup complete');
+  }
+
+  /**
+   * Clean up resources
+   */
+  public cleanup() {
+    console.log('[PushNotificationService] Cleaning up resources');
+    if (this.appStateListener) {
+      console.log('[PushNotificationService] Removing app state listener');
+      App.removeAllListeners();
+      this.appStateListener = null;
+    }
   }
 
   /**
@@ -67,41 +107,44 @@ export class PushNotificationService {
   public async enable(): Promise<boolean> {
     console.log('[PushNotificationService] Attempting to enable notifications');
 
-    if (!Capacitor.isNativePlatform()) {
-      console.log('[PushNotificationService] Not a native platform, cannot enable notifications');
-      return false;
-    }
-    if (!this.userId) {
-      console.log('[PushNotificationService] No user ID, cannot enable notifications');
-      return false;
+    if (!Capacitor.isNativePlatform() || !this.userId) {
+      console.log('[PushNotificationService] Not a native platform or no user ID, skipping enable');
+      return true;
     }
 
     try {
-      // Request permission first
-      console.log('[PushNotificationService] Requesting permissions...');
-      const permission = await PushNotifications.requestPermissions();
-      console.log('[PushNotificationService] Permission result:', permission);
+      // Check current permission status first
+      const permissionStatus = await PushNotifications.checkPermissions();
+      const isPermissionGranted = permissionStatus.receive === 'granted';
 
-      if (permission.receive !== 'granted') {
-        console.log('[PushNotificationService] Permission denied, showing settings prompt');
-        // Permission denied, handle error internally
-        await this.handlePermissionError();
-        return false;
+      if (!isPermissionGranted) {
+        console.log('[PushNotificationService] Notifications are currently disabled, requesting permission');
+        const permission = await PushNotifications.requestPermissions();
+
+        if (permission.receive !== 'granted') {
+          console.log('[PushNotificationService] Permission denied, showing settings prompt');
+          if (confirm('Would you like to enable push notifications in settings?')) {
+            const settingsOpened = await this.openNotificationSettings();
+            if (!settingsOpened) {
+              console.log('[PushNotificationService] Failed to open settings');
+              return false;
+            }
+            // Wait for system to update
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            console.log('[PushNotificationService] User cancelled enabling notifications');
+            return false;
+          }
+        }
       }
 
-      // Permission granted, proceed with registration
-      console.log('[PushNotificationService] Permission granted, registering...');
+      // Register push notifications
       await this.registerPushNotifications();
-
-      // Update the user's preferences in Firestore
-      await FirebaseService.updatePushNotificationSetting(this.userId, true);
-
       this.enabled = true;
       console.log('[PushNotificationService] Successfully enabled notifications');
       return true;
     } catch (error) {
       console.error('[PushNotificationService] Error in enable():', error);
-      await this.handlePermissionError();
       return false;
     }
   }
@@ -113,13 +156,9 @@ export class PushNotificationService {
   public async disable(): Promise<boolean> {
     console.log('[PushNotificationService] Attempting to disable notifications');
 
-    if (!Capacitor.isNativePlatform()) {
-      console.log('[PushNotificationService] Not a native platform, skipping disable');
-      return true; // Consider it successful on non-native platforms
-    }
-    if (!this.userId) {
-      console.log('[PushNotificationService] No user ID, skipping disable');
-      return true; // Consider it successful if there's no user ID
+    if (!Capacitor.isNativePlatform() || !this.userId) {
+      console.log('[PushNotificationService] Not a native platform or no user ID, skipping disable');
+      return true;
     }
 
     try {
@@ -129,13 +168,14 @@ export class PushNotificationService {
 
       if (isPermissionGranted) {
         console.log('[PushNotificationService] Notifications are currently enabled, showing settings prompt');
-        // Show settings prompt to disable notifications
         if (confirm('Would you like to disable push notifications in settings?')) {
           const settingsOpened = await this.openNotificationSettings();
           if (!settingsOpened) {
             console.log('[PushNotificationService] Failed to open settings');
             return false;
           }
+          // Wait for system to update
+          await new Promise(resolve => setTimeout(resolve, 1000));
         } else {
           console.log('[PushNotificationService] User cancelled disabling notifications');
           return false;
@@ -144,10 +184,6 @@ export class PushNotificationService {
 
       // Unregister push notifications
       await this.unregisterPushNotifications();
-
-      // Update the user's preferences in Firestore
-      await FirebaseService.updatePushNotificationSetting(this.userId, false);
-
       this.enabled = false;
       console.log('[PushNotificationService] Successfully disabled notifications');
       return true;
@@ -340,17 +376,6 @@ export class PushNotificationService {
     return false;
   }
 
-  /**
-   * Handle push notification permission error
-   * @returns true if user was prompted to open settings
-   */
-  private async handlePermissionError(): Promise<boolean> {
-    const action = this.enabled ? 'disable' : 'enable';
-    if (confirm(`Would you like to ${action} push notifications in settings?`)) {
-      return await this.openNotificationSettings();
-    }
-    return false;
-  }
 
   /**
    * Check the actual device permission status and sync with our internal state
@@ -363,23 +388,16 @@ export class PushNotificationService {
 
     try {
       console.log('[PushNotificationService] Checking actual permission status');
+      await new Promise(resolve => setTimeout(resolve, 500));
       const permissionStatus = await PushNotifications.checkPermissions();
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       console.log(`[PushNotificationService] Device permission status: ${isPermissionGranted ? 'granted' : 'denied'}`);
 
-      // If our internal state doesn't match the actual permission, update it
       if (this.enabled !== isPermissionGranted) {
         console.log(`[PushNotificationService] Syncing permission status: ${isPermissionGranted}`);
         this.enabled = isPermissionGranted;
-
-        // Notify listeners about the permission change
         this.notifyPermissionListeners(isPermissionGranted);
-
-        // Update the database to match the actual permission status
-        if (this.userId) {
-          await FirebaseService.updatePushNotificationSetting(this.userId, isPermissionGranted);
-        }
       }
 
       return isPermissionGranted;
