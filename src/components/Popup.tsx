@@ -317,7 +317,11 @@ class PopupComponent extends React.Component<PopupProps> {
         onClose={onClose}
         header={
           <div className="bottom-sheet-header">
-            <img src="assets/imgs/bench.png" className="popup-icon" />
+            <svg className="popup-icon" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet">
+              <g transform="translate(0,512) scale(0.1,-0.1)">
+                <path d="M927 3682 c-15 -16 -17 -50 -17 -270 l0 -251 -247 -127 c-387 -199 -397 -205 -401 -237 -4 -36 45 -126 74 -133 13 -3 42 5 72 20 28 14 56 26 62 26 7 0 10 -205 10 -635 0 -725 -11 -655 98 -655 92 0 92 -1 92 238 l0 202 120 0 120 0 0 -198 c0 -241 0 -242 94 -242 103 0 100 -6 104 234 l3 206 1450 0 1449 0 0 -200 c0 -241 0 -240 104 -240 96 0 96 0 96 242 l0 198 120 0 120 0 0 -203 c0 -240 -1 -237 98 -237 42 0 65 5 76 16 14 14 16 86 16 645 0 426 3 629 10 629 6 0 34 -12 62 -26 30 -15 59 -23 72 -20 29 7 78 97 74 133 -4 32 -14 38 -400 237 l-248 127 0 247 c0 300 3 292 -100 292 -60 0 -71 -3 -84 -22 -9 -12 -16 -35 -16 -50 l0 -28 -1449 0 -1448 0 -6 36 c-9 56 -21 64 -97 64 -52 0 -71 -4 -83 -18z m273 -757 l0 -435 -45 0 -45 0 0 435 0 435 45 0 45 0 0 -435z m320 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m310 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m320 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m310 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m320 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m310 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m320 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m310 0 l0 -435 -60 0 -60 0 0 435 0 435 60 0 60 0 0 -435z m290 0 l0 -435 -45 0 -45 0 0 435 0 435 45 0 45 0 0 -435z m-3100 -210 l0 -225 -120 0 -120 0 0 164 0 164 113 61 c61 33 115 60 120 60 4 1 7 -100 7 -224z m3425 164 l115 -61 0 -164 0 -164 -120 0 -120 0 0 225 c0 124 2 225 5 225 3 0 57 -27 120 -61z m115 -774 l0 -25 -1890 0 -1890 0 0 25 0 25 1890 0 1890 0 0 -25z"/>
+              </g>
+            </svg>
             {this.renderShareButton()}
           </div>
         }
@@ -326,9 +330,7 @@ class PopupComponent extends React.Component<PopupProps> {
           {sit.imageCollectionId || (images && images.some(img => img.base64Data)) ? (
             this.renderCarousel()
           ) : (
-            <div className="pending-upload">
-              <p>Uploading new sit...</p>
-            </div>
+            <p>Uploading new sit...</p>
           )}
 
           {this.renderUploadButton()}
@@ -340,7 +342,7 @@ class PopupComponent extends React.Component<PopupProps> {
             {/* Display uploader information */}
             {sit.uploadedBy && sit.createdAt && (
               <div className="sit-uploader-info">
-                Sit uploaded {formatRelativeTime(sit.createdAt)}
+                Sit found {sit.uploadedByUsername ? 'by ' + sit.uploadedByUsername : ''} {formatRelativeTime(sit.createdAt)}
               </div>
             )}
 

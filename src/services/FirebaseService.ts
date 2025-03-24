@@ -317,7 +317,7 @@ export class FirebaseService {
         username: preferences.username,
         pushNotificationsEnabled: preferences.pushNotificationsEnabled,
         lastVisit: Date.now(),
-        cityCoordinates: preferences.cityCoordinates
+        cityCoordinates: preferences.cityCoordinates || null
       }, { merge: true }); // Use merge to preserve other fields
     } catch (error) {
       console.error('Error saving preferences:', error);
@@ -412,15 +412,20 @@ export class FirebaseService {
    * @param userId User ID
    * @param newUsername New username
    */
-  static async updateUserImagesWithNewUsername(userId: string, newUsername: string): Promise<void> {
+  static async updateUserWithNewUsername(userId: string, newUsername: string): Promise<void> {
     try {
       // Query all images uploaded by this user
       const imagesRef = collection(db, 'images');
       const q = query(imagesRef, where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
-        return; // No images to update
+      // Query all sits uploaded by this user
+      const sitsRef = collection(db, 'sits');
+      const sitsQuery = query(sitsRef, where('uploadedBy', '==', userId));
+      const sitsSnapshot = await getDocs(sitsQuery);
+
+      if (querySnapshot.empty && sitsSnapshot.empty) {
+        return; // No documents to update
       }
 
       // Use a batch write for efficiency
@@ -433,11 +438,18 @@ export class FirebaseService {
         });
       });
 
+      // Add each sit document to the batch update
+      sitsSnapshot.forEach((sitDoc) => {
+        batch.update(doc(db, 'sits', sitDoc.id), {
+          uploadedByUsername: newUsername
+        });
+      });
+
       // Commit the batch
       await batch.commit();
-      console.log(`Updated userName in ${querySnapshot.size} images`);
+      console.log(`Updated userName in ${querySnapshot.size} images and ${sitsSnapshot.size} sits`);
     } catch (error) {
-      console.error('Error updating images with new username:', error);
+      console.error('Error updating documents with new username:', error);
       throw error;
     }
   }
@@ -518,16 +530,18 @@ export class FirebaseService {
    * @param coordinates Location coordinates
    * @param imageCollectionId Image collection ID
    * @param userId User ID
+   * @param userName The user's display name
    * @returns Created sit
    */
-  static async createSit(coordinates: Coordinates, imageCollectionId: string, userId: string): Promise<Sit> {
+  static async createSit(coordinates: Coordinates, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
     try {
       const sitRef = doc(collection(db, 'sits'));
       const sitData = {
         location: coordinates,
         imageCollectionId,
         createdAt: new Date(),
-        uploadedBy: userId
+        uploadedBy: userId,
+        uploadedByUsername: userName
       };
 
       await setDoc(sitRef, sitData);
@@ -631,7 +645,7 @@ export class FirebaseService {
       };
 
       // Create the sit
-      const sit = await this.createSit(photoResult.location, imageCollectionId, userId);
+      const sit = await this.createSit(photoResult.location, imageCollectionId, userId, userName);
 
       return { sit, image };
     } catch (error: any) {

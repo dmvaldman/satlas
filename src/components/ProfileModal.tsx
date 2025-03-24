@@ -416,7 +416,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Update images with new username if needed
       if (usernameChanged && user) {
-        await FirebaseService.updateUserImagesWithNewUsername(user.uid, username);
+        await FirebaseService.updateUserWithNewUsername(user.uid, username);
       }
 
       // Create the updated preferences object
