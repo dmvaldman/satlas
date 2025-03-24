@@ -20,6 +20,7 @@ import { ValidationUtils } from './utils/ValidationUtils';
 import Notification from './components/Notification';
 import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
+import { SplashScreen } from '@capacitor/splash-screen';
 
 interface AppState {
   // Auth state
@@ -131,8 +132,7 @@ class App extends React.Component<{}, AppState> {
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),
-      this.initializeMap(),
-      this.initializeOfflineService()
+      this.initializeMap()
     ]).catch(error => {
       console.error('Initialization error:', error);
       this.showNotification('Failed to initialize app', 'error');
@@ -141,6 +141,7 @@ class App extends React.Component<{}, AppState> {
     // Configure status bar first since it's fast
     if (Capacitor.isNativePlatform()) {
       this.configureStatusBar();
+      SplashScreen.hide();
     }
 
     // Add location listener before initializations
@@ -148,6 +149,9 @@ class App extends React.Component<{}, AppState> {
 
     // Setup deep links for web/mobile
     this.setupDeepLinks();
+
+    // Initialize offline service
+    this.initializeOfflineService();
   }
 
   componentWillUnmount() {
@@ -895,7 +899,8 @@ class App extends React.Component<{}, AppState> {
           location: location,
           uploadedBy: user.uid,
           uploadedByUsername: userPreferences.username,
-          imageCollectionId: ''
+          imageCollectionId: '',
+          createdAt: new Date()
         };
 
         // Create a temporary image
@@ -1040,7 +1045,7 @@ class App extends React.Component<{}, AppState> {
       // Configure system bars (dark icons on transparent background)
       await StatusBar.setOverlaysWebView({ overlay: true });
       await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: '#000000' });
+      await StatusBar.setBackgroundColor({ color: '#00000000' });
 
       // Android navigation bar is handled by native styles.xml
     } catch (e) {
