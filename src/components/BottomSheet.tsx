@@ -14,6 +14,8 @@ interface BottomSheetState {
   isDragging: boolean;
   sheetHeight: number;
   paddingBottom: number; // Needs to be in sync with the paddingBottom in the css
+  previousTimestamp: number | null;
+  velocityY: number;
 }
 
 class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
@@ -21,6 +23,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   private contentContainerRef = React.createRef<HTMLDivElement>();
   private sheetContainerRef = React.createRef<HTMLDivElement>();
   private resizeObserver: ResizeObserver | null = null;
+  private readonly VELOCITY_THRESHOLD = 0.5; // pixels per millisecond
 
   constructor(props: BottomSheetProps) {
     super(props);
@@ -31,6 +34,8 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
       isDragging: false,
       sheetHeight: window.innerHeight,
       paddingBottom: 100,
+      previousTimestamp: null,
+      velocityY: 0,
     };
   }
 
@@ -155,18 +160,27 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     const currentTranslate = this.state.translateY;
     let deltaY = clientY - this.state.startDrag;
 
-    console.log(`currentTranslate: ${currentTranslate}, deltaY: ${deltaY}, topMargin: ${this.state.paddingBottom}`);
-
     // slow down drag to a stop after padding
     if (currentTranslate < this.state.paddingBottom) {
       deltaY = (currentTranslate) / this.state.paddingBottom * deltaY;
     }
 
     const newTranslate = currentTranslate + deltaY;
+    const now = Date.now();
+
+    // Calculate velocity if we have previous timestamp
+    let velocityY = 0;
+    if (this.state.previousTimestamp !== null) {
+      const deltaY = newTranslate - currentTranslate;
+      const deltaTime = now - this.state.previousTimestamp;
+      velocityY = deltaTime > 0 ? deltaY / deltaTime : 0;
+    }
 
     this.setState({
       translateY: newTranslate,
-      startDrag: clientY
+      startDrag: clientY,
+      previousTimestamp: now,
+      velocityY
     });
 
     // Update overlay opacity based on sheet position
@@ -179,9 +193,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   private handleDragEnd = () => {
     if (!this.state.isDragging) return;
 
-    this.setState({ isDragging: false, startDrag: null });
+    const isBelowSpatialThreshold = this.state.translateY > this.state.sheetHeight * 0.5;
+    const isBelowVelocityThreshold = this.state.velocityY > this.VELOCITY_THRESHOLD && this.state.velocityY > 0;
 
-    if (this.state.translateY > this.state.sheetHeight * 0.5) {
+    this.setState({
+        isDragging: false,
+        startDrag: null,
+        previousTimestamp: null,
+        velocityY: 0
+    });
+
+    if (isBelowSpatialThreshold || isBelowVelocityThreshold) {
       this.close();
     } else {
       this.open();
