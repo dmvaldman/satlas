@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { Capacitor } from '@capacitor/core';
 
 // Initialize React app
 const container = document.getElementById('root');
@@ -14,4 +15,6 @@ root.render(<App />);
 SplashScreen.hide();
 
 // Lock the screen orientation to portrait
-ScreenOrientation.lock({ orientation: 'portrait' });
+if (Capacitor.isNativePlatform()) {
+  ScreenOrientation.lock({ orientation: 'portrait' });
+}
