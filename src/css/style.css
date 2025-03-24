@@ -110,13 +110,25 @@ body {
 
 
 .satlas-marker {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   background-color: #62bdd9;  /* Default green color for other people's sits */
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
   opacity: 1;
+}
+
+/* Add marker container styles */
+.marker-container {
+  width: 60px;  /* Larger hit area */
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  /* background: red; */
+  border-radius: 50%;
 }
 
 .satlas-marker.own-sit {
