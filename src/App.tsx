@@ -233,25 +233,28 @@ class App extends React.Component<{}, AppState> {
       .catch(error => {
         console.error('Location error:', error);
 
-        let coordinates: { latitude: number; longitude: number };
+        let mapCoordinates: { latitude: number; longitude: number };
+        let userCoordinates: { latitude: number; longitude: number } | null;
         let zoom: number;
 
         if (this.state.userPreferences.cityCoordinates) {
-          coordinates = this.state.userPreferences.cityCoordinates;
+          mapCoordinates = this.state.userPreferences.cityCoordinates;
+          userCoordinates = mapCoordinates;
           zoom = 4;
         } else {
           // Center map on geographic center of America
-          coordinates = { latitude: 39.8283, longitude: -98.5795 };
+          mapCoordinates = { latitude: 39.8283, longitude: -98.5795 };
+          userCoordinates = null;
           zoom = 3;
         }
 
-        const map = this.createMap(coordinates, zoom);
+        const map = this.createMap(mapCoordinates, zoom);
 
         // poll for GPS location
         this.pollForGPSLocation();
 
         this.setState({
-          currentLocation: coordinates,
+          currentLocation: userCoordinates,
           map: map
         });
       });
