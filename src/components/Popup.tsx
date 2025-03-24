@@ -138,6 +138,19 @@ class PopupComponent extends React.Component<PopupProps> {
     }
   };
 
+  private getIconPath(type: MarkType): string {
+    switch (type) {
+      case 'favorite':
+        return 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z';
+      case 'visited':
+        return 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z';
+      case 'wantToGo':
+        return 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z';
+      default:
+        return '';
+    }
+  }
+
   private renderCarousel() {
     const { images, user } = this.props;
 
@@ -169,15 +182,9 @@ class PopupComponent extends React.Component<PopupProps> {
             onClick={(e) => this.handleMarkClick(e, type)}
           >
             <svg className="mark-icon" viewBox="0 0 24 24">
-              {type === 'favorite' && (
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-              )}
-              {type === 'visited' && (
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-              )}
-              {type === 'wantToGo' && (
-                <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-              )}
+              <path
+                d={this.getIconPath(type)}
+              />
             </svg>
             {label}
           </button>
@@ -310,7 +317,7 @@ class PopupComponent extends React.Component<PopupProps> {
         onClose={onClose}
         header={
           <div className="bottom-sheet-header">
-            <span className="header-emoji">🪑</span>
+            <img src="assets/imgs/bench.png" className="popup-icon" />
             {this.renderShareButton()}
           </div>
         }

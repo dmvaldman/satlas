@@ -60,7 +60,7 @@
 /* Header and handle bar styles */
 .satlas-bottom-sheet .bottom-sheet-header {
   position: relative;
-  padding-top: 30px !important;
+  padding-top: 20px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -92,7 +92,6 @@
 /* Content container styles */
 .satlas-bottom-sheet .content-container {
   overflow: visible;
-  padding: 16px;
   flex: 1;
   min-height: min-content;
 }

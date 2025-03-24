@@ -156,7 +156,7 @@ body {
 }
 
 .satlas-popup {
-  padding: 10px;
+  padding: 16px;
 }
 
 .satlas-popup p {
@@ -586,18 +586,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   gap: 8px;
   margin-top: 12px;
   margin-bottom: 8px;
-  justify-content: center; /* Center the buttons horizontally */
+  justify-content: space-between; /* Distribute buttons evenly */
+  width: 100%; /* Ensure container takes full width */
 }
 
 .mark-button {
   display: flex;
   align-items: center;
-  justify-content: center; /* Center content within button */
+  justify-content: center;
   gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
+  padding: 4px 4px;
+  border: 2px solid #ccc;
   border-radius: 4px;
-  background: white;
+  background: rgb(245, 245, 245);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
@@ -605,7 +606,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   height: 40px;
   flex: 1; /* Make all buttons take equal width */
   min-width: 0; /* Allow buttons to shrink if needed */
-  max-width: 120px; /* Set a maximum width to prevent overly wide buttons */
+  max-width: none; /* Remove max-width constraint */
 }
 
 .mark-button .mark-icon {
@@ -615,31 +616,47 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   transition: fill 0.2s;
 }
 
+.mark-button.visited .mark-icon {
+  stroke-width: 2;
+  stroke: #666;
+}
+
+.mark-button.wantToGo .mark-icon {
+  stroke-width: 2;
+  stroke: #666;
+}
+
 .mark-button.favorite.active {
   border-color: #ff3b30;
-  color: #ff3b30;
+  color: #b52a23;
+  background: #fbd9d8;
 }
 
 .mark-button.favorite.active .mark-icon {
-  fill: #ff3b30;
+  fill: #b52a23;
+  stroke: #b52a23;
 }
 
 .mark-button.visited.active {
-  border-color: #34C759;
-  color: #34C759;
+  border-color: #279b44;
+  color: #279b44;
+  background: #d9fbd8;
 }
 
 .mark-button.visited.active .mark-icon {
   fill: #34C759;
+  stroke: #279b44;
 }
 
 .mark-button.wantToGo.active {
-  border-color: #007AFF;
-  color: #007AFF;
+  border-color: #0168d6;
+  color: #0168d6;
+  background: #b3d5f9;
 }
 
 .mark-button.wantToGo.active .mark-icon {
   fill: #007AFF;
+  stroke: #007AFF;
 }
 
 .map-loading {
@@ -730,17 +747,15 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   to { transform: rotate(360deg); }
 }
 
-.header-emoji {
-  font-size: 24px;
-  margin: 0 auto;
+.popup-icon {
+  width: 54px;
 }
 
 .sit-metadata-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 12px;
-  padding: 10px;
+  margin-top: 12px;  padding-bottom: 10px;
 }
 
 .favorite-count {
@@ -766,14 +781,15 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .share-button {
   position: absolute;
-  right: 12px;
-  padding: 10px;
+  right: 16px;
+  padding: 8px;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: #f5f5f5;
-  border: none;
+  border-radius: 4px;
+  background: #ebebeb;
+  border: 1px solid #dedede;
   cursor: pointer;
+  fill: #2f2f2f;
 }
 
 .photo-option-button {
