@@ -122,16 +122,45 @@ export class LocationService {
       }
     }
 
-    try {
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: LOCATION_TIMEOUT
-      });
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Location request timed out'));
+      }, LOCATION_TIMEOUT);
+    });
 
-      return {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
+    try {
+      // First try with high accuracy
+      try {
+        const position = await Promise.race([
+          Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: LOCATION_TIMEOUT
+          }),
+          timeoutPromise
+        ]);
+
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+      } catch (highAccuracyError) {
+        console.log('High accuracy location failed, falling back to low accuracy:', highAccuracyError);
+
+        // Fallback to low accuracy with timeout
+        const position = await Promise.race([
+          Geolocation.getCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: LOCATION_TIMEOUT
+          }),
+          timeoutPromise
+        ]);
+
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+      }
     } catch (error) {
       this.handleLocationError(error);
       throw error;
