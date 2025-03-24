@@ -67,6 +67,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // Add permission change listener
     if (Capacitor.isNativePlatform() && this.props.user) {
+      console.log('[ProfileModal] Adding permission change listener on mount');
       PushNotificationService.getInstance().addPermissionChangeListener(this.handlePermissionChange);
     }
 
@@ -89,6 +90,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   componentDidUpdate(prevProps: ProfileModalProps) {
     if (!prevProps.isOpen && this.props.isOpen) {
       // Modal is opening
+      console.log('[ProfileModal] Modal opening, re-initializing notification service');
 
       // Re-initialize notification service when modal opens with a different user
       if (prevProps.user?.uid !== this.props.user?.uid) {
@@ -97,6 +99,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Sync the toggle state with actual device permissions
       this.syncNotificationToggleState();
+
+      // Add permission change listener if not already added
+      if (Capacitor.isNativePlatform() && this.props.user) {
+        console.log('[ProfileModal] Adding permission change listener on modal open');
+        // PushNotificationService.getInstance().addPermissionChangeListener(this.handlePermissionChange);
+      }
 
       // Set to active after a small delay to ensure initial transform is applied
       requestAnimationFrame(() => {
@@ -113,7 +121,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
       requestAnimationFrame(() => {
-       this.setState({ isActive: false });
+        this.setState({ isActive: false });
       });
     }
 
@@ -140,7 +148,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // Remove permission change listener
     if (Capacitor.isNativePlatform() && this.props.user) {
+      console.log('[ProfileModal] Removing permission change listener on unmount');
       PushNotificationService.getInstance().removePermissionChangeListener(this.handlePermissionChange);
+      PushNotificationService.getInstance().cleanup();
     }
   }
 
@@ -489,16 +499,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         await notificationService.disable();
       }
 
-      // Force a fresh sync with current permissions
-      const actualStatus = await notificationService.syncPermissionStatus();
-      this.setState({ pushNotifications: actualStatus });
-
-      // Update preferences to match current state
-      const updatedPreferences = {
-        ...this.props.preferences,
-        pushNotificationsEnabled: actualStatus
-      };
-      this.props.onUpdatePreferences(updatedPreferences);
+      // Force a fresh sync with current permissions after a delay
+      setTimeout(async () => {
+        const actualStatus = await notificationService.syncPermissionStatus();
+        this.setState({ pushNotifications: actualStatus });
+      }, 1000);
     } catch (error) {
       console.error('[ProfileModal] Error in handlePushNotificationToggle:', error);
       showNotification('Failed to update push notification settings', 'error');
