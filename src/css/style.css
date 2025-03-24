@@ -533,7 +533,27 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   z-index: 10;
   display: flex;
   gap: 4px;
-  opacity: 0.7;
+  opacity: .8;
+}
+
+/* Image controls */
+.image-control-button {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.image-control-button svg {
+  width: 20px;
+  height: 20px;
+  fill: white;
 }
 
 /* Image uploader info */
@@ -654,35 +674,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
-}
-
-/* Image controls */
-.image-control-button {
-  background-color: rgba(0, 0, 0, 0.3);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  padding: 0;
-}
-
-.image-control-button:hover {
-  background-color: rgba(0, 0, 0, 0.7);
-}
-
-.image-control-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.image-control-button svg {
-  width: 20px;
-  height: 20px;
-  fill: white;
 }
 
 .pending-upload {

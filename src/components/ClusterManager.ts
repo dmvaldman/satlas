@@ -143,7 +143,7 @@ export class ClusterManager {
       if (err || zoom === null || zoom === undefined) return;
 
       // Center the map on the cluster and zoom in
-      map.easeTo({
+      map.flyTo({
         center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number],
         zoom: zoom
       });
