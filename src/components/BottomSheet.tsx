@@ -20,6 +20,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   private overlayRef = React.createRef<HTMLDivElement>();
   private contentContainerRef = React.createRef<HTMLDivElement>();
   private sheetContainerRef = React.createRef<HTMLDivElement>();
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(props: BottomSheetProps) {
     super(props);
@@ -59,6 +60,26 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
             this.sheetContainerRef.current.addEventListener('mouseup', this.handleDragEnd, { passive: true });
         }
     }
+
+    // Set up ResizeObserver to track content height changes
+    if (this.sheetContainerRef.current) {
+      this.resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          const newHeight = entry.contentRect.height;
+          console.log(`newHeight: ${newHeight}`);
+          this.setState({
+            sheetHeight: newHeight + this.state.paddingBottom
+          }, () => {
+            // If the sheet is closed, update its position to match the new height
+            if (!this.props.open) {
+              this.setState({ translateY: this.state.sheetHeight + this.state.paddingBottom });
+            }
+          });
+        }
+      });
+
+      this.resizeObserver.observe(this.sheetContainerRef.current);
+    }
   }
 
   componentDidUpdate(prevProps: BottomSheetProps) {
@@ -86,6 +107,12 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
             this.sheetContainerRef.current.removeEventListener('mousemove', this.handleDragMove);
             this.sheetContainerRef.current.removeEventListener('mouseup', this.handleDragEnd);
         }
+    }
+
+    // Clean up ResizeObserver
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
   }
 
