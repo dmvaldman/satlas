@@ -108,7 +108,7 @@ export class PushNotificationService {
     console.log('[PushNotificationService] Attempting to enable notifications');
 
     if (!Capacitor.isNativePlatform() || !this.userId) {
-      console.log('[PushNotificationService] Not a native platform or no user ID, skipping enable');
+      console.log('[PushNotificationService] Not a native platform or no user ID, skipping enable', this.userId);
       return true;
     }
 
@@ -375,7 +375,6 @@ export class PushNotificationService {
     }
     return false;
   }
-
 
   /**
    * Check the actual device permission status and sync with our internal state
