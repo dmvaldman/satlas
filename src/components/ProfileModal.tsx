@@ -79,10 +79,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // If we have coordinates, resolve them to a city name
     if (this.props.preferences?.cityCoordinates) {
-      this.getCityFromCoordinates(
-        this.props.preferences.cityCoordinates.latitude,
-        this.props.preferences.cityCoordinates.longitude
-      );
+      this.getCityFromCoordinates(this.props.preferences.cityCoordinates);
     }
   }
 
@@ -112,10 +109,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // If we have coordinates, resolve them to a city name
       if (this.props.preferences?.cityCoordinates && !this.state.city) {
-        this.getCityFromCoordinates(
-          this.props.preferences.cityCoordinates.latitude,
-          this.props.preferences.cityCoordinates.longitude
-        );
+        this.getCityFromCoordinates(this.props.preferences.cityCoordinates);
       }
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
@@ -133,10 +127,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (prevProps.preferences !== this.props.preferences &&
         this.props.preferences?.cityCoordinates &&
         !this.state.city) {
-      this.getCityFromCoordinates(
-        this.props.preferences.cityCoordinates.latitude,
-        this.props.preferences.cityCoordinates.longitude
-      );
+      this.getCityFromCoordinates(this.props.preferences.cityCoordinates);
     }
   }
 
@@ -212,10 +203,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
         // If we have coordinates, resolve them to a city name
         if (preferences.cityCoordinates) {
-          this.getCityFromCoordinates(
-            preferences.cityCoordinates.latitude,
-            preferences.cityCoordinates.longitude
-          );
+          this.getCityFromCoordinates(preferences.cityCoordinates);
         }
       } else {
         // No preferences yet, but we'll use display name as a starting point
@@ -489,7 +477,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     try {
       const notificationService = PushNotificationService.getInstance();
 
-      // Service should already be initialized, just enable or disable
       if (enabled) {
         console.log('[ProfileModal] Attempting to enable notifications');
         await notificationService.enable();
