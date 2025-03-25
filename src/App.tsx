@@ -30,7 +30,7 @@ interface AppState {
 
   // Map state
   map: mapboxgl.Map | null;
-  currentLocation: { latitude: number; longitude: number } | null;
+  currentLocation: Location | null;
 
   // Data state
   sits: Map<string, Sit>;
@@ -70,6 +70,11 @@ interface AppState {
 
   // Add this new property
   isOffline: boolean;
+}
+
+interface Location {
+  latitude: number;
+  longitude: number;
 }
 
 class App extends React.Component<{}, AppState> {
@@ -141,6 +146,16 @@ class App extends React.Component<{}, AppState> {
     if (Capacitor.isNativePlatform()) {
       this.configureStatusBar();
       SplashScreen.hide();
+
+      // Add resume listener for native platforms
+      CapacitorApp.addListener('resume', () => {
+        if (this.state.map && this.state.currentLocation) {
+          this.state.map.flyTo({
+            center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],
+            zoom: 13
+          });
+        }
+      });
     }
 
     // Add location listener before initializations
@@ -162,6 +177,11 @@ class App extends React.Component<{}, AppState> {
     // Clean up location tracking
     this.locationService.offLocationUpdate(this.handleLocationUpdate);
     this.locationService.stopTracking();
+
+    // Clean up app resume listener
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.removeAllListeners();
+    }
 
     // Clean up auth listener
     if (this.authUnsubscribe) {
@@ -231,8 +251,8 @@ class App extends React.Component<{}, AppState> {
       .catch(error => {
         console.error('Location error:', error);
 
-        let mapCoordinates: { latitude: number; longitude: number };
-        let userCoordinates: { latitude: number; longitude: number } | null;
+        let mapCoordinates: Location;
+        let userCoordinates: Location | null;
         let zoom: number;
 
         if (this.state.userPreferences.cityCoordinates) {
@@ -269,7 +289,7 @@ class App extends React.Component<{}, AppState> {
       });
   };
 
-  private createMap = (coordinates: { latitude: number; longitude: number }, zoom: number) => {
+  private createMap = (coordinates: Location, zoom: number) => {
     if (!this.mapContainer.current) return null;
 
     const map: mapboxgl.Map = new mapboxgl.Map({
@@ -1034,7 +1054,9 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Handle location updates from LocationService
-  private handleLocationUpdate = (location: { latitude: number; longitude: number }) => {
+  private handleLocationUpdate = (location?: Location) => {
+    if (!location) return;
+
     // Update state with new location
     this.setState({ currentLocation: location });
 
