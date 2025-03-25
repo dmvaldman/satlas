@@ -29,7 +29,7 @@ import {
   uploadString,
   deleteObject
 } from 'firebase/storage';
-import { Sit, Image, Coordinates, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
+import { Sit, Image, Location, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { OfflineService } from './OfflineService';
@@ -533,7 +533,7 @@ export class FirebaseService {
    * @param userName The user's display name
    * @returns Created sit
    */
-  static async createSit(coordinates: Coordinates, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
+  static async createSit(coordinates: Location, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
     try {
       const sitRef = doc(collection(db, 'sits'));
       const sitData = {

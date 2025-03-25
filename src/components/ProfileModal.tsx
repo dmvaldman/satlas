@@ -1,6 +1,5 @@
 import React from 'react';
-import { User } from 'firebase/auth';
-import { UserPreferences } from '../types';
+import { User, UserPreferences, Location } from '../types';
 import { FirebaseService } from '../services/FirebaseService';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -11,7 +10,7 @@ interface ProfileModalProps {
   isOpen: boolean;
   user: User | null;
   preferences: UserPreferences;
-  currentLocation?: { latitude: number; longitude: number } | null;
+  currentLocation?: Location | null;
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
@@ -23,7 +22,7 @@ interface ProfileModalState {
   username: string;
   pushNotifications: boolean;
   city: string;
-  cityCoordinates: { latitude: number; longitude: number } | null;
+  cityCoordinates: Location | null;
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
@@ -375,11 +374,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
-  private getCityFromCoordinates = async (latitude: number, longitude: number) => {
+  private getCityFromCoordinates = async (location: Location) => {
     try {
       // Use Mapbox reverse geocoding to get city name from coordinates
       const accessToken = mapboxgl.accessToken;
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${accessToken}&types=place`;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${location.longitude},${location.latitude}.json?access_token=${accessToken}&types=place`;
 
       const response = await fetch(url);
       const data = await response.json();
@@ -397,7 +396,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   private saveInBackground = async (data: {
     username: string;
     pushNotifications: boolean;
-    cityCoordinates: { latitude: number; longitude: number } | null;
+    cityCoordinates: Location | null;
     preferences: UserPreferences | undefined;
   }) => {
     const { username, pushNotifications, cityCoordinates, preferences } = data;

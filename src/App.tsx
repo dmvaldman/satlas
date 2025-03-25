@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
 import AuthComponent from './components/AuthComponent';
 import MapComponent from './components/MapComponent';
-import { Image, Sit, Coordinates, MarkType, PhotoResult } from './types';
+import { Image, Sit, Location, MarkType, PhotoResult } from './types';
 import PhotoUploadComponent from './components/PhotoUpload';
 import ProfileModal from './components/ProfileModal';
 import { UserPreferences } from './types';
@@ -70,11 +70,6 @@ interface AppState {
 
   // Add this new property
   isOffline: boolean;
-}
-
-interface Location {
-  latitude: number;
-  longitude: number;
 }
 
 class App extends React.Component<{}, AppState> {
@@ -1002,7 +997,7 @@ class App extends React.Component<{}, AppState> {
     return tempImage;
   }
 
-  private findNearbySit = async (coordinates: Coordinates): Promise<Sit | null> => {
+  private findNearbySit = async (coordinates: Location): Promise<Sit | null> => {
     const { sits } = this.state;
 
     try {

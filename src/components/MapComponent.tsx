@@ -1,7 +1,7 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { debounce } from '../utils/debounce';
-import { Sit, MarkType, User } from '../types';
+import { Sit, MarkType, User, Location } from '../types';
 import { MarkerManager } from './MarkerManager';
 import { ClusterManager } from './ClusterManager';
 
@@ -13,10 +13,10 @@ interface MapProps {
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;
   user: User | null;
-  currentLocation: { latitude: number; longitude: number } | null;
+  currentLocation: Location | null;
   seenSits: Set<string>;
   onLoadSits: (bounds: { north: number; south: number }) => void;
-  onLocationUpdate?: (location: { latitude: number; longitude: number }) => void;
+  onLocationUpdate?: (location: Location) => void;
   onOpenPopup: (sit: Sit) => void;
 }
 
@@ -126,7 +126,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   // Update user location marker
-  public updateUserLocation(location: { latitude: number; longitude: number }) {
+  public updateUserLocation(location: Location) {
     const { map } = this.props;
 
     if (!map) return;

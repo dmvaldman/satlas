@@ -1,9 +1,9 @@
-import { Coordinates } from '../types';
+import { Location } from '../types';
 
 /**
  * Calculate the distance between two coordinates in feet
  */
-export function getDistanceInFeet(coord1: Coordinates, coord2: Coordinates): number {
+export function getDistanceInFeet(coord1: Location, coord2: Location): number {
   const R = 20902231; // Earth radius in feet
   const dLat = (coord2.latitude - coord1.latitude) * Math.PI / 180;
   const dLon = (coord2.longitude - coord1.longitude) * Math.PI / 180;
