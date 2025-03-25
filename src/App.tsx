@@ -147,7 +147,9 @@ class App extends React.Component<{}, AppState> {
         if (this.state.map && this.state.currentLocation) {
           this.state.map.flyTo({
             center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],
-            zoom: 13
+            zoom: 13,
+            duration: 1000,
+            essential: true
           });
         }
       });
@@ -276,7 +278,9 @@ class App extends React.Component<{}, AppState> {
             // animate to new location and zoom
             this.state.map.flyTo({
               center: [coordinates.longitude, coordinates.latitude],
-              zoom: 13
+              zoom: 13,
+              duration: 1000,
+              essential: true
             });
             this.setState({ currentLocation: coordinates });
           }
@@ -918,6 +922,16 @@ class App extends React.Component<{}, AppState> {
             images: [tempImage]
           },
           sits: new Map(this.state.sits).set(initialSit.id, initialSit)
+        }, () => {
+          // After state is updated, fly to the new sit's location
+          if (this.state.map) {
+            this.state.map.flyTo({
+              center: [initialSit.location.longitude, initialSit.location.latitude],
+              zoom: 13,
+              duration: 1000,
+              essential: true
+            });
+          }
         });
 
         try {
@@ -1172,7 +1186,9 @@ class App extends React.Component<{}, AppState> {
         if (this.state.map) {
           this.state.map.flyTo({
             center: [sit.location.longitude, sit.location.latitude],
-            zoom: 15
+            zoom: 13,
+            duration: 1000,
+            essential: true
           });
         }
       } else {
