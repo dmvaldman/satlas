@@ -6,46 +6,76 @@ interface Location {
   longitude: number;
 }
 
-type LocationCallback = (location: Location) => void;
-
-const LOCATION_TIMEOUT = 3000; // 3 seconds
+type LocationCallback = (location?: Location) => void;
 
 export class LocationService {
   private locationWatchId: string | null = null;
   private locationCallbacks: LocationCallback[] = [];
+  private onReconnectCallbacks: LocationCallback[] = [];
+  private onDisconnectCallbacks: (() => void)[] = [];
   private hasLocationPermission: boolean = false;
   private static lastKnownLocation: Location | null = null;
+  private trackingPollId: number | null = null;
+  private readonly TRACKING_POLL_INTERVAL = 1000; // 1 second
+  private readonly LOCATION_TIMEOUT = 3000; // 3 seconds
+  private readonly LOCATION_MAX_AGE = 5000; // 5 seconds
+  private isConnected: boolean = false;
 
   constructor() {
-    this.addLocationListener(LocationService.setLastKnownLocation);
+    this.onLocationUpdate(LocationService.setLastKnownLocation);
   }
 
   // Start watching location changes
-  public async startLocationTracking(): Promise<void> {
-    if (this.locationWatchId) return;
+  public async startTracking(): Promise<void> {
+    if (this.locationWatchId || this.trackingPollId) return;
 
     try {
-      if (Capacitor.getPlatform() !== 'web') {
-        const permissionStatus = await Geolocation.requestPermissions();
-        this.hasLocationPermission = permissionStatus.location === 'granted';
-        if (!this.hasLocationPermission) {
-          console.warn('Location permission not granted');
-          return;
-        }
-      }
-
-      if (Capacitor.getPlatform() === 'web') {
-        this.setupWebWatch();
-      } else {
-        await this.setupNativeWatch();
-      }
+      await this._startTracking();
     } catch (error) {
       this.handleLocationError(error);
+      this._startTrackingPoll();
+    }
+  }
+
+  private async _startTracking(): Promise<void> {
+    if (Capacitor.getPlatform() !== 'web') {
+      const permissionStatus = await Geolocation.requestPermissions();
+      this.hasLocationPermission = permissionStatus.location === 'granted';
+      if (!this.hasLocationPermission) {
+        throw new Error('Location permission not granted');
+      }
+    }
+
+    if (Capacitor.getPlatform() === 'web') {
+      this.setupWebWatch();
+    } else {
+      await this.setupNativeWatch();
+    }
+  }
+
+  private _startTrackingPoll(): void {
+    if (this.trackingPollId) return;
+
+    console.log('Starting location tracking poll...');
+    this.trackingPollId = window.setInterval(async () => {
+      try {
+        await this._startTracking();
+        this._stopTrackingPoll();
+      } catch (error) {
+        console.warn('Location tracking poll failed:', error);
+      }
+    }, this.TRACKING_POLL_INTERVAL);
+  }
+
+  private _stopTrackingPoll(): void {
+    if (this.trackingPollId) {
+      window.clearInterval(this.trackingPollId);
+      this.trackingPollId = null;
     }
   }
 
   // Stop watching location changes
-  public async stopLocationTracking(): Promise<void> {
+  public async stopTracking(): Promise<void> {
     if (this.locationWatchId) {
       if (Capacitor.getPlatform() === 'web') {
         navigator.geolocation.clearWatch(Number(this.locationWatchId));
@@ -53,7 +83,9 @@ export class LocationService {
         await Geolocation.clearWatch({ id: this.locationWatchId });
       }
       this.locationWatchId = null;
+      this.handleConnectionStateChange(false);
     }
+    this._stopTrackingPoll();
   }
 
   // Get current location (one-time)
@@ -85,7 +117,7 @@ export class LocationService {
       const timeoutId = setTimeout(() => {
         console.log('Location request timed out');
         reject(new Error('Location request timed out'));
-      }, LOCATION_TIMEOUT);
+      }, this.LOCATION_TIMEOUT);
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -103,8 +135,8 @@ export class LocationService {
         },
         {
           enableHighAccuracy: true,
-          timeout: LOCATION_TIMEOUT,
-          maximumAge: 10000
+          timeout: this.LOCATION_TIMEOUT,
+          maximumAge: this.LOCATION_MAX_AGE
         }
       );
     });
@@ -126,7 +158,7 @@ export class LocationService {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error('Location request timed out'));
-      }, LOCATION_TIMEOUT);
+      }, this.LOCATION_TIMEOUT);
     });
 
     try {
@@ -135,7 +167,7 @@ export class LocationService {
         const position = await Promise.race([
           Geolocation.getCurrentPosition({
             enableHighAccuracy: true,
-            timeout: LOCATION_TIMEOUT
+            timeout: this.LOCATION_TIMEOUT
           }),
           timeoutPromise
         ]);
@@ -151,7 +183,7 @@ export class LocationService {
         const position = await Promise.race([
           Geolocation.getCurrentPosition({
             enableHighAccuracy: false,
-            timeout: LOCATION_TIMEOUT
+            timeout: this.LOCATION_TIMEOUT
           }),
           timeoutPromise
         ]);
@@ -167,44 +199,8 @@ export class LocationService {
     }
   }
 
-  private setupWebWatch(): void {
-    if (!navigator.geolocation) {
-      throw new Error('Geolocation not supported in this browser');
-    }
-
-    this.locationWatchId = navigator.geolocation.watchPosition(
-      position => {
-        this.handleLocationUpdate({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-      },
-      error => {
-        this.handleLocationError(error);
-        console.error('Web geolocation error:', error);
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-    ) as unknown as string;
-  }
-
-  private async setupNativeWatch(): Promise<void> {
-    this.locationWatchId = await Geolocation.watchPosition(
-      { enableHighAccuracy: true },
-      (position, error) => {
-        if (error) {
-          this.handleLocationError(error);
-          return;
-        }
-        if (position) this.handleLocationUpdate({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-      }
-    );
-  }
-
-  public static setLastKnownLocation(location: Location): void {
-    LocationService.lastKnownLocation = location;
+  public static setLastKnownLocation(location?: Location): void {
+    LocationService.lastKnownLocation = location || null;
   }
 
   public static getLastKnownLocation(): Location | null{
@@ -212,16 +208,16 @@ export class LocationService {
   }
 
   // Register a callback to receive location updates
-  public addLocationListener(callback: LocationCallback): void {
+  public onLocationUpdate(callback: LocationCallback): void {
     this.locationCallbacks.push(callback);
   }
 
   // Remove a previously registered callback
-  public removeLocationListener(callback: LocationCallback): void {
+  public offLocationUpdate(callback: LocationCallback): void {
     this.locationCallbacks = this.locationCallbacks.filter(cb => cb !== callback);
   }
 
-  private handleLocationUpdate(location: Location): void {
+  private handleLocationUpdate(location?: Location): void {
     this.locationCallbacks.forEach(callback => {
       try {
         callback(location);
@@ -237,7 +233,93 @@ export class LocationService {
     if (error?.message?.includes('permission') || error?.code === 1) {
       this.hasLocationPermission = false;
       console.warn('Location permission revoked');
+      this._startTrackingPoll();
+    } else if (error?.code === 3) { // Position unavailable
+      this.handleConnectionStateChange(false);
     }
   }
 
+  // Add handlers for GPS connection state changes
+  public onReconnect(callback: LocationCallback) {
+    this.onReconnectCallbacks.push(callback);
+  }
+
+  public offReconnect(callback: LocationCallback): void {
+    this.onReconnectCallbacks = this.onReconnectCallbacks.filter(cb => cb !== callback);
+  }
+
+  public onDisconnect(callback: () => void): void {
+    this.onDisconnectCallbacks.push(callback);
+  }
+
+  public offDisconnect(callback: () => void): void {
+    this.onDisconnectCallbacks = this.onDisconnectCallbacks.filter(cb => cb !== callback);
+  }
+
+  private handleConnectionStateChange(isConnected: boolean, coordinates?: Location): void {
+    if (this.isConnected === isConnected) return;
+
+    this.isConnected = isConnected;
+    if (isConnected) {
+      this.onReconnectCallbacks.forEach(callback => {
+        try {
+          callback(coordinates);
+        } catch (error) {
+          console.error('Error in reconnect listener:', error);
+        }
+      });
+    } else {
+      this.onDisconnectCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          console.error('Error in disconnect listener:', error);
+        }
+      });
+    }
+  }
+
+  private async setupNativeWatch(): Promise<void> {
+    this.locationWatchId = await Geolocation.watchPosition(
+      { enableHighAccuracy: true },
+      (position, error) => {
+        if (error) {
+          this.handleLocationError(error);
+          this.handleConnectionStateChange(false);
+          return;
+        }
+        if (position) {
+          const coordinates = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          this.handleConnectionStateChange(true, coordinates);
+          this.handleLocationUpdate(coordinates);
+        }
+      }
+    );
+  }
+
+  private setupWebWatch(): void {
+    if (!navigator.geolocation) {
+      throw new Error('Geolocation not supported in this browser');
+    }
+
+    this.locationWatchId = navigator.geolocation.watchPosition(
+      position => {
+        const coordinates = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+        this.handleConnectionStateChange(true, coordinates);
+        this.handleLocationUpdate(coordinates);
+      },
+      error => {
+        this.handleLocationError(error);
+        this.handleConnectionStateChange(false);
+        console.error('Web geolocation error:', error);
+      },
+      { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT }
+    ) as unknown as string;
+  }
 }
