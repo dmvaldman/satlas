@@ -77,7 +77,6 @@ class App extends React.Component<{}, AppState> {
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
   private tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
-  private gpsTimeoutHandle: NodeJS.Timeout | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
 
@@ -145,7 +144,7 @@ class App extends React.Component<{}, AppState> {
     }
 
     // Add location listener before initializations
-    this.locationService.addLocationListener(this.handleLocationUpdate);
+    this.locationService.onLocationUpdate(this.handleLocationUpdate);
 
     // Setup deep links for web/mobile
     this.setupDeepLinks();
@@ -161,8 +160,8 @@ class App extends React.Component<{}, AppState> {
     }
 
     // Clean up location tracking
-    this.locationService.removeLocationListener(this.handleLocationUpdate);
-    this.locationService.stopLocationTracking();
+    this.locationService.offLocationUpdate(this.handleLocationUpdate);
+    this.locationService.stopTracking();
 
     // Clean up auth listener
     if (this.authUnsubscribe) {
@@ -172,11 +171,6 @@ class App extends React.Component<{}, AppState> {
     // Clean up offline service listener
     if (this.offlineServiceUnsubscribe) {
       this.offlineServiceUnsubscribe();
-    }
-
-    // Clean up GPS timeout
-    if (this.gpsTimeoutHandle) {
-      clearTimeout(this.gpsTimeoutHandle);
     }
   }
 
@@ -254,39 +248,25 @@ class App extends React.Component<{}, AppState> {
 
         const map = this.createMap(mapCoordinates, zoom);
 
-        // poll for GPS location
-        this.pollForGPSLocation();
-
         this.setState({
           currentLocation: userCoordinates,
           map: map
         });
-      });
-  };
 
-  private pollForGPSLocation = () => {
-    this.gpsTimeoutHandle = setTimeout(() => {
-      this.locationService.getCurrentLocation()
-        .then(coordinates => {
-          // move map to new location
-          if (this.state.map) {
+        // Fire onReconnect GPS callback
+        console.log('Firing onReconnect GPS callback');
+        this.locationService.onReconnect((coordinates) => {
+          console.log('onReconnect GPS callback fired with coordinates:', coordinates);
+          if (this.state.map && coordinates) {
             // animate to new location and zoom
             this.state.map.flyTo({
               center: [coordinates.longitude, coordinates.latitude],
-              zoom: 13,
-              essential: true
+              zoom: 13
             });
+            this.setState({ currentLocation: coordinates });
           }
-          if (this.gpsTimeoutHandle) {
-            clearTimeout(this.gpsTimeoutHandle);
-          }
-          this.gpsTimeoutHandle = null;
-          this.setState({ currentLocation: coordinates });
-        })
-        .catch(() => {
-          this.pollForGPSLocation();
         });
-    }, 1000);
+      });
   };
 
   private createMap = (coordinates: { latitude: number; longitude: number }, zoom: number) => {
@@ -301,7 +281,7 @@ class App extends React.Component<{}, AppState> {
 
     map.on('load', () => {
         console.log('Map fully loaded');
-        this.locationService.startLocationTracking();
+        this.locationService.startTracking();
 
         const bounds = map.getBounds();
         console.log('Map Bounds:', bounds);
