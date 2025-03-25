@@ -1,7 +1,7 @@
 import React from 'react';
 import Carousel from './Carousel';
 import { User } from 'firebase/auth';
-import { Sit, Image, MarkType } from '../types';
+import { Sit, Image, MarkType, Location } from '../types';
 import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
 import { Share } from '@capacitor/share';

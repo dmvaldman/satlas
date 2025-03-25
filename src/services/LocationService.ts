@@ -1,10 +1,7 @@
 import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
+import { Location } from '../types';
 
-interface Location {
-  latitude: number;
-  longitude: number;
-}
 
 type LocationCallback = (location?: Location) => void;
 

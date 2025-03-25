@@ -12,14 +12,14 @@ export interface Image {
   height: number;
 }
 
-export interface Coordinates {
+export interface Location {
   latitude: number;
   longitude: number;
 }
 
 export interface Sit {
   id: string;
-  location: Coordinates;
+  location: Location;
   imageCollectionId: string;
   createdAt?: Date;
   uploadedBy?: string;
@@ -45,7 +45,7 @@ export type MarkType = 'favorite' | 'wantToGo' | 'visited';
 
 export interface PhotoResult {
   base64Data: string;
-  location: Coordinates;
+  location: Location;
   dimensions: {
     width: number;
     height: number;

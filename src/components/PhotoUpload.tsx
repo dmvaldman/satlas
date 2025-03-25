@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Coordinates, Sit, PhotoResult } from '../types';
+import { Location, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { OfflineService } from '../services/OfflineService';
 import { LocationService } from '../services/LocationService';
@@ -53,7 +53,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     }
   }
 
-  private async getImageLocationFromBase64(base64Image: string): Promise<Coordinates | null> {
+  private async getImageLocationFromBase64(base64Image: string): Promise<Location | null> {
     console.log('[PhotoUpload] Starting EXIF extraction from image');
 
     return new Promise((resolve) => {
@@ -291,7 +291,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         throw new Error('No image data received');
       }
 
-      let location: Coordinates | null = null;
+      let location: Location | null = null;
       try {
         location = await this.getLocation();
         if (!location) {
@@ -336,7 +336,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     }
   };
 
-  private async getLocation(): Promise<Coordinates | null> {
+  private async getLocation(): Promise<Location | null> {
     // Try cached location first
     const cachedLocation = LocationService.getLastKnownLocation();
     if (cachedLocation) {

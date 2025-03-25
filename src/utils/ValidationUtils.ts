@@ -1,4 +1,4 @@
-import { Coordinates, Sit, Image } from '../types';
+import { Location, Sit, Image } from '../types';
 import { getDistanceInFeet } from './geo';
 import { OfflineService } from '../services/OfflineService';
 
@@ -42,7 +42,7 @@ export class ValidationUtils {
    * @returns True if the location is valid
    * @throws InvalidLocationError if the location is invalid
    */
-  static isLocationValid(location: Coordinates | null | undefined): boolean {
+  static isLocationValid(location: Location | null | undefined): boolean {
     if (!location) {
       throw new InvalidLocationError();
     }
@@ -74,7 +74,7 @@ export class ValidationUtils {
    * @returns True if the location is near the sit
    */
   static isLocationNearSit(
-    location: Coordinates,
+    location: Location,
     sit: Sit,
     maxDistanceFeet: number = 100
   ): boolean {
@@ -182,7 +182,7 @@ export class ValidationUtils {
    * @throws ValidationError subclasses for different validation failures
    */
   static canUserCreateSitAtLocation(
-    location: Coordinates,
+    location: Location,
     userId: string,
     nearbySits?: Sit[],
     maxDistanceFeet: number = 100

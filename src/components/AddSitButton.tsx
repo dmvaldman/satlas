@@ -1,12 +1,12 @@
 import React from 'react';
-import { Coordinates, User, Sit } from '../types';
+import { Location, User, Sit } from '../types';
 
 interface AddSitButtonProps {
   isAuthenticated: boolean;
   user: User | null;
-  currentLocation: Coordinates | null;
+  currentLocation: Location | null;
   onSignIn: () => Promise<void>;
-  findNearbySit: (coordinates: Coordinates) => Promise<Sit | null>;
+  findNearbySit: (coordinates: Location) => Promise<Sit | null>;
   onNearbySitFound: (sit: Sit) => void;
   onPhotoUploadOpen: () => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
