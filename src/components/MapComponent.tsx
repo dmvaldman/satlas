@@ -108,7 +108,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     this.updateVisibleMarkers();
   }
 
-  private createLocationMarkerSVG(): HTMLElement {
+  private createLocationMarker(): HTMLElement {
     const container = document.createElement('div');
     container.className = 'location-marker';
 
@@ -134,7 +134,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     // Create user marker if it doesn't exist
     if (!this.userMarker) {
       this.userMarker = new mapboxgl.Marker({
-        element: this.createLocationMarkerSVG(),
+        element: this.createLocationMarker(),
         anchor: 'center'
       })
       .setLngLat([location.longitude, location.latitude])
