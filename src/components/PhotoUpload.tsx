@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { Location, Sit, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { OfflineService } from '../services/OfflineService';
 import { LocationService } from '../services/LocationService';
 import { convertDMSToDD } from '../utils/geo';
@@ -156,19 +158,23 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
   private handleChooseFromGallery = async () => {
     try {
+      console.log('[PhotoUpload] Starting gallery selection');
       let base64Data: string;
 
       // Platform-specific code to get the base64 image data
       if (Capacitor.getPlatform() === 'web') {
+        console.log('[PhotoUpload] Using web implementation');
         // Web implementation using file input
         base64Data = await this.getImageFromWebFileInput();
         if (!base64Data) return; // User cancelled
       } else {
+        console.log('[PhotoUpload] Using native implementation');
         // Native implementation using Capacitor
         base64Data = await this.getImageFromNativeGallery();
         if (!base64Data) return; // User cancelled or error
       }
 
+      console.log('[PhotoUpload] Got base64 data, processing...');
       // Common code for both platforms
       await this.processImageData(base64Data);
 
@@ -176,6 +182,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       // Check if error is a cancellation or user denied permission
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
+        console.log('[PhotoUpload] Error details:', errorMessage);
         if (errorMessage.includes('cancel') ||
             errorMessage.includes('denied') ||
             errorMessage.includes('permission')) {
@@ -186,7 +193,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
       console.error('[PhotoUpload] Error choosing photo:', error);
       this.props.showNotification('Error accessing photos', 'error');
-
     }
   };
 
@@ -223,8 +229,67 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     });
   };
 
-  // Get image from native gallery
   private getImageFromNativeGallery = async (): Promise<string> => {
+    if (Capacitor.getPlatform() === 'android') {
+      return this.getImageFromAndroidGallery();
+    } else if (Capacitor.getPlatform() === 'ios') {
+      return this.getImageFromIOSGallery();
+    } else {
+      throw new Error('Unsupported platform');
+    }
+  };
+
+  // Get image from Android gallery
+  private getImageFromAndroidGallery = async (): Promise<string> => {
+    try {
+      console.log('[PhotoUpload] Starting native gallery selection');
+
+      const result = await FilePicker.pickImages({
+        limit: 1,
+        readData: true
+      });
+
+      if (!result.files || result.files.length === 0) {
+        throw new Error('No image selected');
+      }
+
+      const file = result.files[0];
+
+      // Check if we have the data directly
+      if (file.data) {
+        console.log('[PhotoUpload] Got data directly');
+        return file.data;
+      }
+
+      // If no data, try to get the path and read the file
+      if (file.path) {
+        console.log('[PhotoUpload] Got path, reading file');
+        // Use Capacitor's Filesystem API to read the file
+        const fileContent = await Filesystem.readFile({
+          path: file.path,
+          directory: Directory.External
+        });
+
+        if (typeof fileContent.data === 'string') {
+          return fileContent.data;
+        }
+      }
+
+      throw new Error('Could not read image data');
+    } catch (error) {
+      console.error('[PhotoUpload] Error getting image from gallery:', error);
+      // Check if it's a user cancellation
+      if (error instanceof Error &&
+          (error.message.includes('cancel') ||
+           error.message.includes('File does not exist'))) {
+        return ''; // Return empty string for cancellation
+      }
+      throw error;
+    }
+  };
+
+  // Get image from iOS gallery
+  private getImageFromIOSGallery = async (): Promise<string> => {
     const image = await Camera.getPhoto({
       quality: 90,
       allowEditing: false,
