@@ -1056,7 +1056,7 @@ class App extends React.Component<{}, AppState> {
         await StatusBar.setOverlaysWebView({ overlay: true });
         await StatusBar.setStyle({ style: Style.Light });
         await StatusBar.setBackgroundColor({ color: '#00000000' });
-      }, 500);
+      }, 1000);
       // Android navigation bar is handled by native styles.xml
     } catch (e) {
       console.error('Error configuring system bars:', e);
