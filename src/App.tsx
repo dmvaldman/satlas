@@ -21,6 +21,7 @@ import Notification from './components/Notification';
 import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { debounce } from './utils/debounce';
 
 interface AppState {
   // Auth state
@@ -340,7 +341,9 @@ class App extends React.Component<{}, AppState> {
 
     // Keep existing offline service listener logic
     let lastKnownNetworkState = offlineService.isNetworkOnline();
-    this.offlineServiceUnsubscribe = offlineService.addStatusListener(async (isOnline) => {
+
+    // Create a debounced handler for network status changes
+    const debouncedNetworkHandler = debounce(async (isOnline: boolean) => {
       console.log('[App] Network status changed:', isOnline ? 'online' : 'offline');
 
       // Check if this is a real network change or just the app coming back to foreground
@@ -386,7 +389,9 @@ class App extends React.Component<{}, AppState> {
         // Still update offline state even if there was an error
         this.setState({ isOffline: false });
       }
-    });
+    }, 100); // 100ms debounce
+
+    this.offlineServiceUnsubscribe = offlineService.addStatusListener(debouncedNetworkHandler);
   };
 
   private async loadUserData(userId: string) {

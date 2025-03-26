@@ -609,6 +609,7 @@ export class FirebaseService {
       }
 
       const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
+        console.log('[Firebase] Base64 data length (without prefix):', base64WithoutPrefix.length);
 
       // Add metadata with detected content type
       const metadata = {
