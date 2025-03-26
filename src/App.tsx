@@ -1052,10 +1052,11 @@ class App extends React.Component<{}, AppState> {
   private configureStatusBar = async () => {
     try {
       // Configure system bars (dark icons on transparent background)
-      await StatusBar.setOverlaysWebView({ overlay: true });
-      await StatusBar.setStyle({ style: Style.Light });
-      await StatusBar.setBackgroundColor({ color: '#00000000' });
-
+      setTimeout(async () => {
+        await StatusBar.setOverlaysWebView({ overlay: true });
+        await StatusBar.setStyle({ style: Style.Light });
+        await StatusBar.setBackgroundColor({ color: '#00000000' });
+      }, 500);
       // Android navigation bar is handled by native styles.xml
     } catch (e) {
       console.error('Error configuring system bars:', e);
