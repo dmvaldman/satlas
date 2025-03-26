@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
 import mapboxgl from 'mapbox-gl';
+import { App } from '@capacitor/app';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -35,6 +36,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   private cityInputRef = React.createRef<HTMLInputElement>();
   private contentRef = React.createRef<HTMLDivElement>();
   private keyboardListenersAdded = false;
+  private notificationService: PushNotificationService | null = null;
+  private permissionChangeHandler: ((isGranted: boolean) => void) | null = null;
+  private appStateListenerHandle: { remove: () => void } | null = null;
 
   constructor(props: ProfileModalProps) {
     super(props);
@@ -49,6 +53,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       usernameError: null,
       isActive: false
     };
+
+    // Create the permission change handler bound to this instance
+    this.permissionChangeHandler = this.handlePermissionChange.bind(this);
   }
 
   componentDidMount() {
@@ -64,10 +71,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // Sync the toggle state with actual device permissions
     this.syncNotificationToggleState();
 
-    // Add permission change listener
-    if (Capacitor.isNativePlatform() && this.props.user) {
-      console.log('[ProfileModal] Adding permission change listener on mount');
-      PushNotificationService.getInstance().addPermissionChangeListener(this.handlePermissionChange);
+    // Add app resume listener for when returning from system settings
+    if (Capacitor.isNativePlatform()) {
+      this.setupAppStateListener();
     }
 
     // Set to active after a small delay to ensure initial transform is applied
@@ -95,12 +101,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       // Sync the toggle state with actual device permissions
       this.syncNotificationToggleState();
-
-      // Add permission change listener if not already added
-      if (Capacitor.isNativePlatform() && this.props.user) {
-        console.log('[ProfileModal] Adding permission change listener on modal open');
-        // PushNotificationService.getInstance().addPermissionChangeListener(this.handlePermissionChange);
-      }
 
       // Set to active after a small delay to ensure initial transform is applied
       requestAnimationFrame(() => {
@@ -136,11 +136,14 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       this.removeKeyboardListeners();
     }
 
-    // Remove permission change listener
-    if (Capacitor.isNativePlatform() && this.props.user) {
-      console.log('[ProfileModal] Removing permission change listener on unmount');
-      PushNotificationService.getInstance().removePermissionChangeListener(this.handlePermissionChange);
-      PushNotificationService.getInstance().cleanup();
+    // Remove permission change listener and clean up notification service
+    this.cleanupNotificationService();
+
+    // Remove app resume listener - only remove our specific listener
+    if (this.appStateListenerHandle) {
+      this.appStateListenerHandle.remove();
+      this.appStateListenerHandle = null;
+      console.log('[ProfileModal] App state listener removed');
     }
   }
 
@@ -427,15 +430,58 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
+  // Clean up notification service
+  private cleanupNotificationService = () => {
+    if (this.notificationService && this.permissionChangeHandler) {
+      console.log('[ProfileModal] Cleaning up notification service');
+      this.notificationService.removePermissionChangeListener(this.permissionChangeHandler);
+      this.notificationService.cleanup();
+      this.notificationService = null;
+    }
+  };
+
+  // Handle app resuming from background (returning from system settings)
+  private handleAppResume = () => {
+    console.log('[ProfileModal] App resumed, re-initializing notification service');
+
+    // Re-create notification service since the app might have refreshed
+    this.cleanupNotificationService();
+    this.initializeNotificationService();
+
+    // Re-sync notification status immediately when app resumes
+    this.syncNotificationToggleState();
+
+    // If we have a user, make sure notification preferences are up to date
+    if (this.props.user && this.props.preferences) {
+      this.updateNotificationPreferencesIfNeeded();
+    }
+  };
+
   // Add a method to initialize the notification service
   private initializeNotificationService = async () => {
     const { user, preferences } = this.props;
 
     if (user && Capacitor.isNativePlatform()) {
       try {
-        const notificationService = PushNotificationService.getInstance();
-        console.log('[ProfileModal] Initializing notification service on mount/update');
-        await notificationService.initialize(user.uid, preferences || { username: '', pushNotificationsEnabled: false });
+        // Clean up any existing service first
+        this.cleanupNotificationService();
+
+        // Create a new instance instead of using the singleton
+        this.notificationService = new PushNotificationService();
+
+        console.log('[ProfileModal] Creating new notification service with userId:', user.uid);
+
+        // Initialize the new instance
+        await this.notificationService.initialize(user.uid, preferences || {
+          username: '',
+          pushNotificationsEnabled: false,
+          lastVisit: Date.now()
+        });
+
+        // Add permission change listener to the new instance
+        if (this.permissionChangeHandler) {
+          this.notificationService.addPermissionChangeListener(this.permissionChangeHandler);
+        }
       } catch (error) {
         console.error('[ProfileModal] Error initializing notification service:', error);
       }
@@ -444,15 +490,20 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
   // Add a method to sync the notification toggle state with actual device permissions
   private syncNotificationToggleState = async () => {
-    const { user } = this.props;
-
-    if (user && Capacitor.isNativePlatform()) {
+    if (Capacitor.isNativePlatform()) {
       try {
-        const notificationService = PushNotificationService.getInstance();
+        // If we don't have a notification service, create one
+        if (!this.notificationService && this.props.user) {
+          await this.initializeNotificationService();
+        }
+
+        // Skip if still no notification service
+        if (!this.notificationService) return;
+
         console.log('[ProfileModal] Syncing notification toggle state with device permissions');
 
         // Get the actual permission status
-        const isPermissionGranted = await notificationService.syncPermissionStatus();
+        const isPermissionGranted = await this.notificationService.syncPermissionStatus();
 
         // Update our UI state to match
         if (this.state.pushNotifications !== isPermissionGranted) {
@@ -465,40 +516,118 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
+  // Add a method to update notification preferences if needed
+  private updateNotificationPreferencesIfNeeded = async () => {
+    const { user, preferences, onUpdatePreferences } = this.props;
+
+    if (!user || !preferences || !this.notificationService) return;
+
+    try {
+      // Get the current permission status directly from the service
+      const currentPermissionStatus = await this.notificationService.syncPermissionStatus();
+
+      // If permission status doesn't match preferences, update preferences
+      if (preferences.pushNotificationsEnabled !== currentPermissionStatus) {
+        console.log(`[ProfileModal] Updating push notification preferences to match current status: ${currentPermissionStatus}`);
+
+        const updatedPreferences = {
+          ...preferences,
+          pushNotificationsEnabled: currentPermissionStatus
+        };
+
+        // Save to Firebase
+        await FirebaseService.saveUserPreferences(user.uid, updatedPreferences);
+
+        // Update parent component state
+        onUpdatePreferences(updatedPreferences);
+      }
+    } catch (error) {
+      console.error('[ProfileModal] Error updating notification preferences:', error);
+    }
+  };
+
   private handlePushNotificationToggle = async (enabled: boolean) => {
     const { user, showNotification } = this.props;
     console.log('[ProfileModal] Toggle notifications:', enabled);
 
     if (!user) {
       console.log('[ProfileModal] No user, cannot toggle notifications');
+      showNotification('You must be logged in to manage notifications', 'error');
       return;
     }
 
-    try {
-      const notificationService = PushNotificationService.getInstance();
+    // Make sure we have a notification service
+    if (!this.notificationService) {
+      await this.initializeNotificationService();
+      if (!this.notificationService) {
+        showNotification('Failed to initialize notification service', 'error');
+        return;
+      }
+    }
 
+    try {
       if (enabled) {
         console.log('[ProfileModal] Attempting to enable notifications');
-        await notificationService.enable();
+        await this.notificationService.enable();
       } else {
         console.log('[ProfileModal] Attempting to disable notifications');
-        await notificationService.disable();
+        await this.notificationService.disable();
       }
 
-      // Force a fresh sync with current permissions after a delay
-      setTimeout(async () => {
-        const actualStatus = await notificationService.syncPermissionStatus();
-        this.setState({ pushNotifications: actualStatus });
-      }, 1000);
+      // Get the actual permission status after the user interaction
+      const actualStatus = await this.notificationService.syncPermissionStatus();
+      console.log(`[ProfileModal] Post-toggle permission status: ${actualStatus}`);
+
+      // Only update UI to reflect actual permission status
+      this.setState({ pushNotifications: actualStatus });
     } catch (error) {
       console.error('[ProfileModal] Error in handlePushNotificationToggle:', error);
       showNotification('Failed to update push notification settings', 'error');
     }
   };
 
+  // Helper method to save notification preference
+  private saveNotificationPreference = async (userId: string, enabled: boolean) => {
+    const { preferences, onUpdatePreferences } = this.props;
+
+    if (!preferences) return;
+
+    const updatedPreferences = {
+      ...preferences,
+      pushNotificationsEnabled: enabled
+    };
+
+    // Save to Firebase
+    await FirebaseService.saveUserPreferences(userId, updatedPreferences);
+
+    // Update parent component state
+    onUpdatePreferences(updatedPreferences);
+  };
+
   private handlePermissionChange = (isGranted: boolean) => {
     console.log('[ProfileModal] Permission change detected:', isGranted);
+
+    // Update UI state
     this.setState({ pushNotifications: isGranted });
+
+    // If user is available, update preferences to match actual permission
+    if (this.props.user?.uid && this.props.preferences) {
+      this.saveNotificationPreference(this.props.user.uid, isGranted);
+    }
+  }
+
+  private setupAppStateListener = async () => {
+    try {
+      // Store the listener handle so we can remove it later
+      this.appStateListenerHandle = await App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          this.handleAppResume();
+        }
+      });
+      console.log('[ProfileModal] App state listener added');
+    } catch (error) {
+      console.error('[ProfileModal] Error setting up app state listener:', error);
+    }
   }
 
   render() {

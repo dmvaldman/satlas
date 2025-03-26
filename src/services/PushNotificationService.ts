@@ -15,17 +15,7 @@ export class PushNotificationService {
   private permissionCallbacks: ((isGranted: boolean) => void)[] = [];
   private userId: string | null = null;
   private enabled = false;
-  private appStateListener: any = null;
-
-  /**
-   * Get the singleton instance
-   */
-  public static getInstance(): PushNotificationService {
-    if (!PushNotificationService.instance) {
-      PushNotificationService.instance = new PushNotificationService();
-    }
-    return PushNotificationService.instance;
-  }
+  private appStateListenerHandle: { remove: () => void } | null = null;
 
   /**
    * Initialize the notification service
@@ -56,7 +46,7 @@ export class PushNotificationService {
       await this.syncPermissionStatus();
 
       // Set up app state listener
-      this.setupAppStateListener();
+      await this.setupAppStateListener();
     } else {
       console.log('[PushNotificationService] Not a native platform, skipping native initialization');
     }
@@ -65,27 +55,30 @@ export class PushNotificationService {
     console.log('[PushNotificationService] Initialization complete');
   }
 
-  private setupAppStateListener() {
+  private async setupAppStateListener() {
     console.log('[PushNotificationService] Setting up app state listener');
 
     // Clean up existing listener if any
-    if (this.appStateListener) {
+    if (this.appStateListenerHandle) {
       console.log('[PushNotificationService] Removing existing app state listener');
-      App.removeAllListeners();
+      this.appStateListenerHandle.remove();
+      this.appStateListenerHandle = null;
     }
 
-    // Create new listener
-    this.appStateListener = async ({ isActive }: { isActive: boolean }) => {
-      console.log('[PushNotificationService] App state changed:', isActive ? 'active' : 'background');
-      if (isActive) {
-        console.log('[PushNotificationService] App became active, syncing permission status');
-        await this.syncPermissionStatus();
-      }
-    };
+    try {
+      // Create new listener and store the handle
+      this.appStateListenerHandle = await App.addListener('appStateChange', async ({ isActive }: { isActive: boolean }) => {
+        console.log('[PushNotificationService] App state changed:', isActive ? 'active' : 'background');
+        if (isActive) {
+          console.log('[PushNotificationService] App became active, syncing permission status');
+          await this.syncPermissionStatus();
+        }
+      });
 
-    // Add the listener
-    App.addListener('appStateChange', this.appStateListener);
-    console.log('[PushNotificationService] App state listener setup complete');
+      console.log('[PushNotificationService] App state listener setup complete');
+    } catch (error) {
+      console.error('[PushNotificationService] Error setting up app state listener:', error);
+    }
   }
 
   /**
@@ -93,11 +86,16 @@ export class PushNotificationService {
    */
   public cleanup() {
     console.log('[PushNotificationService] Cleaning up resources');
-    if (this.appStateListener) {
+
+    // Remove App state listener
+    if (this.appStateListenerHandle) {
       console.log('[PushNotificationService] Removing app state listener');
-      App.removeAllListeners();
-      this.appStateListener = null;
+      this.appStateListenerHandle.remove();
+      this.appStateListenerHandle = null;
     }
+
+    // Clean up Push Notification listeners
+    PushNotifications.removeAllListeners();
   }
 
   /**
@@ -253,6 +251,10 @@ export class PushNotificationService {
   private async registerPushNotifications(): Promise<void> {
     try {
       console.log('[PushNotificationService] Registering with FCM...');
+
+      // Remove any existing listeners first
+      PushNotifications.removeAllListeners();
+
       // Register with FCM
       await PushNotifications.register();
       console.log('[PushNotificationService] Successfully registered with FCM');
@@ -305,7 +307,7 @@ export class PushNotificationService {
         await FirebaseService.deletePushToken(token.id);
       }
 
-      // Remove all listeners
+      // Remove all push notification listeners
       PushNotifications.removeAllListeners();
       console.log('[PushNotificationService] Removed all push notification listeners');
     } catch (error) {
