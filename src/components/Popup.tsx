@@ -32,7 +32,7 @@ interface PopupProps {
   images?: Image[];
   marks?: Set<MarkType>;
   favoriteCount?: number;
-  currentLocation: { latitude: number; longitude: number } | null;
+  currentLocation: Location | null;
   onClose: () => void;
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
@@ -342,7 +342,7 @@ class PopupComponent extends React.Component<PopupProps> {
             {/* Display uploader information */}
             {sit.uploadedBy && sit.createdAt && (
               <div className="sit-uploader-info">
-                Sit found {sit.uploadedByUsername ? 'by ' + sit.uploadedByUsername : ''} {formatRelativeTime(sit.createdAt)}
+                Sit found {sit.uploadedByUsername ? 'by @' + sit.uploadedByUsername : ''} {formatRelativeTime(sit.createdAt)}
               </div>
             )}
 
