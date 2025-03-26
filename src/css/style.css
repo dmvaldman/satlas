@@ -7,11 +7,11 @@
   --primary-color: #3326c3;
   --sit-color: #4cb4d4;
   --sit-mine-color: #8bdf91;
-  --action-green: #31d53d;
+  --action-green: #41b449;
   --action-red: #ff3b30;
   --white: #ffffff;
   --light-gray: rgb(245, 245, 245);
-  --medium-gray: #bbb;
+  --medium-gray: #aaa;
   --dark-gray: #555;
   --black: #000000;
   --light-blue: #bdefff;
@@ -806,12 +806,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   padding: 12px 16px;
   border-radius: 8px;
   color: var(--white);
-  font-size: 18px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   animation: slideDown 0.3s ease-out; /* Changed to slideDown */
+  text-shadow: 0px 0px 1px var(--black);
 }
 
 .notification-message {
@@ -819,23 +820,33 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .notification-close {
-  background: none;
-  border: 1px solid var(--light-red);
-  color: var(--white);
-  font-size: 26px;
-  cursor: pointer;
-  padding: 0 4px;
-  border-radius: 50%;
   width: 32px;
   height: 32px;
+  background: none;
+  color: var(--white);
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid;
+  line-height: 100%;
 }
 
 .notification.success {
   background-color: var(--action-green);
+  border: 1px solid var(--dark-green);
 }
 
 .notification.error {
   background-color: var(--action-red);
+  border: 1px solid var(--dark-red);
+}
+
+.notification.error .notification-close{
+  border-color: var(--dark-red);
+}
+
+.notification.success .notification-close{
+  border-color: var(--dark-green);
 }
 
 /* Update animation for top notifications */
