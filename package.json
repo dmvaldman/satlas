@@ -10,6 +10,7 @@
     "build": "NODE_ENV=production vite build",
     "preview": "NODE_ENV=production vite preview",
     "gen-assets": "npx capacitor-assets generate",
+    "logs": "adb logcat | grep -E 'Capacitor'",
     "android:build": "NODE_ENV=production npm run gen-assets && npm run build && npx cap sync android && npx cap run android",
     "android:clean": "cd android && ./gradlew clean && cd ..",
     "android:release": "cd android && ./gradlew assembleRelease && cd .. && adb install android/app/build/outputs/apk/release/app-release.apk",
