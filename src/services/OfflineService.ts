@@ -58,7 +58,7 @@ export class OfflineService {
   private isOnline: boolean = navigator.onLine;
   private pendingUploads: PendingUpload[] = [];
   private listeners: Set<(isOnline: boolean) => void> = new Set();
-  private initialized: boolean = false;
+  private networkListener: any = null; // Store the network listener reference
 
   public static getInstance(): OfflineService {
     if (!OfflineService.instance) {
@@ -68,7 +68,8 @@ export class OfflineService {
   }
 
   public async initialize(): Promise<void> {
-    if (this.initialized) return;
+    // Clean up any existing listeners before reinitializing
+    await this.cleanup();
 
     // Load any saved pending uploads
     await this.loadPendingUploads();
@@ -79,7 +80,9 @@ export class OfflineService {
       const status = await Network.getStatus();
       this.isOnline = status.connected;
 
-      Network.addListener('networkStatusChange', (status) => {
+      // Store the listener reference so we can remove it later
+      this.networkListener = Network.addListener('networkStatusChange', (status) => {
+        console.log('[OfflineService] Network status changed:', status);
         const wasOffline = !this.isOnline;
         this.isOnline = status.connected;
 
@@ -95,19 +98,42 @@ export class OfflineService {
       // Use browser events for web
       this.isOnline = navigator.onLine;
 
-      window.addEventListener('online', () => {
-        this.isOnline = true;
-        this.notifyListeners();
-        this.processPendingUploads();
-      });
+      // Store the listener references so we can remove them later
+      this.networkListener = {
+        online: () => {
+          console.log('[OfflineService] Browser is online');
+          this.isOnline = true;
+          this.notifyListeners();
+          this.processPendingUploads();
+        },
+        offline: () => {
+          console.log('[OfflineService] Browser is offline');
+          this.isOnline = false;
+          this.notifyListeners();
+        }
+      };
 
-      window.addEventListener('offline', () => {
-        this.isOnline = false;
-        this.notifyListeners();
-      });
+      window.addEventListener('online', this.networkListener.online);
+      window.addEventListener('offline', this.networkListener.offline);
     }
 
     this.initialized = true;
+  }
+
+  public async cleanup(): Promise<void> {
+    // Remove network listeners
+    if (Capacitor.isNativePlatform() && this.networkListener) {
+      await Network.removeAllListeners();
+      this.networkListener = null;
+    } else if (this.networkListener) {
+      window.removeEventListener('online', this.networkListener.online);
+      window.removeEventListener('offline', this.networkListener.offline);
+      this.networkListener = null;
+    }
+
+    // Clear all status listeners
+    this.listeners.clear();
+    this.initialized = false;
   }
 
   public isNetworkOnline(): boolean {
@@ -273,8 +299,8 @@ export class OfflineService {
 
   private async saveImageToFileSystem(id: string, base64Data: string): Promise<void> {
     try {
-      // Ensure the base64 data doesn't have the prefix
-      const data = base64Data.replace(/^data:image\/\w+;base64,/, '');
+      // Ensure the base64 data doesn't have the prefix and is clean
+      const data = base64Data.replace(/^data:image\/\w+;base64,/, '')
 
       // Create directory if it doesn't exist
       try {
@@ -289,7 +315,7 @@ export class OfflineService {
 
       await Filesystem.writeFile({
         path: `offline_uploads/${id}.jpg`,
-        data,
+        data: data,
         directory: Directory.Cache,
         encoding: Encoding.UTF8
       });
@@ -301,17 +327,20 @@ export class OfflineService {
 
   private async getImageFromFileSystem(id: string): Promise<string> {
     try {
-      const result = await Filesystem.readFile({
-        path: `offline_uploads/${id}.jpg`,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8
-      });
+        const result = await Filesystem.readFile({
+            path: `offline_uploads/${id}.jpg`,
+            directory: Directory.Cache,
+            encoding: Encoding.UTF8
+        });
 
-      // Add the data URL prefix back
-      return `data:image/jpeg;base64,${result.data}`;
+        // Convert to string if it's a Blob
+        const data = typeof result.data === 'string' ? result.data : await result.data.text();
+
+        // Add the data URL prefix back
+        return `data:image/jpeg;base64,${data}`;
     } catch (error) {
-      console.error('Error reading image from filesystem:', error);
-      throw error;
+        console.error('Error reading image from filesystem:', error);
+        throw error;
     }
   }
 
