@@ -95,21 +95,11 @@ export class OfflineService {
       // Store the listener reference so we can remove it later
       this.networkListener = Network.addListener('networkStatusChange', (status) => {
         console.log(`[OfflineService] Network status changed - Connected: ${status.connected}, Type: ${status.connectionType}, Previous: ${this.isOnline}, Time: ${new Date().toISOString()}`);
-        console.log('[OfflineService] Current pending uploads:', this.pendingUploads.length);
 
         // Only process if this is a real state change
         if (status.connected !== this.isOnline) {
-          const wasOffline = !this.isOnline;
           this.isOnline = status.connected;
-
-          // Notify listeners of status change
           this.notifyListeners();
-
-          // If we just came back online, process the queue
-          if (wasOffline && this.isOnline) {
-            console.log('[OfflineService] Coming back online, checking pending uploads');
-            this.processPendingUploads();
-          }
         }
       });
     } else {
@@ -123,8 +113,6 @@ export class OfflineService {
           console.log('[OfflineService] Browser is online');
           this.isOnline = true;
           this.notifyListeners();
-          console.log('[OfflineService] Current pending uploads:', this.pendingUploads.length);
-          this.processPendingUploads();
         },
         offline: () => {
           console.log('[OfflineService] Browser is offline');
@@ -173,8 +161,6 @@ export class OfflineService {
 
   public addStatusListener(listener: (isOnline: boolean) => void): () => void {
     this.listeners.add(listener);
-    // Immediately notify with current status
-    listener(this.isOnline);
 
     // Return function to remove listener
     return () => {
@@ -454,26 +440,6 @@ export class OfflineService {
       console.error('[OfflineService] Error loading pending uploads:', error);
       this.pendingUploads = [];
     }
-  }
-
-  public async processPendingUploads(): Promise<void> {
-    console.log('[OfflineService] processPendingUploads called');
-    console.log('[OfflineService] Current state - isOnline:', this.isOnline, 'pendingUploads:', this.pendingUploads.length);
-
-    if (!this.isOnline) {
-      console.log('[OfflineService] Cannot process uploads while offline');
-      return;
-    }
-
-    if (this.pendingUploads.length === 0) {
-      console.log('[OfflineService] No pending uploads to process');
-      return;
-    }
-
-    // This method is now implemented in the App component
-    // We just notify listeners that the queue is ready to be processed
-    console.log('[OfflineService] Network is online, ready to process pending uploads');
-    console.log('[OfflineService] Pending upload types:', this.pendingUploads.map(u => u.type));
   }
 
   public async removePendingUpload(id: string): Promise<void> {
