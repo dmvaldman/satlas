@@ -343,7 +343,7 @@ class App extends React.Component<{}, AppState> {
     let lastKnownNetworkState = offlineService.isNetworkOnline();
 
     // Create a debounced handler for network status changes
-    const debouncedNetworkHandler = debounce(async (isOnline: boolean) => {
+    const networkHandler = debounce(async (isOnline: boolean) => {
       console.log('[App] Network status changed:', isOnline ? 'online' : 'offline');
 
       // Check if this is a real network change or just the app coming back to foreground
@@ -408,7 +408,7 @@ class App extends React.Component<{}, AppState> {
       }
     }, 100); // 100ms debounce
 
-    this.offlineServiceUnsubscribe = offlineService.addStatusListener(debouncedNetworkHandler);
+    this.offlineServiceUnsubscribe = offlineService.addStatusListener(networkHandler);
   };
 
   private async loadUserData(userId: string) {
