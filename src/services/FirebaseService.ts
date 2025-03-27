@@ -1252,7 +1252,6 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing new sit upload:', error);
-          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
@@ -1276,7 +1275,6 @@ export class FirebaseService {
           );
 
           if (!canAddPhoto) {
-            await offlineService.removePendingUpload(upload.id);
             onError(upload.id, new Error('You already have an image in this collection'));
             continue;
           }
@@ -1290,7 +1288,6 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing add to sit upload:', error);
-          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
@@ -1328,7 +1325,6 @@ export class FirebaseService {
           }
 
           if (!canReplaceImage) {
-            await offlineService.removePendingUpload(upload.id);
             onError(upload.id, new Error('You cannot replace this image'));
             continue;
           }
@@ -1343,7 +1339,6 @@ export class FirebaseService {
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing replace image upload:', error);
-          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
@@ -1356,7 +1351,6 @@ export class FirebaseService {
           await offlineService.removePendingUpload(deletion.id);
         } catch (error) {
           console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
-          await offlineService.removePendingUpload(deletion.id);
           onError(deletion.id, error);
         }
       }

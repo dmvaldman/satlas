@@ -1157,6 +1157,7 @@ class App extends React.Component<{}, AppState> {
       // Let the FirebaseService handle the actual processing
       await FirebaseService.processPendingUploads((uploadId, error) => {
         // Show a notification for each individual error
+        offlineService.removePendingUpload(uploadId);
         this.showNotification(`Error uploading photo: ${error.message || 'Unknown error'}`, 'error');
       });
 
