@@ -81,17 +81,21 @@ export class OfflineService {
     await this.cleanup();
 
     // Load any saved pending uploads
+    console.log('[OfflineService] Loading pending uploads during initialization');
     await this.loadPendingUploads();
+    console.log('[OfflineService] Current pending uploads after loading:', this.pendingUploads.length);
 
     // Set up network status listeners
     if (Capacitor.isNativePlatform()) {
       // Use Capacitor Network plugin for native platforms
       const status = await Network.getStatus();
       this.isOnline = status.connected;
+      console.log('[OfflineService] Initial network status:', this.isOnline ? 'online' : 'offline');
 
       // Store the listener reference so we can remove it later
       this.networkListener = Network.addListener('networkStatusChange', (status) => {
         console.log(`[OfflineService] Network status changed - Connected: ${status.connected}, Type: ${status.connectionType}, Previous: ${this.isOnline}, Time: ${new Date().toISOString()}`);
+        console.log('[OfflineService] Current pending uploads:', this.pendingUploads.length);
 
         // Only process if this is a real state change
         if (status.connected !== this.isOnline) {
@@ -103,6 +107,7 @@ export class OfflineService {
 
           // If we just came back online, process the queue
           if (wasOffline && this.isOnline) {
+            console.log('[OfflineService] Coming back online, checking pending uploads');
             this.processPendingUploads();
           }
         }
@@ -110,6 +115,7 @@ export class OfflineService {
     } else {
       // Use browser events for web
       this.isOnline = navigator.onLine;
+      console.log('[OfflineService] Initial network status:', this.isOnline ? 'online' : 'offline');
 
       // Store the listener references so we can remove them later
       this.networkListener = {
@@ -117,6 +123,7 @@ export class OfflineService {
           console.log('[OfflineService] Browser is online');
           this.isOnline = true;
           this.notifyListeners();
+          console.log('[OfflineService] Current pending uploads:', this.pendingUploads.length);
           this.processPendingUploads();
         },
         offline: () => {
@@ -185,6 +192,7 @@ export class OfflineService {
     userId: string,
     userName: string
   ): Promise<string> {
+    console.log('[OfflineService] Adding new pending sit for user:', userId);
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const pendingUpload: NewSitPendingUpload = {
@@ -198,6 +206,7 @@ export class OfflineService {
 
     // Save the image data to filesystem if on native platform
     if (Capacitor.isNativePlatform()) {
+      console.log('[OfflineService] Saving image data to filesystem for ID:', id);
       await this.saveImageToFileSystem(id, photoResult.base64Data);
 
       // Replace the base64 data with a reference to save memory
@@ -205,10 +214,13 @@ export class OfflineService {
       // @ts-ignore - we're intentionally replacing the data with a reference
       savedPhotoResult.base64Data = `file:${id}`;
       pendingUpload.photoResult = savedPhotoResult;
+      console.log('[OfflineService] Saved image data to filesystem');
     }
 
     this.pendingUploads.push(pendingUpload);
+    console.log('[OfflineService] Added pending upload to queue, total pending:', this.pendingUploads.length);
     await this.savePendingUploads();
+    console.log('[OfflineService] Saved pending uploads to storage');
 
     return id;
   }
@@ -382,6 +394,7 @@ export class OfflineService {
 
   private async savePendingUploads(): Promise<void> {
     try {
+      console.log('[OfflineService] Saving pending uploads:', this.pendingUploads.length);
       const data = JSON.stringify(this.pendingUploads);
 
       if (Capacitor.isNativePlatform()) {
@@ -391,16 +404,19 @@ export class OfflineService {
           directory: Directory.Cache,
           encoding: Encoding.UTF8
         });
+        console.log('[OfflineService] Successfully saved pending uploads to filesystem');
       } else {
         localStorage.setItem('pendingUploads', data);
+        console.log('[OfflineService] Successfully saved pending uploads to localStorage');
       }
     } catch (error) {
-      console.error('Error saving pending uploads:', error);
+      console.error('[OfflineService] Error saving pending uploads:', error);
     }
   }
 
   private async loadPendingUploads(): Promise<void> {
     try {
+      console.log('[OfflineService] Loading pending uploads');
       let data: string | null = null;
 
       if (Capacitor.isNativePlatform()) {
@@ -411,29 +427,47 @@ export class OfflineService {
             encoding: Encoding.UTF8
           });
           data = result.data as string;
+          console.log('[OfflineService] Successfully loaded pending uploads from filesystem');
         } catch (e) {
-          // File might not exist yet, that's ok
+          console.log('[OfflineService] No pending uploads found in filesystem');
           data = null;
         }
       } else {
         data = localStorage.getItem('pendingUploads');
+        console.log('[OfflineService] Loaded pending uploads from localStorage:', data ? 'found' : 'not found');
       }
 
       if (data) {
         this.pendingUploads = JSON.parse(data);
+        console.log('[OfflineService] Loaded pending uploads:', this.pendingUploads.length);
+      } else {
+        console.log('[OfflineService] No pending uploads to load');
+        this.pendingUploads = [];
       }
     } catch (error) {
-      console.error('Error loading pending uploads:', error);
+      console.error('[OfflineService] Error loading pending uploads:', error);
       this.pendingUploads = [];
     }
   }
 
   public async processPendingUploads(): Promise<void> {
-    if (!this.isOnline || this.pendingUploads.length === 0) return;
+    console.log('[OfflineService] processPendingUploads called');
+    console.log('[OfflineService] Current state - isOnline:', this.isOnline, 'pendingUploads:', this.pendingUploads.length);
+
+    if (!this.isOnline) {
+      console.log('[OfflineService] Cannot process uploads while offline');
+      return;
+    }
+
+    if (this.pendingUploads.length === 0) {
+      console.log('[OfflineService] No pending uploads to process');
+      return;
+    }
 
     // This method is now implemented in the App component
     // We just notify listeners that the queue is ready to be processed
     console.log('[OfflineService] Network is online, ready to process pending uploads');
+    console.log('[OfflineService] Pending upload types:', this.pendingUploads.map(u => u.type));
   }
 
   public async removePendingUpload(id: string): Promise<void> {
