@@ -609,7 +609,6 @@ export class FirebaseService {
       }
 
       const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
-        console.log('[Firebase] Base64 data length (without prefix):', base64WithoutPrefix.length);
 
       // Add metadata with detected content type
       const metadata = {
@@ -1228,35 +1227,32 @@ export class FirebaseService {
     onError: (uploadId: string, error: any) => void = () => {}
   ): Promise<void> {
     try {
-      console.log('[Firebase] Processing pending uploads');
-      const offlineService = OfflineService.getInstance();
-
-      // Check if we're online
       if (!this.isOnline()) {
         console.log('[Firebase] Cannot process uploads while offline');
         return;
       }
 
+      const offlineService = OfflineService.getInstance();
+
       // Process new sits
       const pendingNewSits = offlineService.getPendingNewSits();
       for (const upload of pendingNewSits) {
         try {
-          if (!upload.photoResult) {
-            console.error('[Firebase] Missing photoResult in pending upload:', upload.id);
-            onError(upload.id, new Error('Missing photo data'));
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload?.photoResult) {
             await offlineService.removePendingUpload(upload.id);
             continue;
           }
 
           await this.createSitWithPhoto(
-            upload.photoResult,
-            upload.userId,
-            upload.userName
+            fullUpload.photoResult,
+            fullUpload.userId,
+            fullUpload.userName
           );
-          // Remove from queue on success
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing new sit upload:', error);
+          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
@@ -1265,33 +1261,36 @@ export class FirebaseService {
       const pendingAddToSits = offlineService.getPendingAddToSits();
       for (const upload of pendingAddToSits) {
         try {
-          // Validate directly using ValidationUtils
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload?.photoResult) {
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
           const existingImages = await this.getImages(upload.imageCollectionId);
           const canAddPhoto = ValidationUtils.canUserAddPhotoToSit(
             upload.imageCollectionId,
             upload.userId,
-            true, // isOnline
+            true,
             existingImages
           );
 
           if (!canAddPhoto) {
-            console.log(`[Firebase] User ${upload.userId} already has an image in collection ${upload.imageCollectionId}, skipping`);
             await offlineService.removePendingUpload(upload.id);
             onError(upload.id, new Error('You already have an image in this collection'));
             continue;
           }
 
-          // Proceed with upload if validation passes
           await this.addPhotoToSit(
-            upload.photoResult,
+            fullUpload.photoResult,
             upload.imageCollectionId,
             upload.userId,
             upload.userName
           );
-          // Remove from queue on success
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing add to sit upload:', error);
+          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
@@ -1300,13 +1299,16 @@ export class FirebaseService {
       const pendingReplaceImages = offlineService.getPendingReplaceImages();
       for (const upload of pendingReplaceImages) {
         try {
-          // Validate directly using ValidationUtils
-          let canReplaceImage = false;
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload?.photoResult) {
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
 
+          let canReplaceImage = false;
           if (upload.imageId.startsWith('temp_')) {
             canReplaceImage = ValidationUtils.canUserReplaceImage(upload.imageId, upload.userId, true);
           } else {
-            // Get the image document
             const imageDoc = await getDoc(doc(db, 'images', upload.imageId));
             if (imageDoc.exists()) {
               const imageData = imageDoc.data();
@@ -1326,41 +1328,36 @@ export class FirebaseService {
           }
 
           if (!canReplaceImage) {
-            console.log(`[Firebase] User ${upload.userId} cannot replace image ${upload.imageId}, skipping`);
             await offlineService.removePendingUpload(upload.id);
             onError(upload.id, new Error('You cannot replace this image'));
             continue;
           }
 
-          // Proceed with replacement if validation passes
           await this.replaceImage(
-            upload.photoResult,
+            fullUpload.photoResult,
             upload.imageCollectionId,
             upload.imageId,
             upload.userId,
             upload.userName
           );
-          // Remove from queue on success
           await offlineService.removePendingUpload(upload.id);
         } catch (error) {
           console.error('[Firebase] Error processing replace image upload:', error);
+          await offlineService.removePendingUpload(upload.id);
           onError(upload.id, error);
         }
       }
 
       // Process pending deletions
       const pendingDeletions = offlineService.getPendingImageDeletions();
-      if (pendingDeletions.length > 0) {
-        console.log(`[FirebaseService] Processing ${pendingDeletions.length} pending image deletions`);
-
-        for (const deletion of pendingDeletions) {
-          try {
-            await FirebaseService.deleteImage(deletion.imageId, deletion.userId);
-            await offlineService.removePendingUpload(deletion.id);
-          } catch (error) {
-            console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
-            onError(deletion.id, error);
-          }
+      for (const deletion of pendingDeletions) {
+        try {
+          await FirebaseService.deleteImage(deletion.imageId, deletion.userId);
+          await offlineService.removePendingUpload(deletion.id);
+        } catch (error) {
+          console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
+          await offlineService.removePendingUpload(deletion.id);
+          onError(deletion.id, error);
         }
       }
 
