@@ -365,23 +365,40 @@ class App extends React.Component<{}, AppState> {
       // First check authentication state to prevent momentary logout
       console.log('[App] Back online, checking authentication before updating UI');
 
-      try {
-        // Check if we have a current user in Firebase
-        const currentUser = auth.currentUser;
+      const { user, isAuthenticated } = this.state;
+      console.log('[App] Current auth state - hasUser:', !!user, 'isAuthenticated:', isAuthenticated, 'userId:', user?.uid, 'currentUser:', auth.currentUser);
 
+      try {
+        // If we have a valid user in state, trust it when coming back online
+        // This prevents unnecessary state updates while Firebase reinitializes
+        if (user && isAuthenticated) {
+          console.log('[App] Have valid user in state, using it for pending uploads');
+          this.setState({ isOffline: false }, () => {
+            console.log('[App] Processing pending uploads with existing user state');
+            this.handleProcessPendingUploads();
+          });
+          return;
+        }
+
+        // Only check Firebase auth if we don't have a valid user in state
+        const currentUser = auth.currentUser;
         if (currentUser) {
           console.log('[App] Found Firebase user, updating state with user:', currentUser.uid);
-
-          // Update state with the current user and set offline to false in one update
-          // This prevents the momentary logout
           this.setState({
             user: currentUser,
             isAuthenticated: true,
             isOffline: false
           }, () => {
-            // Now process uploads with the authenticated user
             console.log('[App] Processing pending uploads with authenticated user');
             this.handleProcessPendingUploads();
+          });
+        } else {
+          // If we don't have a user in state and Firebase is null, we're logged out
+          console.log('[App] No user found in Firebase, updating state to logged out');
+          this.setState({
+            user: null,
+            isAuthenticated: false,
+            isOffline: false
           });
         }
       } catch (error) {
