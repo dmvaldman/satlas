@@ -59,6 +59,7 @@ export class OfflineService {
   private pendingUploads: PendingUpload[] = [];
   private listeners: Set<(isOnline: boolean) => void> = new Set();
   private networkListener: any = null; // Store the network listener reference
+  private isInitialized: boolean = false; // Track initialization state
 
   public static getInstance(): OfflineService {
     if (!OfflineService.instance) {
@@ -68,6 +69,14 @@ export class OfflineService {
   }
 
   public async initialize(): Promise<void> {
+    // Prevent multiple initializations
+    if (this.isInitialized) {
+      console.log('[OfflineService] Already initialized, skipping');
+      return;
+    }
+
+    console.log('[OfflineService] Initializing...');
+
     // Clean up any existing listeners before reinitializing
     await this.cleanup();
 
@@ -82,16 +91,20 @@ export class OfflineService {
 
       // Store the listener reference so we can remove it later
       this.networkListener = Network.addListener('networkStatusChange', (status) => {
-        console.log('[OfflineService] Network status changed:', status);
-        const wasOffline = !this.isOnline;
-        this.isOnline = status.connected;
+        console.log(`[OfflineService] Network status changed - Connected: ${status.connected}, Type: ${status.connectionType}, Previous: ${this.isOnline}, Time: ${new Date().toISOString()}`);
 
-        // Notify listeners of status change
-        this.notifyListeners();
+        // Only process if this is a real state change
+        if (status.connected !== this.isOnline) {
+          const wasOffline = !this.isOnline;
+          this.isOnline = status.connected;
 
-        // If we just came back online, process the queue
-        if (wasOffline && this.isOnline) {
-          this.processPendingUploads();
+          // Notify listeners of status change
+          this.notifyListeners();
+
+          // If we just came back online, process the queue
+          if (wasOffline && this.isOnline) {
+            this.processPendingUploads();
+          }
         }
       });
     } else {
@@ -117,23 +130,34 @@ export class OfflineService {
       window.addEventListener('offline', this.networkListener.offline);
     }
 
-    this.initialized = true;
+    this.isInitialized = true;
+    console.log('[OfflineService] Initialization complete');
   }
 
   public async cleanup(): Promise<void> {
+    console.log('[OfflineService] Cleaning up...');
+
     // Remove network listeners
     if (Capacitor.isNativePlatform() && this.networkListener) {
-      await Network.removeAllListeners();
+      try {
+        // Remove all listeners as a safety measure
+        await Network.removeAllListeners();
+        console.log('[OfflineService] Removed native network listeners');
+      } catch (error) {
+        console.error('[OfflineService] Error removing network listeners:', error);
+      }
       this.networkListener = null;
     } else if (this.networkListener) {
       window.removeEventListener('online', this.networkListener.online);
       window.removeEventListener('offline', this.networkListener.offline);
       this.networkListener = null;
+      console.log('[OfflineService] Removed web network listeners');
     }
 
     // Clear all status listeners
     this.listeners.clear();
-    this.initialized = false;
+    this.isInitialized = false;
+    console.log('[OfflineService] Cleanup complete');
   }
 
   public isNetworkOnline(): boolean {
