@@ -335,8 +335,8 @@ export class OfflineService {
 
   private async saveImageToFileSystem(id: string, base64Data: string): Promise<void> {
     try {
-      // Ensure the base64 data doesn't have the prefix and is clean
-      const data = base64Data.replace(/^data:image\/\w+;base64,/, '')
+      // Clean the data - remove any existing data URL prefix and any whitespace
+      const cleanData = base64Data.replace(/^data:image\/\w+;base64,/, '').trim();
 
       // Create directory if it doesn't exist
       try {
@@ -351,32 +351,38 @@ export class OfflineService {
 
       await Filesystem.writeFile({
         path: `offline_uploads/${id}.jpg`,
-        data: data,
+        data: cleanData,
         directory: Directory.Cache,
         encoding: Encoding.UTF8
       });
     } catch (error) {
-      console.error('Error saving image to filesystem:', error);
+      console.error('[OfflineService] Error saving image to filesystem:', error);
+      // Remove the pending upload if saving fails
+      await this.removePendingUpload(id);
       throw error;
     }
   }
 
   private async getImageFromFileSystem(id: string): Promise<string> {
     try {
-        const result = await Filesystem.readFile({
-            path: `offline_uploads/${id}.jpg`,
-            directory: Directory.Cache,
-            encoding: Encoding.UTF8
-        });
+      console.log('[OfflineService] Reading file from filesystem:', id);
+      const result = await Filesystem.readFile({
+        path: `offline_uploads/${id}.jpg`,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8
+      });
 
-        // Convert to string if it's a Blob
-        const data = typeof result.data === 'string' ? result.data : await result.data.text();
+      // Convert to string if it's a Blob
+      const data = typeof result.data === 'string' ? result.data : await result.data.text();
 
-        // Add the data URL prefix back
-        return `data:image/jpeg;base64,${data}`;
+      // Clean the data - remove any existing data URL prefix and any whitespace
+      const cleanData = data.replace(/^data:image\/\w+;base64,/, '').trim();
+
+      // Add the data URL prefix back
+      return `data:image/jpeg;base64,${cleanData}`;
     } catch (error) {
-        console.error('Error reading image from filesystem:', error);
-        throw error;
+      console.error('[OfflineService] Error reading image from filesystem:', error);
+      throw error;
     }
   }
 
@@ -499,17 +505,25 @@ export class OfflineService {
         upload.photoResult?.base64Data.startsWith('file:')) {
 
       const fileId = upload.photoResult?.base64Data.substring(5);
-      const base64Data = await this.getImageFromFileSystem(fileId);
 
-      // Only process photoResult if it exists
-      if (upload.photoResult) {
-        return {
-          ...upload,
-          photoResult: {
-            ...upload.photoResult,
-            base64Data
-          }
-        };
+      try {
+        const base64Data = await this.getImageFromFileSystem(fileId);
+
+        // Only process photoResult if it exists
+        if (upload.photoResult) {
+          return {
+            ...upload,
+            photoResult: {
+              ...upload.photoResult,
+              base64Data
+            }
+          };
+        }
+      } catch (error) {
+        console.error('[OfflineService] Error loading image from filesystem:', error);
+        // If we can't load the file, remove it from pending uploads
+        await this.removePendingUpload(id);
+        return null;
       }
     }
 
