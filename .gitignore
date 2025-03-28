@@ -12,3 +12,4 @@ ios/
 tsconfig.tsbuildinfo
 .cursorrules
 android/keystore.properties
+configs/

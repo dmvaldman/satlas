@@ -29,10 +29,15 @@ const baseConfig: CapacitorConfig = {
     },
     FirebaseAuthentication: {
       skipNativeAuth: false,
-      providers: ['google.com'],
+      providers: ['google.com', 'apple.com'],
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
+    },
+    SignInWithApple: {
+      clientId: 'com.dmvaldman.Satlas',
+      redirectURI: 'com.dmvaldman.Satlas://login',
+      scopes: 'email name'
     }
   }
 };
