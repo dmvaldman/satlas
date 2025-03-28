@@ -115,11 +115,3 @@
 .satlas-bottom-sheet *:not(svg) {
   box-sizing: border-box;
 }
-
-/* Android UI adjustments */
-body:has(.bottom-nav-space) {
-    /* Map container adjustment */
-    .satlas-bottom-sheet .sheet-container {
-      bottom: calc(48px + var(--safe-area-bottom)) !important;
-    }
-}

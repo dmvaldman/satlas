@@ -13,6 +13,7 @@ import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './services/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
 import PopupComponent from './components/Popup';
 import { OfflineService } from './services/OfflineService';
@@ -1079,12 +1080,15 @@ class App extends React.Component<{}, AppState> {
   private configureStatusBar = async () => {
     try {
       // Configure system bars (dark icons on transparent background)
-      setTimeout(async () => {
+      if (Capacitor.getPlatform() === 'android') {
+        await EdgeToEdge.setBackgroundColor({ color: '#000000' });
+        await StatusBar.setOverlaysWebView({ overlay: true });
+      }
+      else {
         await StatusBar.setOverlaysWebView({ overlay: true });
         await StatusBar.setStyle({ style: Style.Light });
-        await StatusBar.setBackgroundColor({ color: '#00000000' });
-      }, 1000);
-      // Android navigation bar is handled by native styles.xml
+        await StatusBar.setBackgroundColor({ color: '#000000' });
+      }
     } catch (e) {
       console.error('Error configuring system bars:', e);
     }
@@ -1268,7 +1272,6 @@ class App extends React.Component<{}, AppState> {
           <div
             id="map-container"
             ref={this.mapContainer}
-            className={isAndroid ? 'with-bottom-nav' : ''}
             style={{ width: '100%' }}
           />
         </div>
@@ -1292,7 +1295,6 @@ class App extends React.Component<{}, AppState> {
         <div
           id="map-container"
           ref={this.mapContainer}
-          className={isAndroid ? 'with-bottom-nav' : ''}
           style={{ width: '100%' }}
         />
 
@@ -1384,8 +1386,6 @@ class App extends React.Component<{}, AppState> {
           image={modals.fullscreenImage.image}
           onClose={this.toggleFullscreenImage}
         />
-
-        {isAndroid && <div className="bottom-nav-space"></div>}
       </div>
     );
   }

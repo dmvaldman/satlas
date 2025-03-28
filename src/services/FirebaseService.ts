@@ -35,7 +35,13 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { OfflineService } from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
-import { SignInWithApple, SignInWithAppleResponse, SignInWithAppleOptions } from '@capacitor-community/apple-sign-in';
+
+// Conditionally import Apple Sign In plugin only for iOS
+let SignInWithApple: any;
+if (Capacitor.getPlatform() === 'ios') {
+  const appleSignInModule = require('@capacitor-community/apple-sign-in');
+  SignInWithApple = appleSignInModule.SignInWithApple;
+}
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
@@ -258,41 +264,48 @@ export class FirebaseService {
           await this.signOut();
           console.log('[Firebase] Sign out complete');
 
-          // Configure Apple Sign In options
-          console.log('[Firebase] Configuring Apple Sign In options');
-          const options: SignInWithAppleOptions = {
-            clientId: process.env.FIREBASE_AUTH_DOMAIN || '',
-            redirectURI: `${window.location.origin}/login`,
-            scopes: 'email name',
-            state: Math.random().toString(36).substring(7),
-            nonce: Math.random().toString(36).substring(7)
-          };
-          console.log('[Firebase] Apple Sign In options configured:', options);
+          if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
+            // Configure Apple Sign In options
+            console.log('[Firebase] Configuring Apple Sign In options');
+            const options = {
+              clientId: process.env.FIREBASE_AUTH_DOMAIN || '',
+              redirectURI: `${window.location.origin}/login`,
+              scopes: 'email name',
+              state: Math.random().toString(36).substring(7),
+              nonce: Math.random().toString(36).substring(7)
+            };
+            console.log('[Firebase] Apple Sign In options configured:', options);
 
-          // Use the native plugin
-          console.log('[Firebase] Calling SignInWithApple.authorize');
-          const result: SignInWithAppleResponse = await SignInWithApple.authorize(options);
-          console.log('[Firebase] Native Apple sign-in raw result:', result);
+            // Use the native plugin
+            console.log('[Firebase] Calling SignInWithApple.authorize');
+            const result = await SignInWithApple.authorize(options);
+            console.log('[Firebase] Native Apple sign-in raw result:', result);
 
-          if (!result || !result.response) {
-            console.error('[Firebase] No result from native sign-in');
-            throw new Error('No result from native sign-in');
+            if (!result || !result.response) {
+              console.error('[Firebase] No result from native sign-in');
+              throw new Error('No result from native sign-in');
+            }
+
+            // Create Firebase credential from Apple ID token
+            console.log('[Firebase] Creating Firebase credential from Apple ID token');
+            const provider = new OAuthProvider('apple.com');
+            const credential = provider.credential({
+              idToken: result.response.identityToken,
+              accessToken: result.response.authorizationCode,
+              rawNonce: options.nonce
+            });
+            console.log('[Firebase] Firebase credential created');
+
+            // Sign in to Firebase with the credential
+            console.log('[Firebase] Signing in to Firebase with credential');
+            await signInWithCredential(auth, credential);
+            console.log('[Firebase] Firebase sign-in complete');
+          } else {
+            // For Android or web, use Firebase's built-in Apple Sign In
+            console.log('[Firebase] Using Firebase built-in Apple Sign In');
+            const provider = new OAuthProvider('apple.com');
+            await signInWithPopup(auth, provider);
           }
-
-          // Create Firebase credential from Apple ID token
-          console.log('[Firebase] Creating Firebase credential from Apple ID token');
-          const provider = new OAuthProvider('apple.com');
-          const credential = provider.credential({
-            idToken: result.response.identityToken,
-            accessToken: result.response.authorizationCode,
-            rawNonce: options.nonce
-          });
-          console.log('[Firebase] Firebase credential created');
-
-          // Sign in to Firebase with the credential
-          console.log('[Firebase] Signing in to Firebase with credential');
-          await signInWithCredential(auth, credential);
-          console.log('[Firebase] Firebase sign-in complete');
 
           // Add debug statement here
           console.log('[Firebase] Credential sign-in completed, current user:',
