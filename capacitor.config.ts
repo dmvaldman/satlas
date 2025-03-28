@@ -12,7 +12,7 @@ const baseConfig: CapacitorConfig = {
       launchFadeOutDuration: 200,
       launchAutoHide: false,
       androidSplashResourceName: "splash",
-      androidScaleType: "FIT_CENTER",
+      androidScaleType: "CENTER_INSIDE",
       androidSpinnerStyle: 'large'
     },
     StatusBar: {
@@ -34,13 +34,22 @@ const baseConfig: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
+    EdgeToEdge: {
+      backgroundColor: "#000000"
+    }
+  }
+};
+
+// Add iOS-specific configurations
+const iosConfig = process.env.PLATFORM === 'ios' ? {
+  plugins: {
     SignInWithApple: {
       clientId: 'com.dmvaldman.Satlas',
       redirectURI: 'com.dmvaldman.Satlas://login',
       scopes: 'email name'
     }
   }
-};
+} : {};
 
 const devConfig = process.env.NODE_ENV === 'development' ? {
   server: {
@@ -50,4 +59,7 @@ const devConfig = process.env.NODE_ENV === 'development' ? {
   }
 } : {};
 
-export default { ...baseConfig, ...devConfig };
+// Merge configurations
+const config = { ...baseConfig, ...iosConfig, ...devConfig };
+
+export default config;
