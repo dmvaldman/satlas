@@ -432,8 +432,13 @@ class App extends React.Component<{}, AppState> {
   // Auth methods
   private handleSignIn = async () => {
     console.log('[App] handleSignIn called');
+
+    const signInMethod = Capacitor.getPlatform() === 'ios' ?
+      FirebaseService.signInWithApple :
+      FirebaseService.signInWithGoogle;
+
     try {
-      await FirebaseService.signInWithGoogle();
+      await signInMethod();
       console.log('[App] Sign-in successful');
 
       // Force update the UI state directly after sign-in
