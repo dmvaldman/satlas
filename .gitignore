@@ -13,3 +13,4 @@ tsconfig.tsbuildinfo
 .cursorrules
 android/keystore.properties
 configs/
+GoogleService-Info.plist
