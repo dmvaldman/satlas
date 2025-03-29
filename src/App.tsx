@@ -17,7 +17,7 @@ import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
 import PopupComponent from './components/Popup';
 import { OfflineService } from './services/OfflineService';
-import { ValidationUtils } from './utils/ValidationUtils';
+import { ValidationUtils, SitTooCloseError } from './utils/ValidationUtils';
 import Notification from './components/Notification';
 import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
@@ -805,10 +805,7 @@ class App extends React.Component<{}, AppState> {
 
       // Create a new sit if we're in create_sit mode
       if (state === 'create_sit') {
-        const newSit = await this.createSit(photoResult);
-        if (!newSit) {
-          this.showNotification('Failed to create sit', 'error');
-        }
+        await this.createSit(photoResult);
       }
       // Add image to existing sit if we're in add_image mode
       else if (state === 'add_image' && sitId) {
@@ -1067,15 +1064,30 @@ class App extends React.Component<{}, AppState> {
     }));
   };
 
-  private createSit = async (result: PhotoResult): Promise<Sit | null> => {
-    const { user, userPreferences } = this.state;
+  private createSit = async (photoResult: PhotoResult): Promise<Sit | null> => {
+    const { user, userPreferences, sits } = this.state;
     if (!user) return null;
 
     try {
+      // Validate that there are no nearby sits
+      try {
+        ValidationUtils.canUserCreateSitAtLocation(
+          photoResult.location,
+          user.uid,
+          Array.from(sits.values())
+        );
+      } catch (error) {
+        if (error instanceof SitTooCloseError) {
+          this.showNotification('This Sit is too close to an existing one', 'error');
+          return null;
+        }
+        throw error; // Re-throw other validation errors
+      }
+
       // Create a new sit
       const initialSit = {
         id: `new_${Date.now()}`,
-        location: result.location,
+        location: photoResult.location,
         uploadedBy: user.uid,
         uploadedByUsername: userPreferences.username,
         imageCollectionId: '',
@@ -1084,7 +1096,7 @@ class App extends React.Component<{}, AppState> {
 
       // Create a temporary image
       const tempImage = this.createTemporaryImage(
-        result,
+        photoResult,
         initialSit.imageCollectionId || '',
         user.uid,
         userPreferences.username
@@ -1115,7 +1127,7 @@ class App extends React.Component<{}, AppState> {
 
       // Create sit with photo using FirebaseService in the background
       const { sit, image } = await FirebaseService.createSitWithPhoto(
-        result,
+        photoResult,
         user.uid,
         userPreferences.username
       );
@@ -1156,14 +1168,20 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private addImageToSit = async (sit: Sit, result: PhotoResult): Promise<void> => {
+  private addImageToSit = async (sit: Sit, photoResult: PhotoResult): Promise<void> => {
     const { user, userPreferences, drawer } = this.state;
     if (!user) return;
 
     try {
+      // Validate that the new image location is close enough to the sit
+      if (!ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
+        this.showNotification('This image is too far from the Sit', 'error');
+        return;
+      }
+
       // Create a temporary image with a unique ID
       const tempImage = this.createTemporaryImage(
-        result,
+        photoResult,
         sit.imageCollectionId,
         user.uid,
         userPreferences.username
@@ -1180,7 +1198,7 @@ class App extends React.Component<{}, AppState> {
 
       // Use FirebaseService to handle the upload (including offline case)
       const uploadedImage = await FirebaseService.addPhotoToSit(
-        result,
+        photoResult,
         sit.imageCollectionId,
         user.uid,
         userPreferences.username
@@ -1194,14 +1212,20 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private replaceImage = async (sit: Sit, imageId: string, result: PhotoResult): Promise<void> => {
+  private replaceImage = async (sit: Sit, imageId: string, photoResult: PhotoResult): Promise<void> => {
     const { user, userPreferences, drawer } = this.state;
     if (!user) return;
 
     try {
+      // Validate that the new image location is close enough to the sit
+      if (!ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
+        this.showNotification('This image is too far from the Sit', 'error');
+        return;
+      }
+
       // Create a temporary image with the new data
       const tempImage = this.createTemporaryImage(
-        result,
+        photoResult,
         sit.imageCollectionId,
         user.uid,
         userPreferences.username
@@ -1230,7 +1254,7 @@ class App extends React.Component<{}, AppState> {
 
       // Upload to server in the background
       const replacedImage = await FirebaseService.replaceImage(
-        result,
+        photoResult,
         sit.imageCollectionId,
         realImageId,
         user.uid,
