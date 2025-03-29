@@ -1,7 +1,7 @@
 import React from 'react';
 import Carousel from './Carousel';
 import { User } from 'firebase/auth';
-import { Sit, Image, MarkType, Location } from '../types';
+import { Sit, Image, MarkType, Location, PhotoModalState } from '../types';
 import { getDistanceInFeet } from '../utils/geo';
 import { formatRelativeTime } from '../utils/dateUtils';
 import { Share } from '@capacitor/share';
@@ -37,8 +37,7 @@ interface PopupProps {
   onToggleMark: (sitId: string, type: MarkType) => Promise<void>;
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
-  onOpenPhotoModal: (sit: Sit) => void;
-  onOpenProfileModal: () => void;
+  onOpenPhotoModal: (state: PhotoModalState, sitId: string) => void;
   onSignIn?: () => Promise<void>;
   onOpenFullscreenImage: (image: Image) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
@@ -256,16 +255,12 @@ class PopupComponent extends React.Component<PopupProps> {
     if (hasUserUploadedImage) return null;
 
     const handleClick = async () => {
-      if (!user) {
-        this.props.onOpenProfileModal();
-        return;
-      }
       if (!sit) {
         console.error('sit is undefined');
         return;
       }
       if (!sit.imageCollectionId) return;
-      this.props.onOpenPhotoModal(sit);
+      this.props.onOpenPhotoModal('add_image', sit.id);
     };
 
     return (

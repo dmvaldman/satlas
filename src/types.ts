@@ -1,5 +1,8 @@
 import { User } from 'firebase/auth';
 
+export type MarkType = 'favorite' | 'wantToGo' | 'visited';
+export type PhotoModalState = 'add_image' | 'create_sit' | 'replace_image' | 'none';
+
 export interface Image {
   id: string;
   photoURL: string;
@@ -40,8 +43,6 @@ export interface UserPreferences {
     longitude: number;
   };
 }
-
-export type MarkType = 'favorite' | 'wantToGo' | 'visited';
 
 export interface PhotoResult {
   base64Data: string;

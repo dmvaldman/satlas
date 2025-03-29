@@ -6,7 +6,7 @@ import MapComponent from './components/MapComponent';
 import { Image, Sit, Location, MarkType, PhotoResult } from './types';
 import PhotoUploadComponent from './components/PhotoUpload';
 import ProfileModal from './components/ProfileModal';
-import { UserPreferences } from './types';
+import { UserPreferences, PhotoModalState } from './types';
 import AddSitButton from './components/AddSitButton';
 import NearbyExistingSitModal from './components/NearbyExistingSitModal';
 import { FirebaseService } from './services/FirebaseService';
@@ -23,8 +23,6 @@ import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { debounce } from './utils/debounce';
-
-type PhotoModalState = 'add_image' | 'create_sit' | 'replace_image' | 'none';
 
 interface AppState {
   // Auth state
@@ -878,6 +876,13 @@ class App extends React.Component<{}, AppState> {
 
   private handleUploadToExisting = (sitId: string) => {
     this.toggleNearbySitModal(sitId);
+  };
+
+  private handleCreateSit = () => {
+    this.togglePhotoUpload('create_sit');
+  };
+
+  private handleAddPhotoToSit = (sitId: string) => {
     this.togglePhotoUpload('add_image', sitId);
   };
 
@@ -1335,7 +1340,7 @@ class App extends React.Component<{}, AppState> {
           currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
           onNearbySitFound={this.handleUploadToExisting}
-          onPhotoUploadOpen={() => this.togglePhotoUpload('none')}
+          onPhotoUploadOpen={this.handleCreateSit}
           showNotification={this.showNotification}
         />
 
@@ -1344,7 +1349,7 @@ class App extends React.Component<{}, AppState> {
           sitId={modals.nearbySit.sitId}
           hasUserContributed={modals.nearbySit.hasUserContributed}
           onClose={this.toggleNearbySitModal}
-          onUploadToExisting={this.handleUploadToExisting}
+          onUploadToExisting={this.handleAddPhotoToSit}
         />
 
         <Notification />
@@ -1362,7 +1367,7 @@ class App extends React.Component<{}, AppState> {
           onToggleMark={this.handleToggleMark}
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
-          onOpenPhotoModal={() => this.togglePhotoUpload('none')}
+          onOpenPhotoModal={this.togglePhotoUpload}
           onSignIn={this.handleSignIn}
           onOpenFullscreenImage={this.toggleFullscreenImage}
           showNotification={this.showNotification}
