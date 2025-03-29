@@ -112,7 +112,7 @@ export class FirebaseService {
         console.log('[Firebase] Using native authentication');
         try {
           // First ensure we're signed out
-          await this.signOut();
+          await FirebaseService.signOut();
 
           // Use the native plugin
           const result = await FirebaseAuthentication.signInWithGoogle({
@@ -261,7 +261,7 @@ export class FirebaseService {
         try {
           // First ensure we're signed out
           console.log('[Firebase] Ensuring user is signed out before Apple sign-in');
-          await this.signOut();
+          await FirebaseService.signOut();
           console.log('[Firebase] Sign out complete');
 
           if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
