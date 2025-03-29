@@ -17,7 +17,7 @@
   --light-blue: #bdefff;
   --dark-blue: #007AFF;
   --light-green: #b3ffb8;
-  --dark-green: #279b44;
+  --dark-green: #21863a;
   --light-red: #fab7b3;
   --dark-red: #b52a23;
 }
@@ -590,13 +590,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   justify-content: center;
   gap: 4px;
   padding: 4px 4px;
-  border: 1px solid var(--medium-gray);
+  border: 1px solid var(--dark-gray);
   border-radius: 4px;
   background: var(--light-gray);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
-  color: var(--medium-gray);
+  color: var(--dark-gray);
   height: 40px;
   flex: 1; /* Make all buttons take equal width */
   min-width: 0; /* Allow buttons to shrink if needed */
@@ -606,18 +606,18 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .mark-button .mark-icon {
   width: 16px;
   height: 16px;
-  fill: var(--medium-gray);
+  fill: var(--dark-gray);
   transition: fill 0.2s;
 }
 
 .mark-button.visited .mark-icon {
   stroke-width: 2;
-  stroke: var(--medium-gray);
+  stroke: var(--dark-gray);
 }
 
 .mark-button.wantToGo .mark-icon {
   stroke-width: 2;
-  stroke: var(--medium-gray);
+  stroke: var(--dark-gray);
 }
 
 .mark-button.favorite.active {

@@ -195,25 +195,20 @@ class PopupComponent extends React.Component<PopupProps> {
     );
   }
 
-  private renderGoogleMapsLink() {
+  private renderMapsLink() {
     const { sit } = this.props;
     if (!sit) return null;
 
-    // Use geo: URI scheme which will open default maps app
-    const mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}`;
-    // Fallback to Google Maps on desktop
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${sit.location.latitude},${sit.location.longitude}`;
+    let mapsUrl: string;
+    if (Capacitor.isNativePlatform()) {
+      mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}`;
+    } else {
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${sit.location.latitude},${sit.location.longitude}`;
+    }
 
     return (
       <a
         href={mapsUrl}
-        onClick={(e) => {
-          // If geo: URI fails, fall back to Google Maps
-          if (!navigator.userAgent.match(/iPhone|iPad|iPod|Android/i)) {
-            e.preventDefault();
-            window.open(googleMapsUrl, '_blank');
-          }
-        }}
         target="_blank"
         rel="noopener noreferrer"
         className="maps-link"
@@ -337,7 +332,7 @@ class PopupComponent extends React.Component<PopupProps> {
             {this.renderFavoriteCount()}
 
             {/* Show Google Maps link */}
-            {this.renderGoogleMapsLink()}
+            {this.renderMapsLink()}
           </div>
 
         </div>
