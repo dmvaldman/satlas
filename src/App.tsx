@@ -24,6 +24,8 @@ import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { debounce } from './utils/debounce';
 
+type PhotoModalState = 'add_image' | 'create_sit' | 'replace_image' | 'none';
+
 interface AppState {
   // Auth state
   user: User | null;
@@ -44,6 +46,7 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
+      state: PhotoModalState;
       sitId?: string;
       replacementImageId?: string;
     };
@@ -103,7 +106,7 @@ class App extends React.Component<{}, AppState> {
 
       // Modal state
       modals: {
-        photo: { isOpen: false },
+        photo: { isOpen: false, state: 'none' },
         profile: { isOpen: false },
         nearbySit: { isOpen: false, sitId: null, hasUserContributed: false },
         fullscreenImage: { isOpen: false, image: null }
@@ -513,8 +516,8 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private togglePhotoUpload = (sitId?: string) => {
-    console.log('[App] togglePhotoUpload called with sitId:', sitId || 'null');
+  private togglePhotoUpload = (state: PhotoModalState, sitId?: string, replacementImageId?: string) => {
+    console.log('[App] togglePhotoUpload called with state:', state, 'sitId:', sitId || 'null', 'replacementImageId:', replacementImageId || 'null');
 
     this.setState(prevState => {
       // If we're opening the photo modal
@@ -524,7 +527,9 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: true,
-              sitId: sitId
+              state,
+              sitId,
+              replacementImageId
             }
           }
         };
@@ -534,7 +539,10 @@ class App extends React.Component<{}, AppState> {
         return {
           modals: {
             ...prevState.modals,
-            photo: { isOpen: false }
+            photo: {
+              isOpen: false,
+              state: 'none' // Reset to none state when closing
+            }
           }
         };
       }
@@ -775,26 +783,8 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleReplaceImage = async (sitId: string, imageId: string) => {
-    const { drawer, sits } = this.state;
-
-    // Get the sit from Firebase only if we don't already have it
-    let sit;
-    if (drawer.sit && drawer.sit.id === sitId) {
-      sit = drawer.sit;
-    } else {
-      sit = sits.get(sitId);
-    }
-
-    if (!sit) throw new Error('Sit not found');
-
-    // Open photo upload modal with replacement data
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        photo: { isOpen: true, sitId: sit.id, replacementImageId: imageId }
-      }
-    }));
+  private handleReplaceImage = (sitId: string, imageId: string) => {
+    this.togglePhotoUpload('replace_image', sitId, imageId);
   };
 
   private getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
@@ -807,215 +797,38 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handlePhotoUpload = async (photoResult: PhotoResult, sitId?: string, replacementImageId?: string) => {
-    const { user, userPreferences, drawer, sits } = this.state;
-    if (!user) return;
+  private handlePhotoUpload = async (photoResult: PhotoResult) => {
+    const { state, sitId, replacementImageId } = this.state.modals.photo;
+    console.log('[App] handlePhotoUpload called with state:', state, 'sitId:', sitId || 'null', 'replacementImageId:', replacementImageId || 'null');
 
     try {
-      // Case 1: Replacing an existing image
-      if (sitId && replacementImageId) {
-        const sit = sits.get(sitId);
-        if (!sit) throw new Error('Sit not found');
+      // Close the photo modal immediately for better UX
+      this.togglePhotoUpload('none');
 
-        // Create a temporary image with the new data
-        const tempImage = this.createTemporaryImage(
-          photoResult,
-          sit.imageCollectionId,
-          user.uid,
-          userPreferences.username
-        );
-
-        // Replace the image in the array
-        const updatedImages = drawer.images.map(img =>
-          img.id === replacementImageId ? tempImage : img
-        );
-
-        // Close the photo modal and immediately update the drawer with optimistic data
-        this.setState({
-          modals: {
-            ...this.state.modals,
-            photo: { isOpen: false }
-          },
-          drawer: {
-            isOpen: true,
-            sit: sit,
-            images: updatedImages
-          }
-        });
-
-        try {
-          const isTemporaryImage = replacementImageId.startsWith('temp_');
-
-          if (isTemporaryImage) {
-            const realImageId = this.tempImageMapping.get(replacementImageId);
-            if (!realImageId) {
-              console.error('No real image ID found for temporary image:', replacementImageId);
-              return;
-            }
-            replacementImageId = realImageId;
-            this.tempImageMapping.delete(replacementImageId);
-          }
-
-          // Upload to server in the background
-          const replacedImage = await FirebaseService.replaceImage(
-            photoResult,
-            sit.imageCollectionId,
-            replacementImageId,
-            user.uid,
-            userPreferences.username
-          );
-
-          this.tempImageMapping.set(tempImage.id, replacedImage.id);
-        } catch (error: any) {
-          // Show the error message to the user
-          this.showNotification(error.message, 'error');
+      // Create a new sit if we're in create_sit mode
+      if (state === 'create_sit') {
+        const newSit = await this.createSit(photoResult);
+        if (!newSit) {
+          this.showNotification('Failed to create sit', 'error');
         }
-
-        return;
       }
-      // Case 2: Adding to an existing sit
-      else if (sitId) {
-        const sit = sits.get(sitId);
-        if (!sit) throw new Error('Sit not found');
-
-        // Create a temporary image with a unique ID
-        const tempImage = this.createTemporaryImage(
-          photoResult,
-          sit.imageCollectionId,
-          user.uid,
-          userPreferences.username
-        );
-
-        // Close the photo modal and immediately update the drawer with optimistic data
-        this.setState({
-          modals: {
-            ...this.state.modals,
-            photo: { isOpen: false }
-          },
-          drawer: {
-            isOpen: true,
-            sit,
-            images: [...drawer.images, tempImage]
-          }
-        });
-
-        try {
-          // Use FirebaseService to handle the upload (including offline case)
-          const uploadedImage = await FirebaseService.addPhotoToSit(
-            photoResult,
-            sit.imageCollectionId,
-            user.uid,
-            userPreferences.username
-          );
-
-          // Store mapping from temp ID to real Firebase ID
-          this.tempImageMapping.set(tempImage.id, uploadedImage.id);
-        } catch (error: any) {
-          this.showNotification(error.message, 'error');
+      // Add image to existing sit if we're in add_image mode
+      else if (state === 'add_image' && sitId) {
+        const sit = this.state.sits.get(sitId);
+        if (sit) {
+          await this.addImageToSit(sit, photoResult);
         }
-
-        return;
       }
-      // Case 3: Creating a new sit
-      else {
-        const location = photoResult.location;
-        if (!location) throw new Error('No location available');
-
-        // Create a new sit
-        const initialSit = {
-          id: `new_${Date.now()}`,
-          location: location,
-          uploadedBy: user.uid,
-          uploadedByUsername: userPreferences.username,
-          imageCollectionId: '',
-          createdAt: new Date()
-        };
-
-        // Create a temporary image
-        const tempImage = this.createTemporaryImage(
-          photoResult,
-          initialSit.imageCollectionId || '',
-          user.uid,
-          userPreferences.username
-        );
-
-        // Close the photo modal and immediately update the drawer with optimistic data
-        this.setState({
-          modals: {
-            ...this.state.modals,
-            photo: { isOpen: false }
-          },
-          drawer: {
-            isOpen: true,
-            sit: initialSit,
-            images: [tempImage]
-          },
-          sits: new Map(this.state.sits).set(initialSit.id, initialSit)
-        }, () => {
-          // After state is updated, fly to the new sit's location
-          if (this.state.map) {
-            this.state.map.flyTo({
-              center: [initialSit.location.longitude, initialSit.location.latitude],
-              zoom: 13,
-              duration: 1000,
-              essential: true
-            });
-          }
-        });
-
-        try {
-          // Create sit with photo using FirebaseService in the background
-          const { sit, image } = await FirebaseService.createSitWithPhoto(
-            photoResult,
-            user.uid,
-            userPreferences.username
-          );
-          this.tempImageMapping.set(tempImage.id, image.id);
-          console.log(`Mapped temp image ${tempImage.id} to Firebase ID ${image.id}`);
-
-
-          // Replace initial sit with complete sit
-          this.setState(prevState => {
-            const newSits = new Map(prevState.sits);
-            newSits.delete(initialSit.id);
-            newSits.set(sit.id, sit);
-
-            // Update drawer if it's showing the initial sit
-            if (prevState.drawer.sit?.id === initialSit.id) {
-              return {
-                ...prevState,
-                sits: newSits,
-                drawer: {
-                  ...prevState.drawer,
-                  sit,
-                  images: sit.imageCollectionId ?
-                    prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
-                    prevState.drawer.images
-                }
-              };
-            }
-
-            return {
-              ...prevState,
-              sits: newSits
-            };
-          });
-        } catch (error: any) {
-          // Show the error message to the user
-          this.showNotification(error.message, 'success');
+      // Replace image if we're in replace_image mode
+      else if (state === 'replace_image' && sitId && replacementImageId) {
+        const sit = this.state.sits.get(sitId);
+        if (sit) {
+          await this.replaceImage(sit, replacementImageId, photoResult);
         }
       }
     } catch (error) {
-      // Close the photo modal on error
-      this.setState({
-        modals: {
-          ...this.state.modals,
-          photo: { isOpen: false }
-        }
-      });
-
-      console.error('Error uploading photo:', error);
-      this.showNotification(error instanceof Error ? error.message : 'Failed to upload photo', 'error');
+      console.error('[App] Error handling photo upload:', error);
+      this.showNotification('Error uploading photo', 'error');
     }
   };
 
@@ -1064,11 +877,8 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleUploadToExisting = (sitId: string) => {
-    const sit = this.state.sits.get(sitId);
-    if (!sit) return;
-
     this.toggleNearbySitModal(sitId);
-    this.togglePhotoUpload(sitId);
+    this.togglePhotoUpload('add_image', sitId);
   };
 
   private showNotification = (
@@ -1249,6 +1059,183 @@ class App extends React.Component<{}, AppState> {
     }));
   };
 
+  private createSit = async (result: PhotoResult): Promise<Sit | null> => {
+    const { user, userPreferences } = this.state;
+    if (!user) return null;
+
+    try {
+      // Create a new sit
+      const initialSit = {
+        id: `new_${Date.now()}`,
+        location: result.location,
+        uploadedBy: user.uid,
+        uploadedByUsername: userPreferences.username,
+        imageCollectionId: '',
+        createdAt: new Date()
+      };
+
+      // Create a temporary image
+      const tempImage = this.createTemporaryImage(
+        result,
+        initialSit.imageCollectionId || '',
+        user.uid,
+        userPreferences.username
+      );
+
+      // Update drawer state first
+      this.setState({
+        drawer: {
+          isOpen: true,
+          sit: initialSit,
+          images: [tempImage]
+        }
+      }, () => {
+        // After drawer is open, update sits map and fly to location
+        this.setState(prevState => ({
+          sits: new Map(prevState.sits).set(initialSit.id, initialSit)
+        }), () => {
+          if (this.state.map) {
+            this.state.map.flyTo({
+              center: [initialSit.location.longitude, initialSit.location.latitude],
+              zoom: 13,
+              duration: 1000,
+              essential: true
+            });
+          }
+        });
+      });
+
+      // Create sit with photo using FirebaseService in the background
+      const { sit, image } = await FirebaseService.createSitWithPhoto(
+        result,
+        user.uid,
+        userPreferences.username
+      );
+      this.tempImageMapping.set(tempImage.id, image.id);
+
+      // Replace initial sit with complete sit
+      this.setState(prevState => {
+        const newSits = new Map(prevState.sits);
+        newSits.delete(initialSit.id);
+        newSits.set(sit.id, sit);
+
+        // Update drawer if it's showing the initial sit
+        if (prevState.drawer.sit?.id === initialSit.id) {
+          return {
+            ...prevState,
+            sits: newSits,
+            drawer: {
+              ...prevState.drawer,
+              sit,
+              images: sit.imageCollectionId ?
+                prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
+                prevState.drawer.images
+            }
+          };
+        }
+
+        return {
+          ...prevState,
+          sits: newSits
+        };
+      });
+
+      return sit;
+    } catch (error) {
+      console.error('[App] Error creating sit:', error);
+      this.showNotification('Error creating sit', 'error');
+      return null;
+    }
+  };
+
+  private addImageToSit = async (sit: Sit, result: PhotoResult): Promise<void> => {
+    const { user, userPreferences, drawer } = this.state;
+    if (!user) return;
+
+    try {
+      // Create a temporary image with a unique ID
+      const tempImage = this.createTemporaryImage(
+        result,
+        sit.imageCollectionId,
+        user.uid,
+        userPreferences.username
+      );
+
+      // Update drawer with optimistic data
+      this.setState({
+        drawer: {
+          isOpen: true,
+          sit,
+          images: [...drawer.images, tempImage]
+        }
+      });
+
+      // Use FirebaseService to handle the upload (including offline case)
+      const uploadedImage = await FirebaseService.addPhotoToSit(
+        result,
+        sit.imageCollectionId,
+        user.uid,
+        userPreferences.username
+      );
+
+      // Store mapping from temp ID to real Firebase ID
+      this.tempImageMapping.set(tempImage.id, uploadedImage.id);
+    } catch (error) {
+      console.error('[App] Error adding image to sit:', error);
+      this.showNotification('Error adding image to sit', 'error');
+    }
+  };
+
+  private replaceImage = async (sit: Sit, imageId: string, result: PhotoResult): Promise<void> => {
+    const { user, userPreferences, drawer } = this.state;
+    if (!user) return;
+
+    try {
+      // Create a temporary image with the new data
+      const tempImage = this.createTemporaryImage(
+        result,
+        sit.imageCollectionId,
+        user.uid,
+        userPreferences.username
+      );
+
+      // Replace the image in the array
+      const updatedImages = drawer.images.map(img =>
+        img.id === imageId ? tempImage : img
+      );
+
+      // Update drawer with optimistic data
+      this.setState({
+        drawer: {
+          isOpen: true,
+          sit,
+          images: updatedImages
+        }
+      });
+
+      const isTemporaryImage = imageId.startsWith('temp_');
+      const realImageId = isTemporaryImage ? this.tempImageMapping.get(imageId) : imageId;
+      if (!realImageId) {
+        console.error('No real image ID found for temporary image:', imageId);
+        return;
+      }
+
+      // Upload to server in the background
+      const replacedImage = await FirebaseService.replaceImage(
+        result,
+        sit.imageCollectionId,
+        realImageId,
+        user.uid,
+        userPreferences.username
+      );
+
+      this.tempImageMapping.set(tempImage.id, replacedImage.id);
+    } catch (error) {
+      console.error('[App] Error replacing image:', error);
+      this.showNotification('Error replacing image', 'error');
+    }
+  };
+
   render() {
     const {
       user,
@@ -1322,7 +1309,7 @@ class App extends React.Component<{}, AppState> {
 
         <PhotoUploadComponent
           isOpen={modals.photo.isOpen}
-          onClose={this.togglePhotoUpload}
+          onClose={() => this.togglePhotoUpload('none')}
           onPhotoUpload={this.handlePhotoUpload}
           sitId={modals.photo.sitId}
           replacementImageId={modals.photo.replacementImageId}
@@ -1347,8 +1334,8 @@ class App extends React.Component<{}, AppState> {
           onSignIn={this.handleSignIn}
           currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
-          onNearbySitFound={this.toggleNearbySitModal}
-          onPhotoUploadOpen={this.togglePhotoUpload}
+          onNearbySitFound={this.handleUploadToExisting}
+          onPhotoUploadOpen={() => this.togglePhotoUpload('none')}
           showNotification={this.showNotification}
         />
 
@@ -1375,7 +1362,7 @@ class App extends React.Component<{}, AppState> {
           onToggleMark={this.handleToggleMark}
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
-          onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit?.id)}
+          onOpenPhotoModal={() => this.togglePhotoUpload('none')}
           onSignIn={this.handleSignIn}
           onOpenFullscreenImage={this.toggleFullscreenImage}
           showNotification={this.showNotification}

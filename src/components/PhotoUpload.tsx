@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
-import { Location, Sit, PhotoResult } from '../types';
+import { Location, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { OfflineService } from '../services/OfflineService';
@@ -15,7 +15,7 @@ interface PhotoUploadProps {
   sitId?: string;
   replacementImageId?: string;
   onClose: () => void;
-  onPhotoUpload: (result: PhotoResult, sitId?: string, replacementImageId?: string) => void;
+  onPhotoUpload: (result: PhotoResult) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -193,11 +193,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         return;
       }
 
-      this.props.onPhotoUpload({
+      const photoResult: PhotoResult = {
         base64Data: image.base64String,
         location,
         dimensions
-      }, this.props.sitId, this.props.replacementImageId);
+      };
+
+      this.props.onPhotoUpload(photoResult);
     } catch (error) {
       // Check if error is a cancellation
       if (error instanceof Error) {
@@ -254,12 +256,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         return;
       }
 
-      this.props.onPhotoUpload({
+      const photoResult: PhotoResult = {
         base64Data,
         location,
         dimensions
-      }, this.props.sitId, this.props.replacementImageId);
+      };
 
+      this.props.onPhotoUpload(photoResult);
     } catch (error) {
       // Check if error is a cancellation or user denied permission
       if (error instanceof Error) {
