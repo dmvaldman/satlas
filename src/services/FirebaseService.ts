@@ -596,15 +596,15 @@ export class FirebaseService {
   /**
    * Get a single sit by ID
    * @param sitId Sit ID
-   * @returns Sit object or null if not found
+   * @returns Sit object
    */
-  static async getSit(sitId: string): Promise<Sit | null> {
+  static async getSit(sitId: string): Promise<Sit> {
     try {
       const sitRef = doc(db, 'sits', sitId);
       const sitDoc = await getDoc(sitRef);
       const sitData = sitDoc.data();
 
-      if (!sitData) return null;
+      if (!sitData) throw new Error('Sit not found');
 
       return {
         id: sitId,

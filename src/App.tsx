@@ -52,7 +52,7 @@ interface AppState {
     };
     nearbySit: {
       isOpen: boolean;
-      sit: Sit | null;
+      sitId: string | null;
       hasUserContributed: boolean;
     };
     fullscreenImage: {
@@ -105,7 +105,7 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false },
         profile: { isOpen: false },
-        nearbySit: { isOpen: false, sit: null, hasUserContributed: false },
+        nearbySit: { isOpen: false, sitId: null, hasUserContributed: false },
         fullscreenImage: { isOpen: false, image: null }
       },
 
@@ -513,8 +513,8 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private togglePhotoUpload = (sit?: Sit) => {
-    console.log('[App] togglePhotoUpload called with sit:', sit ? sit.id : 'null');
+  private togglePhotoUpload = (sitId?: string) => {
+    console.log('[App] togglePhotoUpload called with sitId:', sitId || 'null');
 
     this.setState(prevState => {
       // If we're opening the photo modal
@@ -524,7 +524,7 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: true,
-              sitId: sit?.id
+              sitId: sitId
             }
           }
         };
@@ -541,9 +541,12 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private toggleNearbySitModal = async (sit: Sit) => {
+  private toggleNearbySitModal = async (sitId: string) => {
     // If we're opening the modal with a sit
     if (!this.state.modals.nearbySit.isOpen) {
+      const sit = this.state.sits.get(sitId);
+      if (!sit) return;
+
       // Fetch images for the sit if it has an image collection
       const images = await FirebaseService.getImages(sit.imageCollectionId);
       const hasUserContributed = images.some(image => image.userId === this.state.user?.uid);
@@ -554,7 +557,7 @@ class App extends React.Component<{}, AppState> {
           ...prevState.modals,
           nearbySit: {
             isOpen: true,
-            sit: sit,
+            sitId: sitId,
             hasUserContributed: hasUserContributed
           }
         }
@@ -566,7 +569,7 @@ class App extends React.Component<{}, AppState> {
           ...prevState.modals,
           nearbySit: {
             isOpen: !prevState.modals.nearbySit.isOpen,
-            sit: null,
+            sitId: null,
             hasUserContributed: false
           }
         }
@@ -695,7 +698,7 @@ class App extends React.Component<{}, AppState> {
     if (!sit) throw new Error('Sit not found');
 
     // Optimistically update UI first
-    if (drawer.sit && drawer.sit.id === sitId) {
+    if (drawer.isOpen && drawer.sit?.id === sitId) {
       const updatedImages = drawer.images.filter(img => img.id !== imageId);
 
       // If this was the last image, close the drawer
@@ -773,14 +776,14 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleReplaceImage = async (sitId: string, imageId: string) => {
-    const { drawer } = this.state;
+    const { drawer, sits } = this.state;
 
     // Get the sit from Firebase only if we don't already have it
     let sit;
     if (drawer.sit && drawer.sit.id === sitId) {
       sit = drawer.sit;
     } else {
-      sit = await FirebaseService.getSit(sitId);
+      sit = sits.get(sitId);
     }
 
     if (!sit) throw new Error('Sit not found');
@@ -1060,9 +1063,12 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleUploadToExisting = (sit: Sit) => {
-    this.toggleNearbySitModal(sit);
-    this.togglePhotoUpload(sit);
+  private handleUploadToExisting = (sitId: string) => {
+    const sit = this.state.sits.get(sitId);
+    if (!sit) return;
+
+    this.toggleNearbySitModal(sitId);
+    this.togglePhotoUpload(sitId);
   };
 
   private showNotification = (
@@ -1205,29 +1211,28 @@ class App extends React.Component<{}, AppState> {
   }
 
   private async openSitById(sitId: string) {
-    try {
-      // Fetch the sit data from Firebase
-      const sit = await FirebaseService.getSit(sitId);
+    let sit: Sit | undefined;
+    if (this.state.sits.has(sitId)) {
+      sit = this.state.sits.get(sitId);
+    } else {
+      sit = await FirebaseService.getSit(sitId);
+    }
 
-      if (sit) {
-        // If the sit was found, open its popup
-        this.openPopup(sit);
+    if (sit) {
+      // If the sit was found, open its popup
+      this.openPopup(sit);
 
-        // If the map is loaded, center it on the sit
-        if (this.state.map) {
-          this.state.map.flyTo({
-            center: [sit.location.longitude, sit.location.latitude],
-            zoom: 13,
-            duration: 1000,
-            essential: true
-          });
-        }
-      } else {
-        this.showNotification('Sit not found', 'error');
+      // If the map is loaded, center it on the sit
+      if (this.state.map) {
+        this.state.map.flyTo({
+          center: [sit.location.longitude, sit.location.latitude],
+          zoom: 13,
+          duration: 1000,
+          essential: true
+        });
       }
-    } catch (error) {
-      console.error('Error opening sit by ID:', error);
-      this.showNotification('Failed to load sit', 'error');
+    } else {
+      this.showNotification('Sit not found', 'error');
     }
   }
 
@@ -1349,7 +1354,7 @@ class App extends React.Component<{}, AppState> {
 
         <NearbyExistingSitModal
           isOpen={modals.nearbySit.isOpen}
-          sit={modals.nearbySit.sit}
+          sitId={modals.nearbySit.sitId}
           hasUserContributed={modals.nearbySit.hasUserContributed}
           onClose={this.toggleNearbySitModal}
           onUploadToExisting={this.handleUploadToExisting}
@@ -1370,7 +1375,7 @@ class App extends React.Component<{}, AppState> {
           onToggleMark={this.handleToggleMark}
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
-          onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit)}
+          onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit?.id)}
           onOpenProfileModal={this.toggleProfile}
           onSignIn={this.handleSignIn}
           onOpenFullscreenImage={this.toggleFullscreenImage}

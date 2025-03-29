@@ -7,7 +7,7 @@ interface AddSitButtonProps {
   currentLocation: Location | null;
   onSignIn: () => Promise<void>;
   findNearbySit: (coordinates: Location) => Promise<Sit | null>;
-  onNearbySitFound: (sit: Sit) => void;
+  onNearbySitFound: (sitId: string) => void;
   onPhotoUploadOpen: () => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
@@ -37,7 +37,7 @@ class AddSitButton extends React.Component<AddSitButtonProps> {
       console.log('Nearby sit check result:', nearbySit);
 
       if (nearbySit) {
-        onNearbySitFound(nearbySit);
+        onNearbySitFound(nearbySit.id);
         return;
       }
 

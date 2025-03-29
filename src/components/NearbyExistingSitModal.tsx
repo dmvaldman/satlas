@@ -3,10 +3,10 @@ import { Sit } from '../types';
 
 interface NearbyExistingSitModalProps {
   isOpen: boolean;
-  sit: Sit | null;
+  sitId: string | null;
   hasUserContributed?: boolean;
-  onClose: (sit: Sit) => void;
-  onUploadToExisting: (sit: Sit) => void;
+  onClose: (sitId: string) => void;
+  onUploadToExisting: (sitId: string) => void;
 }
 
 class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps> {
@@ -36,12 +36,12 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
   }
 
   render() {
-    const { isOpen, sit, onClose, onUploadToExisting, hasUserContributed } = this.props;
+    const { isOpen, sitId, onClose, onUploadToExisting, hasUserContributed } = this.props;
 
-    if (!isOpen || !sit) return null;
+    if (!isOpen || !sitId) return null;
 
     return (
-      <div className="modal-overlay" onClick={() => onClose(sit)}>
+      <div className="modal-overlay" onClick={() => onClose(sitId)}>
         <div ref={this.modalRef} className="modal-content photo-options" onClick={(e) => e.stopPropagation()}>
           <h2>Sit Nearby</h2>
 
@@ -56,7 +56,7 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
 
               <button
                 className="photo-option-button"
-                onClick={() => onUploadToExisting(sit)}
+                onClick={() => onUploadToExisting(sitId)}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                   <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>

@@ -58,7 +58,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   private async getImageLocation(base64Image: string): Promise<Location> {
     console.log('[PhotoUpload] Starting EXIF extraction from image');
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.src = `data:image/jpeg;base64,${base64Image}`;
 
@@ -105,17 +105,17 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
                 resolve({ latitude, longitude });
                 return;
               } else {
-                console.warn('[PhotoUpload] Invalid coordinates:', { latitude, longitude });
-                throw new Error('Invalid coordinates');
+                console.error('[PhotoUpload] Invalid coordinates:', { latitude, longitude });
+                reject(new Error('Invalid coordinates'));
               }
             } else {
               console.error('[PhotoUpload] No GPS data in EXIF');
-              throw new Error('No GPS data in EXIF');
+              reject(new Error('No GPS data in EXIF'));
             }
           });
         } catch (error) {
           console.error('[PhotoUpload] Error reading EXIF:', error);
-          throw error;
+          reject(error);
         }
       };
     });
