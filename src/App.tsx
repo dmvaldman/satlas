@@ -1376,7 +1376,6 @@ class App extends React.Component<{}, AppState> {
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
           onOpenPhotoModal={() => this.togglePhotoUpload(drawer.sit?.id)}
-          onOpenProfileModal={this.toggleProfile}
           onSignIn={this.handleSignIn}
           onOpenFullscreenImage={this.toggleFullscreenImage}
           showNotification={this.showNotification}

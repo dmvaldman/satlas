@@ -12,7 +12,6 @@ import { convertDMSToDD } from '../utils/geo';
 
 interface PhotoUploadProps {
   isOpen: boolean;
-  isUploading?: boolean;
   sitId?: string;
   replacementImageId?: string;
   onClose: () => void;
@@ -402,7 +401,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   }
 
   render() {
-    const { isOpen, isUploading, onClose } = this.props;
+    const { isOpen, onClose } = this.props;
     const { isActive } = this.state;
     const isOffline = !OfflineService.getInstance().isNetworkOnline();
 
@@ -427,7 +426,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           <button
             className="photo-option-button"
             onClick={this.handleTakePhoto}
-            disabled={isUploading}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
               <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
@@ -439,7 +437,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           <button
             className="photo-option-button"
             onClick={this.handleChooseFromGallery}
-            disabled={isUploading}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
               <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
