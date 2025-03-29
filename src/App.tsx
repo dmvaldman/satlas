@@ -44,7 +44,7 @@ interface AppState {
   modals: {
     photo: {
       isOpen: boolean;
-      sit?: Sit;
+      sitId?: string;
       replacementImageId?: string;
     };
     profile: {
@@ -524,7 +524,7 @@ class App extends React.Component<{}, AppState> {
             ...prevState.modals,
             photo: {
               isOpen: true,
-              sit: sit
+              sitId: sit?.id
             }
           }
         };
@@ -789,7 +789,7 @@ class App extends React.Component<{}, AppState> {
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,
-        photo: { isOpen: true, sit: sit, replacementImageId: imageId }
+        photo: { isOpen: true, sitId: sit.id, replacementImageId: imageId }
       }
     }));
   };
@@ -804,14 +804,15 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handlePhotoUploadComplete = async (photoResult: PhotoResult, existingSit?: Sit, replacementImageId?: string) => {
-    const { user, userPreferences, drawer } = this.state;
+  private handlePhotoUpload = async (photoResult: PhotoResult, sitId?: string, replacementImageId?: string) => {
+    const { user, userPreferences, drawer, sits } = this.state;
     if (!user) return;
 
     try {
       // Case 1: Replacing an existing image
-      if (existingSit && replacementImageId) {
-        const sit = existingSit as Sit;
+      if (sitId && replacementImageId) {
+        const sit = sits.get(sitId);
+        if (!sit) throw new Error('Sit not found');
 
         // Create a temporary image with the new data
         const tempImage = this.createTemporaryImage(
@@ -870,12 +871,9 @@ class App extends React.Component<{}, AppState> {
         return;
       }
       // Case 2: Adding to an existing sit
-      else if (existingSit) {
-        const sit = existingSit as Sit;
-
-        if (!sit.imageCollectionId) {
-          throw new Error('Sit has no image collection');
-        }
+      else if (sitId) {
+        const sit = sits.get(sitId);
+        if (!sit) throw new Error('Sit not found');
 
         // Create a temporary image with a unique ID
         const tempImage = this.createTemporaryImage(
@@ -1262,8 +1260,6 @@ class App extends React.Component<{}, AppState> {
       drawer,
     } = this.state;
 
-    const isAndroid = Capacitor.getPlatform() === 'android';
-
     // Still show loading, but include the map container
     if (!authIsReady) {
       return (
@@ -1322,8 +1318,8 @@ class App extends React.Component<{}, AppState> {
         <PhotoUploadComponent
           isOpen={modals.photo.isOpen}
           onClose={this.togglePhotoUpload}
-          onPhotoCapture={this.handlePhotoUploadComplete}
-          sit={modals.photo.sit}
+          onPhotoUpload={this.handlePhotoUpload}
+          sitId={modals.photo.sitId}
           replacementImageId={modals.photo.replacementImageId}
           showNotification={this.showNotification}
         />
