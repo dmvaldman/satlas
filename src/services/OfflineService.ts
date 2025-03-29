@@ -16,7 +16,6 @@ export enum PendingUploadType {
 interface BasePendingUpload {
   id: string;
   type: PendingUploadType;
-  photoResult: PhotoResult | null;
   timestamp: number;
   userId: string;
   userName: string;
@@ -25,7 +24,7 @@ interface BasePendingUpload {
 // New sit upload
 export interface NewSitPendingUpload extends BasePendingUpload {
   type: PendingUploadType.NEW_SIT;
-  // New sit only needs the photo result with location
+  photoResult: PhotoResult;
 }
 
 // Add photo to existing sit
@@ -46,7 +45,6 @@ export interface ReplaceImagePendingUpload extends BasePendingUpload {
 // Add an interface for deletion operations
 export interface DeleteImagePendingUpload extends BasePendingUpload {
   type: PendingUploadType.DELETE_IMAGE;
-  photoResult: null;  // No photo for deletions
   imageId: string;
 }
 
@@ -306,7 +304,6 @@ export class OfflineService {
     const pendingDeletion: DeleteImagePendingUpload = {
       id,
       type: PendingUploadType.DELETE_IMAGE,
-      photoResult: null, // No photo data needed for deletion
       imageId,
       userId,
       userName,
@@ -447,7 +444,11 @@ export class OfflineService {
     if (!upload) return;
 
     // If the image was saved to the filesystem, delete it
-    if (Capacitor.isNativePlatform() && typeof upload.photoResult?.base64Data === 'string' &&
+    if (Capacitor.isNativePlatform() &&
+        (upload.type === PendingUploadType.REPLACE_IMAGE ||
+         upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
+         upload.type === PendingUploadType.NEW_SIT) &&
+        typeof upload.photoResult?.base64Data === 'string' &&
         upload.photoResult?.base64Data.startsWith('file:')) {
       const fileId = upload.photoResult?.base64Data.substring(5);
       await this.deleteImageFromFileSystem(fileId);
@@ -467,6 +468,9 @@ export class OfflineService {
 
     // If we're on a native platform and the image is a file reference, load it
     if (Capacitor.isNativePlatform() &&
+        (upload.type === PendingUploadType.REPLACE_IMAGE ||
+         upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
+         upload.type === PendingUploadType.NEW_SIT) &&
         typeof upload.photoResult?.base64Data === 'string' &&
         upload.photoResult?.base64Data.startsWith('file:')) {
 
@@ -513,22 +517,6 @@ export class OfflineService {
     return this.pendingUploads.filter(
       (upload): upload is ReplaceImagePendingUpload => upload.type === PendingUploadType.REPLACE_IMAGE
     );
-  }
-
-  // Get count of pending uploads by type
-  public getPendingUploadCounts(): { [key in PendingUploadType]: number } {
-    const counts = {
-      [PendingUploadType.NEW_SIT]: 0,
-      [PendingUploadType.ADD_TO_EXISTING_SIT]: 0,
-      [PendingUploadType.REPLACE_IMAGE]: 0,
-      [PendingUploadType.DELETE_IMAGE]: 0
-    };
-
-    this.pendingUploads.forEach(upload => {
-      counts[upload.type]++;
-    });
-
-    return counts;
   }
 
   /**
