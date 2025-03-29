@@ -883,6 +883,9 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleAddPhotoToSit = (sitId: string) => {
+    // First close the nearby sit modal
+    this.toggleNearbySitModal(sitId);
+    // Then open the photo modal
     this.togglePhotoUpload('add_image', sitId);
   };
 

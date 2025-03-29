@@ -28,7 +28,7 @@ interface PopupProps {
   isOpen: boolean;
   photoModalIsOpen: boolean;
   user: User | null;
-  sit?: Sit;
+  sit: Sit;
   images?: Image[];
   marks?: Set<MarkType>;
   favoriteCount?: number;
@@ -38,7 +38,7 @@ interface PopupProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onOpenPhotoModal: (state: PhotoModalState, sitId: string) => void;
-  onSignIn?: () => Promise<void>;
+  onSignIn: () => Promise<void>;
   onOpenFullscreenImage: (image: Image) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
@@ -52,7 +52,7 @@ class PopupComponent extends React.Component<PopupProps> {
     const { sit, user, isOpen } = this.props;
 
     // Mark the sit as seen when the popup is opened
-    if (isOpen && !prevProps.isOpen && sit && user) {
+    if (isOpen && !prevProps.isOpen && user) {
       FirebaseService.markSitAsSeen(user.uid, sit.id);
     }
   }
@@ -95,25 +95,17 @@ class PopupComponent extends React.Component<PopupProps> {
     if (!window.confirm('Are you sure you want to delete this photo?')) {
       return;
     }
-    if (!sit) {
-      console.error('sit is undefined');
-      return;
-    }
+
     await onDeleteImage(sit.id, imageId);
   };
 
   private handleImageReplace = async (imageId: string) => {
     const { sit, onReplaceImage } = this.props;
-    if (!sit) {
-      console.error('sit is undefined');
-      return;
-    }
     onReplaceImage(sit.id, imageId);
   };
 
   private handleShareSit = async () => {
     const { sit } = this.props;
-    if (!sit) return;
 
     // Create both app deep link and web fallback URL
     const webFallbackUrl = `http://localhost:5173?sitId=${sit.id}`;
