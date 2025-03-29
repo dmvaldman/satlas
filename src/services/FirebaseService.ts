@@ -1336,7 +1336,7 @@ export class FirebaseService {
       for (const upload of pendingNewSits) {
         try {
           const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload?.photoResult) {
+          if (!fullUpload || !('photoResult' in fullUpload)) {
             await offlineService.removePendingUpload(upload.id);
             continue;
           }
@@ -1358,7 +1358,7 @@ export class FirebaseService {
       for (const upload of pendingAddToSits) {
         try {
           const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload?.photoResult) {
+          if (!fullUpload || !('photoResult' in fullUpload)) {
             await offlineService.removePendingUpload(upload.id);
             continue;
           }
@@ -1394,7 +1394,7 @@ export class FirebaseService {
       for (const upload of pendingReplaceImages) {
         try {
           const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload?.photoResult) {
+          if (!fullUpload || !('photoResult' in fullUpload)) {
             await offlineService.removePendingUpload(upload.id);
             continue;
           }
