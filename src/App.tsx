@@ -137,12 +137,14 @@ class App extends React.Component<{}, AppState> {
   }
 
   componentDidMount() {
+    console.log('[App] Component mounted');
+
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),
       this.initializeMap()
     ]).catch(error => {
-      console.error('Initialization error:', error);
+      console.error('[App] Initialization error:', error);
       this.showNotification('Failed to initialize app', 'error');
     });
 
@@ -153,6 +155,7 @@ class App extends React.Component<{}, AppState> {
 
       // Add resume listener for native platforms
       CapacitorApp.addListener('resume', () => {
+        console.log('[App] App resumed from background');
         if (this.state.map && this.state.currentLocation) {
           this.state.map.flyTo({
             center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],
@@ -161,6 +164,16 @@ class App extends React.Component<{}, AppState> {
             essential: true
           });
         }
+      });
+
+      // Add pause listener to track when app goes to background
+      CapacitorApp.addListener('pause', () => {
+        console.log('[App] App paused, going to background');
+        console.log('[App] Current auth state:', {
+          hasUser: !!this.state.user,
+          userId: this.state.user?.uid,
+          firebaseUser: auth.currentUser?.uid
+        });
       });
     }
 
@@ -201,11 +214,14 @@ class App extends React.Component<{}, AppState> {
   }
 
   private initializeAuth = async () => {
+    console.log('[App] Starting auth initialization');
+
     // 1. Auth setup
     this.authUnsubscribe = FirebaseService.onAuthStateChange(async (user) => {
       console.log('[App] Auth state changed:', user ? user.displayName : 'null');
 
       if (user) {
+        console.log('[App] Setting authenticated state with user:', user.uid);
         this.setState({
           user,
           isAuthenticated: true,
@@ -214,6 +230,7 @@ class App extends React.Component<{}, AppState> {
 
         await this.loadUserData(user.uid);
       } else {
+        console.log('[App] Setting unauthenticated state');
         this.setState({
           user: null,
           isAuthenticated: false,
@@ -224,7 +241,11 @@ class App extends React.Component<{}, AppState> {
 
     // 2. Direct auth check
     const currentUser = auth.currentUser;
-    console.log('[App] Direct auth check on mount:', currentUser?.displayName || 'not signed in');
+    console.log('[App] Direct auth check on mount:', {
+      hasUser: !!currentUser,
+      userId: currentUser?.uid,
+      displayName: currentUser?.displayName
+    });
 
     this.setState({
       user: currentUser,
@@ -494,8 +515,10 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleSignOut = async () => {
+    console.log('[App] Starting sign out process');
     try {
       await FirebaseService.signOut();
+      console.log('[App] Firebase sign out completed');
 
       // Explicitly update the auth state in React
       this.setState({
@@ -507,7 +530,7 @@ class App extends React.Component<{}, AppState> {
       }, () => console.log('[App] State manually updated after sign-out'));
 
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[App] Error signing out:', error);
     }
   };
 

@@ -47,20 +47,27 @@ class SignInModal extends React.Component<SignInModalProps, SignInModalState> {
   }
 
   private handleSignIn = async (method: 'apple' | 'google') => {
+    // Close modal immediately for better UX
+    this.props.onClose();
+
     try {
       const signInMethod = method === 'apple' ?
         FirebaseService.signInWithApple :
         FirebaseService.signInWithGoogle;
 
       await signInMethod();
-      console.log('[SignInModal] Sign-in successful');
 
       const currentUser = auth.currentUser;
       if (currentUser) {
-        await this.props.onSignInSuccess(currentUser);
-        this.props.onClose();
+        // Handle success in the background
+        this.props.onSignInSuccess(currentUser).catch(() => {
+          this.props.onSignInError();
+        });
+      } else {
+        this.props.onSignInError();
       }
     } catch (error) {
+      console.error('[SignInModal] Sign-in error:', error);
       // Check if error is a user cancellation
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();

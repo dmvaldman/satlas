@@ -740,7 +740,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 onClose();
               }}
             >
-              Log Out
+              <span className="log-out-text">
+                Log Out
+              </span>
             </button>
           </div>
         </div>

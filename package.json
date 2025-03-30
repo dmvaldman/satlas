@@ -62,7 +62,6 @@
     "@eslint/js": "^9.22.0",
     "@types/mapbox-gl": "^3.4.1",
     "@vitejs/plugin-react": "^4.0.0",
-    "aws-cli": "^2.15.0",
     "eslint": "^9.22.0",
     "eslint-plugin-react": "^7.37.4",
     "globals": "^16.0.0",
