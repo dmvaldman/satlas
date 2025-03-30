@@ -1006,33 +1006,46 @@ class App extends React.Component<{}, AppState> {
     }
     else {
       // Handle deep links on mobile
+      console.log('Setting up deep link listener on mobile');
       CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
-        console.log('App opened with URL:', url);
+        console.log('Deep link received:', url);
 
         try {
           // Handle both satlas:// and https://satlas.earth URLs
           const urlObj = new URL(url);
+          console.log('URL parsed:', `protocol: ${urlObj.protocol}, hostname: ${urlObj.hostname}, pathname: ${urlObj.pathname}, search: ${urlObj.search}`);
+
           let sitId: string | null = null;
 
           if (urlObj.protocol === 'satlas:') {
-            // Handle satlas://sit/123456 format
-            const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+            // For custom scheme URLs, the hostname is actually part of the path
+            // So we need to combine hostname and pathname to get the full path
+            const fullPath = `/${urlObj.hostname}${urlObj.pathname}`;
+            const pathSegments = fullPath.split('/').filter(Boolean);
+            console.log('Custom scheme path segments:', pathSegments);
             if (pathSegments[0] === 'sit' && pathSegments[1]) {
               sitId = pathSegments[1];
             }
           } else if (urlObj.hostname === 'satlas.earth' || urlObj.hostname === 'localhost') {
-            // Handle both production and development URL formats
+            // Handle both production and development URLs
             const urlParams = new URLSearchParams(urlObj.search);
             sitId = urlParams.get('sitId');
+            console.log('Web link sitId:', sitId);
           }
 
           if (sitId) {
+            console.log('Opening sit:', sitId);
             this.openSitById(sitId);
+          } else {
+            console.log('No sitId found in URL');
           }
         } catch (error) {
           console.error('Error handling deep link:', error);
         }
       });
+
+      // Log that we're ready for deep links
+      console.log('Deep link listener setup complete');
     }
   }
 
