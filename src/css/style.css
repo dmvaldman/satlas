@@ -39,6 +39,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   font-family: 'Helvetica Neue', sans-serif;
+  touch-action: none;
 }
 
 #app-header {
