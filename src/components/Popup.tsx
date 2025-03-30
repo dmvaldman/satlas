@@ -118,7 +118,7 @@ class PopupComponent extends React.Component<PopupProps> {
       try {
         await Share.share({
           title: 'Check out this place to sit.',
-          text: 'I found an interesting place to sit.',
+          text: '',
           url: webUrl,
           dialogTitle: 'Share this sit'
         });
