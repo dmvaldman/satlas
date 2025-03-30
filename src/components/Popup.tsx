@@ -108,7 +108,10 @@ class PopupComponent extends React.Component<PopupProps> {
     const { sit } = this.props;
 
     // Create both app deep link and web fallback URL
-    const webFallbackUrl = `http://localhost:5173?sitId=${sit.id}`;
+    const isDev = process.env.NODE_ENV === 'development';
+    const webUrl = isDev
+      ? `http://localhost:5173?sitId=${sit.id}`
+      : `https://satlas.earth?sitId=${sit.id}`;
 
     // On mobile, use the Share API
     if (Capacitor.isNativePlatform()) {
@@ -116,7 +119,7 @@ class PopupComponent extends React.Component<PopupProps> {
         await Share.share({
           title: 'Check out this place to sit.',
           text: 'I found an interesting place to sit.',
-          url: webFallbackUrl,
+          url: webUrl,
           dialogTitle: 'Share this sit'
         });
       } catch (error) {
@@ -124,7 +127,7 @@ class PopupComponent extends React.Component<PopupProps> {
       }
     } else {
       // For web, copy to clipboard or use Web Share API if available
-      navigator.clipboard.writeText(webFallbackUrl);
+      navigator.clipboard.writeText(webUrl);
       this.props.showNotification('Link copied to clipboard', 'success');
     }
   };
@@ -265,11 +268,6 @@ class PopupComponent extends React.Component<PopupProps> {
   }
 
   private renderShareButton() {
-    // Only show share button on web platforms
-    if (Capacitor.isNativePlatform()) {
-      return null;
-    }
-
     return (
       <button className="share-button" onClick={this.handleShareSit}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

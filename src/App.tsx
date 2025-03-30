@@ -1005,17 +1005,28 @@ class App extends React.Component<{}, AppState> {
       }
     }
     else {
+      // Handle deep links on mobile
       CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
         console.log('App opened with URL:', url);
 
-        // Parse the URL to extract the sit ID
-        // Example URL format: yourapp://sit/123456
         try {
+          // Handle both satlas:// and https://satlas.earth URLs
           const urlObj = new URL(url);
-          const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+          let sitId: string | null = null;
 
-          if (pathSegments[0] === 'sit' && pathSegments[1]) {
-            const sitId = pathSegments[1];
+          if (urlObj.protocol === 'satlas:') {
+            // Handle satlas://sit/123456 format
+            const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+            if (pathSegments[0] === 'sit' && pathSegments[1]) {
+              sitId = pathSegments[1];
+            }
+          } else if (urlObj.hostname === 'satlas.earth' || urlObj.hostname === 'localhost') {
+            // Handle both production and development URL formats
+            const urlParams = new URLSearchParams(urlObj.search);
+            sitId = urlParams.get('sitId');
+          }
+
+          if (sitId) {
             this.openSitById(sitId);
           }
         } catch (error) {
