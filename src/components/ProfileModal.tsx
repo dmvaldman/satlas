@@ -401,7 +401,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       // Important: Update the state in the parent component
       this.props.onUpdatePreferences(updatedPreferences);
 
-      // Don't show success notification - only notify on failure
+      showNotification('Profile settings saved', 'success');
     } catch (error) {
       console.error('Error saving profile in background:', error);
       showNotification('Failed to save profile settings. Please try again.', 'error');
@@ -609,7 +609,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   render() {
-    const { isOpen, onClose, onSignOut } = this.props;
+    const { isOpen, onClose, onSignOut, showNotification } = this.props;
     const {
       username,
       pushNotifications,
