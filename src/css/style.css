@@ -256,6 +256,9 @@ body {
   transition: transform 0.3s ease-out;
   will-change: transform;
   z-index: 2001; /* Ensure it's above the overlay */
+  max-width: 500px;
+  border: 1px solid var(--medium-gray);
+  box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.2);
 }
 
 /* Add this rule to reset the transform when the modal is active */
@@ -432,6 +435,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  margin-bottom: 8px;
 }
 
 /* Carousel track - the sliding container for all items */
@@ -578,8 +582,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .mark-buttons {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
-  margin-bottom: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
   justify-content: space-between; /* Distribute buttons evenly */
   width: 100%; /* Ensure container takes full width */
 }
@@ -716,8 +720,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 12px;
-  padding-bottom: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .favorite-count {
