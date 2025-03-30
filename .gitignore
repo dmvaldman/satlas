@@ -14,3 +14,4 @@ tsconfig.tsbuildinfo
 android/keystore.properties
 configs/
 GoogleService-Info.plist
+public/.well-known/

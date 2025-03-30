@@ -1,10 +1,19 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from '@capacitor/cli';
 
-const baseConfig: CapacitorConfig = {
+const config: CapacitorConfig = {
   appId: 'com.dmvaldman.Satlas',
   appName: 'Satlas',
   webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+    cleartext: true
+  },
   plugins: {
+    App: {
+      appUrlOpen: {
+        domains: ['satlas.earth']
+      }
+    },
     SplashScreen: {
       backgroundColor: "#FFFFFF",
       showSpinner: false,
@@ -60,6 +69,6 @@ const devConfig = process.env.NODE_ENV === 'development' ? {
 } : {};
 
 // Merge configurations
-const config = { ...baseConfig, ...iosConfig, ...devConfig };
+const mergedConfig = { ...config, ...iosConfig, ...devConfig };
 
-export default config;
+export default mergedConfig;
