@@ -199,40 +199,18 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         // Cache this user ID as loaded
         ProfileModal.loadedUserIds.add(user.uid);
 
-        // If no username is set but we have a display name, generate one
-        if (!preferences.username && user.displayName) {
-          this.generateUniqueUsername();
-        }
-
         // If we have coordinates, resolve them to a city name
         if (preferences.cityCoordinates) {
           this.getCityFromCoordinates(preferences.cityCoordinates);
         }
       } else {
-        // No preferences yet, but we'll use display name as a starting point
+        // No preferences yet
         this.setState({
           pushNotifications: false,
           cityCoordinates: null
         });
-
-        // Try to generate a username from display name
-        if (user.displayName) {
-          this.generateUniqueUsername();
-        }
       }
     }
-  }
-
-  private generateUniqueUsername = async () => {
-    const { user } = this.props;
-    if (!user) return;
-
-    const username = await FirebaseService.generateUniqueUsername(
-      user.uid,
-      user.displayName
-    );
-
-    this.setState({ username });
   }
 
   private handleUsernameChange = async (username: string) => {

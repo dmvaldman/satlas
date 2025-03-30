@@ -420,6 +420,18 @@ class App extends React.Component<{}, AppState> {
       const userData = await FirebaseService.loadUserPreferences(userId);
       const seenSits = await FirebaseService.getUserSeenSits(userId);
 
+      // If no username exists and we have a user, generate one
+      if (!userData.username && this.state.user?.displayName) {
+        const username = await FirebaseService.generateUniqueUsername(
+          userId,
+          this.state.user.displayName
+        );
+        userData.username = username;
+
+        // Save the updated preferences
+        await FirebaseService.saveUserPreferences(userId, userData);
+      }
+
       this.setState({
         marks: marksMap,
         favoriteCount: favoriteCounts,
