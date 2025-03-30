@@ -38,7 +38,7 @@ interface PopupProps {
   onDeleteImage: (sitId: string, imageId: string) => Promise<void>;
   onReplaceImage: (sitId: string, imageId: string) => void;
   onOpenPhotoModal: (state: PhotoModalState, sitId: string) => void;
-  onSignIn: () => Promise<void>;
+  onSignIn: (message: string) => Promise<void>;
   onOpenFullscreenImage: (image: Image) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
@@ -57,37 +57,14 @@ class PopupComponent extends React.Component<PopupProps> {
     }
   }
 
-  private handleMarkClick = async (e: React.MouseEvent, type: MarkType) => {
-    e.stopPropagation();
-    const { sit, onToggleMark, user, onSignIn } = this.props;
-
-    // If user is not authenticated and we have a sign-in handler, trigger sign-in
-    if (!user && onSignIn) {
-      try {
-        await onSignIn();
-        // After sign-in, the component will re-render with the user prop
-        // We don't need to toggle the mark here as the user might not be set immediately
-      } catch (error) {
-        console.error('Error signing in:', error);
-      }
+  private handleMarkClick = async (markType: 'favorite' | 'wantToGo' | 'visited') => {
+    if (!this.props.user) {
+      await this.props.onSignIn('Sign in to mark a Sit');
       return;
     }
 
-    if (!sit) {
-      console.error('sit is undefined');
-      return;
-    }
-
-    // Only proceed with toggling mark if user is authenticated
-    if (user) {
-      console.log('Before toggle:', this.props.marks);
-      try {
-        await onToggleMark(sit.id, type);
-        console.log('After toggle:', this.props.marks);
-      } catch (error) {
-        console.error('Error toggling mark:', error);
-      }
-    }
+    const { sit, onToggleMark } = this.props;
+    onToggleMark(sit.id, markType as MarkType);
   };
 
   private handleImageDelete = async (imageId: string) => {
@@ -178,7 +155,7 @@ class PopupComponent extends React.Component<PopupProps> {
           <button
             key={type}
             className={`mark-button ${type}${marks && marks.has(type) ? ' active' : ''}`}
-            onClick={(e) => this.handleMarkClick(e, type)}
+            onClick={() => this.handleMarkClick(type)}
           >
             <svg className="mark-icon" viewBox="0 0 24 24">
               <path
@@ -260,7 +237,7 @@ class PopupComponent extends React.Component<PopupProps> {
 
     return (
       <button
-        className="photo-option-button"
+        className="modal-option-button"
         onClick={handleClick}
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

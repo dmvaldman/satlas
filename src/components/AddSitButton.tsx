@@ -5,7 +5,7 @@ interface AddSitButtonProps {
   isAuthenticated: boolean;
   user: User | null;
   currentLocation: Location | null;
-  onSignIn: () => Promise<void>;
+  onSignIn: (message?: string) => Promise<void>;
   findNearbySit: (coordinates: Location) => Promise<Sit | null>;
   onNearbySitFound: (sitId: string) => void;
   onPhotoUploadOpen: () => void;
@@ -23,7 +23,7 @@ class AddSitButton extends React.Component<AddSitButtonProps> {
 
     if (!isAuthenticated) {
       console.log('Not authenticated, triggering sign in');
-      await onSignIn();
+      await onSignIn('Sign in to add a Sit');
       return;
     }
 

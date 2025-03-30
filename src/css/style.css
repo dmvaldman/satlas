@@ -757,7 +757,8 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   fill: var(--dark-gray);
 }
 
-.photo-option-button {
+.modal-option-button {
+  height: 52px;
   width: 100%;
   padding: 14px;
   margin: 14px 0;
@@ -773,10 +774,14 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   justify-self: center;
 }
 
-.photo-option-button svg {
-  width: 24px;
-  height: 24px;
-  fill: var(--action-green);
+.modal-option-button svg {
+  width: 28px;
+  height: 28px;
+  fill: var(--dark-gray);
+}
+
+.modal-option-button .apple-icon {
+  transform: translateY(-2px);
 }
 
 /* Update notification styles - move from bottom to top */

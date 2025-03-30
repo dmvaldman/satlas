@@ -23,6 +23,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { debounce } from './utils/debounce';
+import SignInModal from './components/SignInModal';
 
 interface AppState {
   // Auth state
@@ -59,6 +60,10 @@ interface AppState {
     fullscreenImage: {
       isOpen: boolean;
       image: Image | null;
+    };
+    signIn: {
+      isOpen: boolean;
+      message?: string;
     };
   };
 
@@ -107,7 +112,8 @@ class App extends React.Component<{}, AppState> {
         photo: { isOpen: false, state: 'none' },
         profile: { isOpen: false },
         nearbySit: { isOpen: false, sitId: null, hasUserContributed: false },
-        fullscreenImage: { isOpen: false, image: null }
+        fullscreenImage: { isOpen: false, image: null },
+        signIn: { isOpen: false }
       },
 
       userPreferences: {
@@ -444,40 +450,47 @@ class App extends React.Component<{}, AppState> {
   };
 
   // Auth methods
-  private handleSignIn = async () => {
-    console.log('[App] handleSignIn called');
-
-    const signInMethod = Capacitor.getPlatform() === 'ios' ?
-      FirebaseService.signInWithApple :
-      FirebaseService.signInWithGoogle;
-
-    try {
-      await signInMethod();
-      console.log('[App] Sign-in successful');
-
-      // Force update the UI state directly after sign-in
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        this.setState({
-          user: currentUser,
-          isAuthenticated: true,
-          authIsReady: true
-        }, async () => {
-          console.log('[App] State manually updated after sign-in');
-
-          // Load user preferences after state is updated
-          try {
-            const preferences = await this.loadUserData(currentUser.uid);
-            console.log('[App] User preferences loaded after sign-in:', preferences);
-          } catch (error) {
-            console.error('[App] Error loading preferences after sign-in:', error);
-          }
-        });
+  private handleSignInModalOpen = async (message?: string) => {
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        signIn: { isOpen: true, message }
       }
-    } catch (error) {
-      console.error('[App] Sign-in error:', error);
-      this.showNotification('Failed to sign in.', 'error');
-    }
+    });
+  };
+
+  private handleSignInModalClose = () => {
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        signIn: { isOpen: false }
+      }
+    });
+  };
+
+  private handleSignInSuccess = async (user: User) => {
+    console.log('[App] Sign-in successful, updating state');
+    // Update auth state
+    this.setState({
+      user: user,
+      isAuthenticated: true,
+      authIsReady: true
+    }, async () => {
+      console.log('[App] State manually updated after sign-in');
+
+      // Load user preferences after state is updated
+      try {
+        await this.loadUserData(user.uid);
+        console.log('[App] User preferences loaded after sign-in');
+      } catch (error) {
+        console.error('[App] Error loading preferences after sign-in:', error);
+        this.showNotification('Failed to load user preferences.', 'error');
+      }
+    });
+  };
+
+  private handleSignInError = () => {
+    this.showNotification('Failed to sign in.', 'error');
   };
 
   private handleSignOut = async () => {
@@ -1341,10 +1354,10 @@ class App extends React.Component<{}, AppState> {
             user={user}
             isAuthenticated={isAuthenticated}
             userPreferences={userPreferences}
-            onSignIn={this.handleSignIn}
+            onSignIn={this.handleSignInModalOpen}
             onToggleProfile={this.toggleProfile}
-            onUpdatePreferences={this.updatePreferences}
             onSavePreferences={this.handleSavePreferences}
+            onUpdatePreferences={this.updatePreferences}
           />
         </header>
 
@@ -1399,7 +1412,7 @@ class App extends React.Component<{}, AppState> {
         <AddSitButton
           isAuthenticated={isAuthenticated}
           user={user}
-          onSignIn={this.handleSignIn}
+          onSignIn={this.handleSignInModalOpen}
           currentLocation={currentLocation}
           findNearbySit={this.findNearbySit}
           onNearbySitFound={this.handleUploadToExisting}
@@ -1431,7 +1444,7 @@ class App extends React.Component<{}, AppState> {
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
           onOpenPhotoModal={this.togglePhotoUpload}
-          onSignIn={this.handleSignIn}
+          onSignIn={this.handleSignInModalOpen}
           onOpenFullscreenImage={this.toggleFullscreenImage}
           showNotification={this.showNotification}
         />
@@ -1440,6 +1453,14 @@ class App extends React.Component<{}, AppState> {
           isOpen={modals.fullscreenImage.isOpen}
           image={modals.fullscreenImage.image}
           onClose={this.toggleFullscreenImage}
+        />
+
+        <SignInModal
+          isOpen={modals.signIn.isOpen}
+          onClose={this.handleSignInModalClose}
+          message={modals.signIn.message}
+          onSignInSuccess={this.handleSignInSuccess}
+          onSignInError={this.handleSignInError}
         />
       </div>
     );

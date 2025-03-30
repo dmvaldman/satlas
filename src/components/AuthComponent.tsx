@@ -7,7 +7,7 @@ interface AuthProps {
   user: User | null;
   isAuthenticated: boolean;
   userPreferences: UserPreferences;
-  onSignIn: () => Promise<void>;
+  onSignIn: (message?: string) => Promise<void>;
   onToggleProfile: () => void;
   onSavePreferences: (prefs: UserPreferences) => Promise<void>;
   onUpdatePreferences: (prefs: UserPreferences) => void;
@@ -28,24 +28,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
   }
 
   private handleSignIn = async () => {
-    console.log('[Auth] Sign-in button clicked');
-    this.setState({ isSigningIn: true });
-
-    try {
-      console.log('[Auth] Calling onSignIn...');
-      await this.props.onSignIn();
-      console.log('[Auth] Sign-in successful');
-    } catch (error) {
-      console.error('[Auth] Error signing in:', error);
-      // Check if the error is due to user cancellation
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('cancel') || errorMessage.includes('dismissed') || errorMessage.includes('closed')) {
-        console.log('[Auth] Sign-in was cancelled by the user');
-      }
-    } finally {
-      // Always reset the signing in state, regardless of success or failure
-      this.setState({ isSigningIn: false });
-    }
+    await this.props.onSignIn();
   };
 
   private renderLoginButton() {
@@ -110,8 +93,7 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
     return (
       this.props.user !== nextProps.user ||
       this.props.isAuthenticated !== nextProps.isAuthenticated ||
-      this.state.isSigningIn !== nextState.isSigningIn ||
-      this.state.isSigningInWithApple !== nextState.isSigningInWithApple
+      this.state.isSigningIn !== nextState.isSigningIn
     );
   }
 
@@ -120,7 +102,11 @@ class AuthComponent extends React.Component<AuthProps, AuthState> {
 
     return (
       <div className="auth-container">
-        {isAuthenticated ? this.renderProfileButton() : this.renderLoginButton()}
+        {isAuthenticated ? (
+          this.renderProfileButton()
+        ) : (
+          this.renderLoginButton()
+        )}
       </div>
     );
   }
