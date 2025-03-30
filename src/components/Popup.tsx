@@ -307,7 +307,14 @@ class PopupComponent extends React.Component<PopupProps> {
                 {this.props.user && sit.uploadedBy === this.props.user.uid ? (
                   `You found this sit ${formatRelativeTime(sit.createdAt)}`
                 ) : (
-                  `Sit found ${sit.uploadedByUsername ? 'by @' + sit.uploadedByUsername : ''} ${formatRelativeTime(sit.createdAt)}`
+                  <>
+                    Sit found {sit.uploadedByUsername && (
+                      <>
+                        by <span className="uploader-name">@{sit.uploadedByUsername}</span>{' '}
+                      </>
+                    )}
+                    {formatRelativeTime(sit.createdAt)}
+                  </>
                 )}
               </div>
             )}

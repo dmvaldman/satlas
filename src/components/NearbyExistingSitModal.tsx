@@ -55,7 +55,7 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
               <p>Add a photo to it?</p>
 
               <button
-                className="photo-option-button"
+                className="modal-option-button"
                 onClick={() => onUploadToExisting(sitId)}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">

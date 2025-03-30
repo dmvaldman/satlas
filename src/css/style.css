@@ -11,7 +11,7 @@
   --action-red: #ff3b30;
   --white: #ffffff;
   --light-gray: rgb(245, 245, 245);
-  --medium-gray: #aaa;
+  --medium-gray: #bbb;
   --dark-gray: #555;
   --black: #000000;
   --light-blue: #bdefff;
@@ -736,6 +736,10 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   border-radius: 4px;
 }
 
+.uploader-name {
+  font-weight: 500;
+}
+
 .maps-link {
   display: block;
   color: var(--dark-blue);
@@ -772,12 +776,20 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   gap: 12px;
   cursor: pointer;
   justify-self: center;
+  transition: all 0.2s ease;
 }
+
+.modal-option-button:active {
+  background: var(--medium-gray);
+  border-color: var(--black);
+}
+
 
 .modal-option-button svg {
   width: 28px;
   height: 28px;
   fill: var(--dark-gray);
+  transition: fill 0.2s ease;
 }
 
 .modal-option-button .apple-icon {
