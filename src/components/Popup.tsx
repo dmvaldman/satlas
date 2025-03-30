@@ -165,7 +165,12 @@ class PopupComponent extends React.Component<PopupProps> {
   }
 
   private renderMarkButtons() {
-    const { marks } = this.props;
+    const { marks, sit, user } = this.props;
+
+    // Don't show marks if this is the user's own sit
+    if (user && sit.uploadedBy === user.uid) {
+      return null;
+    }
 
     return (
       <div className="mark-buttons">
@@ -322,7 +327,11 @@ class PopupComponent extends React.Component<PopupProps> {
             {/* Display uploader information */}
             {sit.uploadedBy && sit.createdAt && (
               <div className="sit-uploader-info">
-                Sit found {sit.uploadedByUsername ? 'by @' + sit.uploadedByUsername : ''} {formatRelativeTime(sit.createdAt)}
+                {this.props.user && sit.uploadedBy === this.props.user.uid ? (
+                  `You found this sit ${formatRelativeTime(sit.createdAt)}`
+                ) : (
+                  `Sit found ${sit.uploadedByUsername ? 'by @' + sit.uploadedByUsername : ''} ${formatRelativeTime(sit.createdAt)}`
+                )}
               </div>
             )}
 
