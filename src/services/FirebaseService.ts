@@ -108,12 +108,12 @@ export class FirebaseService {
   static async signInWithGoogle(): Promise<void> {
     console.log('[Firebase] Starting Google sign-in process');
     try {
+      // First ensure we're signed out
+      await FirebaseService.signOut();
+
       if (Capacitor.isNativePlatform()) {
         console.log('[Firebase] Using native authentication');
         try {
-          // First ensure we're signed out
-          await FirebaseService.signOut();
-
           // Use the native plugin
           const result = await FirebaseAuthentication.signInWithGoogle({
             mode: 'popup'  // Force popup mode which works better on emulators
@@ -256,14 +256,12 @@ export class FirebaseService {
   static async signInWithApple(): Promise<void> {
     console.log('[Firebase] Starting Apple sign-in process');
     try {
+      // First ensure we're signed out
+      await FirebaseService.signOut();
+
       if (Capacitor.isNativePlatform()) {
         console.log('[Firebase] Using native Apple Sign In');
         try {
-          // First ensure we're signed out
-          console.log('[Firebase] Ensuring user is signed out before Apple sign-in');
-          await FirebaseService.signOut();
-          console.log('[Firebase] Sign out complete');
-
           if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
             // Configure Apple Sign In options
             console.log('[Firebase] Configuring Apple Sign In options');
@@ -300,21 +298,21 @@ export class FirebaseService {
             console.log('[Firebase] Signing in to Firebase with credential');
             await signInWithCredential(auth, credential);
             console.log('[Firebase] Firebase sign-in complete');
+
+            // Add debug statement here
+            console.log('[Firebase] Credential sign-in completed, current user:',
+              auth.currentUser ? {
+                uid: (auth.currentUser as User).uid,
+                email: (auth.currentUser as User).email,
+                displayName: (auth.currentUser as User).displayName
+              } : 'Still null');
+
           } else {
             // For Android or web, use Firebase's built-in Apple Sign In
             console.log('[Firebase] Using Firebase built-in Apple Sign In');
             const provider = new OAuthProvider('apple.com');
             await signInWithPopup(auth, provider);
           }
-
-          // Add debug statement here
-          console.log('[Firebase] Credential sign-in completed, current user:',
-            auth.currentUser ? {
-              uid: (auth.currentUser as User).uid,
-              email: (auth.currentUser as User).email,
-              displayName: (auth.currentUser as User).displayName
-            } : 'Still null');
-
         } catch (error: unknown) {
           console.error('[Firebase] Plugin error:', error);
           // If we get a specific error about credentials, try web fallback
