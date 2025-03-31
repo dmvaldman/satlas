@@ -484,7 +484,7 @@ class App extends React.Component<{}, AppState> {
     this.setState({
       modals: {
         ...this.state.modals,
-        signIn: { isOpen: false }
+        signIn: { ...this.state.modals.signIn, isOpen: false}
       }
     });
   };
