@@ -244,14 +244,11 @@ body {
   z-index: 2000;
   cursor: pointer;
   align-items: flex-end;
-  will-change: opacity;
-  opacity: 0;
-  transition: opacity 0.3s ease-out;
+  transition: background-color 0.3s ease-out;
 }
 
 .modal-overlay.active {
   background-color: rgba(0, 0, 0, 0.4);
-  opacity: 1;
 }
 
 /* Base modal content styles */

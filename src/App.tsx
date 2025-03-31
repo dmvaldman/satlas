@@ -535,100 +535,111 @@ class App extends React.Component<{}, AppState> {
   };
 
   // UI methods
-  private toggleProfile = () => {
-    // Use functional state update to prevent race conditions
-    this.setState(prevState => {
-      // If the profile is currently open, just close it
-      if (prevState.modals.profile.isOpen) {
-        return {
-          modals: {
-            ...prevState.modals,
-            profile: {
-              isOpen: false
-            }
-          }
-        };
-      }
-
-      // Otherwise, toggle it normally
-      return {
-        modals: {
-          ...prevState.modals,
-          profile: {
-            isOpen: !prevState.modals.profile.isOpen
-          }
+  private openProfileModal = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        profile: {
+          isOpen: true
         }
-      };
-    });
+      }
+    }));
   };
 
-  private togglePhotoUpload = (state: PhotoModalState, sitId?: string, replacementImageId?: string) => {
-    console.log('[App] togglePhotoUpload called with state:', state, 'sitId:', sitId || 'null', 'replacementImageId:', replacementImageId || 'null');
-
-    this.setState(prevState => {
-      // If we're opening the photo modal
-      if (!prevState.modals.photo.isOpen) {
-        return {
-          modals: {
-            ...prevState.modals,
-            photo: {
-              isOpen: true,
-              state,
-              sitId,
-              replacementImageId
-            }
-          }
-        };
+  private closeProfileModal = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        profile: {
+          isOpen: false
+        }
       }
-      // If we're closing the photo modal
-      else {
-        return {
-          modals: {
-            ...prevState.modals,
-            photo: {
-              isOpen: false,
-              state: 'none' // Reset to none state when closing
-            }
-          }
-        };
-      }
-    });
+    }));
   };
 
-  private toggleNearbySitModal = async (sitId: string) => {
-    // If we're opening the modal with a sit
-    if (!this.state.modals.nearbySit.isOpen) {
-      const sit = this.state.sits.get(sitId);
-      if (!sit) return;
-
-      // Fetch images for the sit if it has an image collection
-      const images = await FirebaseService.getImages(sit.imageCollectionId);
-      const hasUserContributed = images.some(image => image.userId === this.state.user?.uid);
-
-      // Now open the modal with the sit and whether the user has contributed
-      this.setState(prevState => ({
-        modals: {
-          ...prevState.modals,
-          nearbySit: {
-            isOpen: true,
-            sitId: sitId,
-            hasUserContributed: hasUserContributed
-          }
+  private openPhotoUploadModal = (state: PhotoModalState, sitId?: string, replacementImageId?: string) => {
+    console.log('[App] openPhotoUploadModal called with state:', state, 'sitId:', sitId || 'null', 'replacementImageId:', replacementImageId || 'null');
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        photo: {
+          isOpen: true,
+          state,
+          sitId,
+          replacementImageId
         }
-      }));
-    } else {
-      // We're closing the modal or opening it without a sit
-      this.setState(prevState => ({
-        modals: {
-          ...prevState.modals,
-          nearbySit: {
-            isOpen: !prevState.modals.nearbySit.isOpen,
-            sitId: null,
-            hasUserContributed: false
-          }
+      }
+    }));
+  };
+
+  private closePhotoUploadModal = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        photo: {
+          isOpen: false,
+          state: 'none'
         }
-      }));
-    }
+      }
+    }));
+  };
+
+  private openNearbySitModal = async (sitId: string) => {
+    const sit = this.state.sits.get(sitId);
+    if (!sit) return;
+
+    // Fetch images for the sit if it has an image collection
+    const images = await FirebaseService.getImages(sit.imageCollectionId);
+    const hasUserContributed = images.some(image => image.userId === this.state.user?.uid);
+
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        nearbySit: {
+          isOpen: true,
+          sitId: sitId,
+          hasUserContributed: hasUserContributed
+        }
+      }
+    }));
+  };
+
+  private closeNearbySitModal = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        nearbySit: {
+          isOpen: false,
+          sitId: null,
+          hasUserContributed: false
+        }
+      }
+    }));
+  };
+
+  private openFullscreenImage = (image: Image) => {
+    console.log('openFullscreenImage', image);
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        fullscreenImage: {
+          isOpen: true,
+          image: image
+        }
+      }
+    }));
+  };
+
+  private closeFullscreenImage = () => {
+    this.setState(prevState => ({
+      modals: {
+        ...prevState.modals,
+        fullscreenImage: {
+          isOpen: false,
+          image: null
+        }
+      }
+    }));
   };
 
   private handleSavePreferences = async (prefs: UserPreferences) => {
@@ -638,7 +649,7 @@ class App extends React.Component<{}, AppState> {
     try {
       await FirebaseService.saveUserPreferences(user.uid, prefs);
       this.setState({ userPreferences: prefs });
-      this.toggleProfile();
+      this.closeProfileModal();
     } catch (error) {
       console.error('Error saving preferences:', error);
       throw error;
@@ -830,7 +841,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
-    this.togglePhotoUpload('replace_image', sitId, imageId);
+    this.openPhotoUploadModal('replace_image', sitId, imageId);
   };
 
   private getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
@@ -849,7 +860,7 @@ class App extends React.Component<{}, AppState> {
 
     try {
       // Close the photo modal immediately for better UX
-      this.togglePhotoUpload('none');
+      this.closePhotoUploadModal();
 
       // Create a new sit if we're in create_sit mode
       if (state === 'create_sit') {
@@ -920,18 +931,18 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleUploadToExisting = (sitId: string) => {
-    this.toggleNearbySitModal(sitId);
+    this.openNearbySitModal(sitId);
   };
 
   private handleCreateSit = () => {
-    this.togglePhotoUpload('create_sit');
+    this.openPhotoUploadModal('create_sit');
   };
 
   private handleAddPhotoToSit = (sitId: string) => {
     // First close the nearby sit modal
-    this.toggleNearbySitModal(sitId);
+    this.closeNearbySitModal();
     // Then open the photo modal
-    this.togglePhotoUpload('add_image', sitId);
+    this.openPhotoUploadModal('add_image', sitId);
   };
 
   private showNotification = (
@@ -1122,19 +1133,6 @@ class App extends React.Component<{}, AppState> {
       this.showNotification('Sit not found', 'error');
     }
   }
-
-  private toggleFullscreenImage = (image?: Image) => {
-    console.log('toggleFullscreenImage', image);
-    this.setState(prevState => ({
-      modals: {
-        ...prevState.modals,
-        fullscreenImage: {
-          isOpen: !!image,
-          image: image || null
-        }
-      }
-    }));
-  };
 
   private createSit = async (photoResult: PhotoResult): Promise<Sit | null> => {
     const { user, userPreferences, sits } = this.state;
@@ -1378,7 +1376,7 @@ class App extends React.Component<{}, AppState> {
             isAuthenticated={isAuthenticated}
             userPreferences={userPreferences}
             onSignIn={this.handleSignInModalOpen}
-            onToggleProfile={this.toggleProfile}
+            onToggleProfile={this.openProfileModal}
             onSavePreferences={this.handleSavePreferences}
             onUpdatePreferences={this.updatePreferences}
           />
@@ -1413,7 +1411,7 @@ class App extends React.Component<{}, AppState> {
 
         <PhotoUploadModal
           isOpen={modals.photo.isOpen}
-          onClose={() => this.togglePhotoUpload('none')}
+          onClose={this.closePhotoUploadModal}
           onPhotoUpload={this.handlePhotoUpload}
           sitId={modals.photo.sitId}
           replacementImageId={modals.photo.replacementImageId}
@@ -1425,7 +1423,7 @@ class App extends React.Component<{}, AppState> {
           user={user}
           preferences={userPreferences}
           currentLocation={currentLocation}
-          onClose={this.toggleProfile}
+          onClose={this.closeProfileModal}
           onSignOut={this.handleSignOut}
           onSave={this.handleSavePreferences}
           onUpdatePreferences={this.updatePreferences}
@@ -1447,7 +1445,7 @@ class App extends React.Component<{}, AppState> {
           isOpen={modals.nearbySit.isOpen}
           sitId={modals.nearbySit.sitId}
           hasUserContributed={modals.nearbySit.hasUserContributed}
-          onClose={this.toggleNearbySitModal}
+          onClose={this.closeNearbySitModal}
           onUploadToExisting={this.handleAddPhotoToSit}
         />
 
@@ -1466,16 +1464,16 @@ class App extends React.Component<{}, AppState> {
           onToggleMark={this.handleToggleMark}
           onDeleteImage={this.handleDeleteImage}
           onReplaceImage={this.handleReplaceImage}
-          onOpenPhotoModal={this.togglePhotoUpload}
+          onOpenPhotoModal={this.openPhotoUploadModal}
           onSignIn={this.handleSignInModalOpen}
-          onOpenFullscreenImage={this.toggleFullscreenImage}
+          onOpenFullscreenImage={this.openFullscreenImage}
           showNotification={this.showNotification}
         />
 
         <FullscreenImage
           isOpen={modals.fullscreenImage.isOpen}
           image={modals.fullscreenImage.image}
-          onClose={this.toggleFullscreenImage}
+          onClose={this.closeFullscreenImage}
         />
 
         <SignInModal
