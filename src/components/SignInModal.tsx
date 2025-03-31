@@ -110,7 +110,7 @@ class SignInModal extends React.Component<SignInModalProps, SignInModalState> {
           )}
 
           <div className="sign-in-buttons">
-            {/* {Capacitor.getPlatform() === 'ios' && ( */}
+            {Capacitor.getPlatform() === 'ios' && (
               <button
                 className="modal-option-button"
                 onClick={() => this.handleSignIn('apple')}
@@ -120,7 +120,7 @@ class SignInModal extends React.Component<SignInModalProps, SignInModalState> {
                 </svg>
                 Sign in with Apple
               </button>
-            {/* )} */}
+            )}
 
             <button
               className="modal-option-button"
