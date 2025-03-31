@@ -614,8 +614,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       usernameError
     } = this.state;
 
-    if (!isOpen) return null;
-
     // Update the handleClose function to avoid event propagation issues
     const handleClose = (e?: React.MouseEvent) => {
       // Prevent event propagation

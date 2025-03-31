@@ -13,7 +13,7 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
   render() {
     const { isOpen, sitId, onClose, onUploadToExisting, hasUserContributed } = this.props;
 
-    if (!isOpen || !sitId) return null;
+    if (!sitId) return null;
 
     return (
       <BaseModal

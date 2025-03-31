@@ -51,8 +51,6 @@ class SignInModal extends React.Component<SignInModalProps> {
   render() {
     const { isOpen, message } = this.props;
 
-    if (!isOpen) return null;
-
     return (
       <BaseModal
         isOpen={isOpen}
