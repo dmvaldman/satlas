@@ -45,7 +45,7 @@ body {
 
 #app-header {
   position: fixed;
-  top: 2rem;
+  top: 1rem;
   left: 0;
   right: 0;
   z-index: 2;
@@ -302,6 +302,14 @@ body {
 .profile-section input[type="text"]:focus {
   border-color: var(--primary-color);
   outline: none;
+}
+
+.profile-section .log-out-text {
+  font-size: 14px;
+  color: var(--white);
+  font-weight: 500;
+  text-align: center;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
 
 /* City input container and autocomplete styling */
@@ -815,32 +823,38 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 
 .notification {
   position: relative;
-  padding: 12px 16px;
+  padding: 6px 12px;
   border-radius: 8px;
   color: var(--white);
-  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   animation: slideDown 0.3s ease-out; /* Changed to slideDown */
-  text-shadow: 0px 0px 1px var(--black);
 }
 
 .notification-message {
+  font-size: 16px;
+  font-weight: 500;
   margin-right: 12px;
+  text-shadow: 0px 0px 2px var(--black);
 }
 
 .notification-close {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: none;
   color: var(--white);
   font-size: 24px;
+  font-weight: 500;
   cursor: pointer;
-  border-radius: 50%;
-  border: 1px solid;
   line-height: 100%;
+  padding: 0;
+  padding-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
 }
 
 .notification.success {
@@ -851,14 +865,6 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 .notification.error {
   background-color: var(--action-red);
   border: 1px solid var(--dark-red);
-}
-
-.notification.error .notification-close{
-  border-color: var(--dark-red);
-}
-
-.notification.success .notification-close{
-  border-color: var(--dark-green);
 }
 
 /* Update animation for top notifications */
