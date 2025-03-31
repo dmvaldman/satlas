@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import AuthComponent from './components/AuthComponent';
 import MapComponent from './components/MapComponent';
 import { Image, Sit, Location, MarkType, PhotoResult } from './types';
-import PhotoUploadComponent from './components/PhotoUpload';
+import PhotoUploadModal from './components/PhotoUploadModal';
 import ProfileModal from './components/ProfileModal';
 import { UserPreferences, PhotoModalState } from './types';
 import AddSitButton from './components/AddSitButton';
@@ -1411,7 +1411,7 @@ class App extends React.Component<{}, AppState> {
           />
         )}
 
-        <PhotoUploadComponent
+        <PhotoUploadModal
           isOpen={modals.photo.isOpen}
           onClose={() => this.togglePhotoUpload('none')}
           onPhotoUpload={this.handlePhotoUpload}

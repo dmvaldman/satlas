@@ -10,20 +10,26 @@ interface BaseModalProps {
 
 interface BaseModalState {
   isActive: boolean;
+  isVisible: boolean;
 }
 
 class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
+  private animationTimeout: number | null = null;
+
   constructor(props: BaseModalProps) {
     super(props);
     this.state = {
-      isActive: false
+      isActive: false,
+      isVisible: false
     };
   }
 
   componentDidMount() {
     if (this.props.isOpen) {
-      requestAnimationFrame(() => {
-        this.setState({ isActive: true });
+      this.setState({ isVisible: true }, () => {
+        requestAnimationFrame(() => {
+          this.setState({ isActive: true });
+        });
       });
     }
   }
@@ -31,14 +37,30 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   componentDidUpdate(prevProps: BaseModalProps) {
     if (!prevProps.isOpen && this.props.isOpen) {
       // Modal is opening
-      requestAnimationFrame(() => {
-        this.setState({ isActive: true });
+      this.setState({ isVisible: true }, () => {
+        requestAnimationFrame(() => {
+          this.setState({ isActive: true });
+        });
       });
     } else if (prevProps.isOpen && !this.props.isOpen) {
       // Modal is closing
-      requestAnimationFrame(() => {
-        this.setState({ isActive: false });
-      });
+      this.setState({ isActive: false });
+
+      // Clear any existing timeout
+      if (this.animationTimeout) {
+        window.clearTimeout(this.animationTimeout);
+      }
+
+      // Wait for animation to complete before removing from DOM
+      this.animationTimeout = window.setTimeout(() => {
+        this.setState({ isVisible: false });
+      }, 300); // Match the CSS transition duration
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.animationTimeout) {
+      window.clearTimeout(this.animationTimeout);
     }
   }
 
@@ -50,15 +72,14 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   };
 
   render() {
-    const { isOpen, children, className = '', contentClassName = '' } = this.props;
-    const { isActive } = this.state;
+    const { children, className = '', contentClassName = '' } = this.props;
+    const { isActive, isVisible } = this.state;
 
-    if (!isOpen) return null;
+    if (!isVisible) return null;
 
     return (
       <div
-        className={`modal-overlay ${isOpen ? 'active' : ''} ${className}`}
-        style={{ display: isOpen ? 'flex' : 'none' }}
+        className={`modal-overlay ${isActive ? 'active' : ''} ${className}`}
         onClick={this.handleClose}
       >
         <div

@@ -244,11 +244,14 @@ body {
   z-index: 2000;
   cursor: pointer;
   align-items: flex-end;
-  transition: background-color 0.3s ease-out;
+  will-change: opacity;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
 }
 
 .modal-overlay.active {
   background-color: rgba(0, 0, 0, 0.4);
+  opacity: 1;
 }
 
 /* Base modal content styles */
@@ -273,7 +276,6 @@ body {
   background-repeat: no-repeat;
 }
 
-/* Add this rule to reset the transform when the modal is active */
 .modal-content.active {
   transform: translateY(0);
 }
