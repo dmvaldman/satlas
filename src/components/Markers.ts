@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { Sit, MarkType, User } from '../types';
 
-export class MarkerManager {
+export class Markers {
   private markers: Map<string, mapboxgl.Marker> = new Map();
   private clusterMarkers: Set<mapboxgl.Marker> = new Set();
 

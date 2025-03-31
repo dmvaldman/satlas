@@ -2,8 +2,8 @@ import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { debounce } from '../utils/debounce';
 import { Sit, MarkType, User, Location } from '../types';
-import { MarkerManager } from './MarkerManager';
-import { ClusterManager } from './ClusterManager';
+import { Markers } from './Markers';
+import { Clusters } from './Clusters';
 
 mapboxgl.accessToken = process.env.MAPBOX_ACCESS_TOKEN || '';
 
@@ -26,8 +26,8 @@ interface MapState {
 }
 
 class MapComponent extends React.Component<MapProps, MapState> {
-  private markerManager: MarkerManager;
-  private clusterManager: ClusterManager;
+  private markerManager: Markers;
+  private clusterManager: Clusters;
   private userMarker: mapboxgl.Marker | null = null;
   private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
 
@@ -38,9 +38,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
       favoriteCount: new Map(props.favoriteCount)
     };
 
-    this.markerManager = new MarkerManager(this.handleMarkerClick);
+    this.markerManager = new Markers(this.handleMarkerClick);
 
-    this.clusterManager = new ClusterManager();
+    this.clusterManager = new Clusters();
 
     this.debouncedHandleMapMove = debounce(this.props.onLoadSits, 300);
   }

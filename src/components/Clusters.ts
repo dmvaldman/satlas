@@ -1,7 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { Sit } from '../types';
 
-export class ClusterManager {
+export class Clusters {
   private clusterSourceAdded: boolean = false;
   private clusterColor: string = '#003f83';
   private clusterRadius: number = 24;

@@ -1,24 +1,24 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
-import AuthComponent from './components/AuthComponent';
-import MapComponent from './components/MapComponent';
+import AuthComponent from './components/AuthButton';
+import MapComponent from './components/Map';
 import { Image, Sit, Location, MarkType, PhotoResult } from './types';
 import PhotoUploadModal from './components/PhotoUploadModal';
 import ProfileModal from './components/ProfileModal';
 import { UserPreferences, PhotoModalState } from './types';
 import AddSitButton from './components/AddSitButton';
-import NearbyExistingSitModal from './components/NearbyExistingSitModal';
+import NearbySitModal from './components/NearbySitModal';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './services/LocationService';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
-import PopupComponent from './components/Popup';
+import SitComponent from './components/Sit';
 import { OfflineService } from './services/OfflineService';
 import { ValidationUtils, SitTooCloseError } from './utils/ValidationUtils';
-import Notification from './components/Notification';
+import Notifications from './components/Notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
@@ -938,7 +938,7 @@ class App extends React.Component<{}, AppState> {
     message: string,
     type: 'success' | 'error'
   ) => {
-    const notification = Notification.getInstance();
+    const notification = Notifications.getInstance();
     if (notification) {
       notification.showNotification({ message, type });
     }
@@ -1443,7 +1443,7 @@ class App extends React.Component<{}, AppState> {
           showNotification={this.showNotification}
         />
 
-        <NearbyExistingSitModal
+        <NearbySitModal
           isOpen={modals.nearbySit.isOpen}
           sitId={modals.nearbySit.sitId}
           hasUserContributed={modals.nearbySit.hasUserContributed}
@@ -1451,9 +1451,9 @@ class App extends React.Component<{}, AppState> {
           onUploadToExisting={this.handleAddPhotoToSit}
         />
 
-        <Notification />
+        <Notifications />
 
-        <PopupComponent
+        <SitComponent
           isOpen={drawer.isOpen}
           photoModalIsOpen={modals.photo.isOpen}
           sit={drawer.sit}
