@@ -267,7 +267,7 @@ body {
   max-width: 500px;
   border: 1px solid var(--medium-gray);
   box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
-  background-image: linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url('../assets/imgs/bkg_small.png');
+  background-image: linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url('../assets/imgs/bkg_small.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
