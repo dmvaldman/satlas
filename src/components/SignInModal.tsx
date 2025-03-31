@@ -60,9 +60,7 @@ class SignInModal extends React.Component<SignInModalProps, SignInModalState> {
       const currentUser = auth.currentUser;
       if (currentUser) {
         // Handle success in the background
-        this.props.onSignInSuccess(currentUser).catch(() => {
-          this.props.onSignInError();
-        });
+        this.props.onSignInSuccess(currentUser)
       } else {
         this.props.onSignInError();
       }
