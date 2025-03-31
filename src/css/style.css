@@ -14,9 +14,9 @@
   --medium-gray: #bbb;
   --dark-gray: #444;
   --black: #000000;
-  --light-blue: #bdefff;
+  --light-blue: #aadcec;
   --dark-blue: #007AFF;
-  --light-green: #b3ffb8;
+  --light-green: #afe7b3;
   --dark-green: #21863a;
   --light-red: #fab7b3;
   --dark-red: #b52a23;
@@ -267,7 +267,7 @@ body {
   max-width: 500px;
   border: 1px solid var(--medium-gray);
   box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
-  background-image: linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url('../assets/imgs/sit_bkg.png');
+  background-image: linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), url('../assets/imgs/bkg_small.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -804,6 +804,7 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .favorite-count {
+  font-size: var(--font-size-large);
   margin: 8px 0;
 }
 
