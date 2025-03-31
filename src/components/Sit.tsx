@@ -105,7 +105,7 @@ class PopupComponent extends React.Component<PopupProps> {
     } else {
       // For web, copy to clipboard or use Web Share API if available
       navigator.clipboard.writeText(webUrl);
-      this.props.showNotification('Link copied to clipboard', 'success');
+      this.props.showNotification('Share link copied to clipboard', 'success');
     }
   };
 
