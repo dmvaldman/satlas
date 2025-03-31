@@ -498,7 +498,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               const status = imageStatuses[index] || 'notLoaded';
               const isVisible = status === 'loading' || status === 'loaded';
               const isLoaded = status === 'loaded';
-              const canShowControls = currentUserId && image.userId === currentUserId;
+              const canShowControls = currentUserId && (image.userId === currentUserId || currentUserId === 'bEorC36iZYZGWKydUqFo6VZ7RSn2');
 
               // Calculate dimensions using the helper method
               const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
