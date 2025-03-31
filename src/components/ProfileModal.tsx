@@ -6,6 +6,7 @@ import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
 import mapboxgl from 'mapbox-gl';
 import { App } from '@capacitor/app';
+import BaseModal from './BaseModal';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -27,7 +28,6 @@ interface ProfileModalState {
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
-  isActive: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
@@ -50,8 +50,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null,
-      isActive: false
+      usernameError: null
     };
 
     // Create the permission change handler bound to this instance
@@ -76,13 +75,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       this.setupAppStateListener();
     }
 
-    // Set to active after a small delay to ensure initial transform is applied
-    if (this.props.isOpen) {
-      requestAnimationFrame(() => {
-        this.setState({ isActive: true });
-      });
-    }
-
     // If we have coordinates, resolve them to a city name
     if (this.props.preferences?.cityCoordinates) {
       this.getCityFromCoordinates(this.props.preferences.cityCoordinates);
@@ -102,20 +94,10 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       // Sync the toggle state with actual device permissions
       this.syncNotificationToggleState();
 
-      // Set to active after a small delay to ensure initial transform is applied
-      requestAnimationFrame(() => {
-        this.setState({ isActive: true });
-      });
-
       // If we have coordinates, resolve them to a city name
       if (this.props.preferences?.cityCoordinates && !this.state.city) {
         this.getCityFromCoordinates(this.props.preferences.cityCoordinates);
       }
-    } else if (prevProps.isOpen && !this.props.isOpen) {
-      // Modal is closing
-      requestAnimationFrame(() => {
-        this.setState({ isActive: false });
-      });
     }
 
     if (prevProps.user !== this.props.user ||
@@ -629,8 +611,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityTopResult,
       cityCoordinates,
       isSubmitting,
-      usernameError,
-      isActive
+      usernameError
     } = this.state;
 
     if (!isOpen) return null;
@@ -681,16 +662,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
 
     return (
-      <div
-        className={`modal-overlay ${isOpen ? 'active' : ''}`}
-        style={{ display: isOpen ? 'flex' : 'none' }}
-        onClick={(e) => handleClose(e)}
+      <BaseModal
+        isOpen={isOpen}
+        onClose={handleClose}
+        contentClassName="profile-content"
       >
-        <div
-          className={`modal-content profile-content ${isActive ? 'active' : ''}`}
-          onClick={e => e.stopPropagation()}
-          ref={this.contentRef}
-        >
+        <div ref={this.contentRef}>
           <h2>Profile Settings</h2>
 
           <div className="profile-section">
@@ -758,7 +735,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             </button>
           </div>
         </div>
-      </div>
+      </BaseModal>
     );
   }
 }
