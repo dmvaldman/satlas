@@ -286,10 +286,22 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       // Extract only the top result
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
-        const topResult = feature.place_name;
+        const parts = feature.place_name.split(', ');
+        const city = parts[0];
+        const countryCode = feature.properties.country_code?.toUpperCase() || 'US';
+
+        let displayName;
+        if (countryCode === 'US' && parts.length > 1) {
+          // For US places, show city and state abbreviation
+          const state = parts[1];
+          displayName = `${city}, ${state}`;
+        } else {
+          // For non-US places, show city and country code
+          displayName = `${city} (${countryCode})`;
+        }
 
         this.setState({
-          cityTopResult: topResult
+          cityTopResult: displayName
         });
       } else {
         this.setState({ cityTopResult: null });
@@ -609,7 +621,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   render() {
-    const { isOpen, onClose, onSignOut, showNotification } = this.props;
+    const { isOpen, onClose, onSignOut } = this.props;
     const {
       username,
       pushNotifications,
