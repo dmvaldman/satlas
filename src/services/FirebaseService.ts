@@ -38,11 +38,25 @@ import { ValidationUtils } from '../utils/ValidationUtils';
 
 // Conditionally import Apple Sign In plugin only for iOS
 let SignInWithApple: any;
-if (Capacitor.getPlatform() === 'ios') {
-  import('@capacitor-community/apple-sign-in').then(module => {
-    SignInWithApple = module.SignInWithApple;
-  });
-}
+const loadAppleSignIn = async () => {
+  if (Capacitor.getPlatform() === 'ios') {
+    try {
+      // Use window.require to avoid Vite's static analysis
+      // @ts-ignore
+      const module = window.require('@capacitor-community/apple-sign-in');
+      SignInWithApple = module.SignInWithApple;
+    } catch (error) {
+      console.log('[Firebase] Apple Sign In module not available:', error);
+      SignInWithApple = null;
+    }
+  }
+};
+
+// Load Apple Sign In module if we're on iOS
+loadAppleSignIn().catch(error => {
+  console.error('[Firebase] Error loading Apple Sign In module:', error);
+  SignInWithApple = null;
+});
 
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
