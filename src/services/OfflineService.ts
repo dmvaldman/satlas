@@ -18,18 +18,19 @@ interface BasePendingUpload {
   type: PendingUploadType;
   timestamp: number;
   userId: string;
-  userName: string;
 }
 
 // New sit upload
 export interface NewSitPendingUpload extends BasePendingUpload {
   type: PendingUploadType.NEW_SIT;
+  userName: string;
   photoResult: PhotoResult;
 }
 
 // Add photo to existing sit
 export interface AddToSitPendingUpload extends BasePendingUpload {
   type: PendingUploadType.ADD_TO_EXISTING_SIT;
+  userName: string;
   photoResult: PhotoResult;
   imageCollectionId: string;
 }
@@ -37,6 +38,7 @@ export interface AddToSitPendingUpload extends BasePendingUpload {
 // Replace existing image
 export interface ReplaceImagePendingUpload extends BasePendingUpload {
   type: PendingUploadType.REPLACE_IMAGE;
+  userName: string;
   photoResult: PhotoResult;
   imageCollectionId: string;
   imageId: string;
@@ -50,6 +52,9 @@ export interface DeleteImagePendingUpload extends BasePendingUpload {
 
 // Union type for all pending upload types
 export type PendingUpload = NewSitPendingUpload | AddToSitPendingUpload | ReplaceImagePendingUpload | DeleteImagePendingUpload;
+
+export class OfflineError extends Error {}
+export class OfflineSuccess extends Error {}
 
 export class OfflineService {
   private static instance: OfflineService;
@@ -171,7 +176,7 @@ export class OfflineService {
   }
 
   // Add a new sit with photo
-  public async addPendingNewSit(
+  public async createSitWithImage(
     photoResult: PhotoResult,
     userId: string,
     userName: string
@@ -210,14 +215,14 @@ export class OfflineService {
   }
 
   // Add a photo to an existing sit
-  public async addPendingPhotoToSit(
+  public async addImageToSit(
     photoResult: PhotoResult,
     imageCollectionId: string,
     userId: string,
     userName: string
   ): Promise<string> {
     // Client-side validation using ValidationUtils directly
-    if (!ValidationUtils.canUserAddPhotoToSit(imageCollectionId, userId, false)) {
+    if (!ValidationUtils.canUserAddImageToSit(imageCollectionId, userId)) {
       throw new Error("You've already added a photo to this sit");
     }
 
@@ -251,18 +256,13 @@ export class OfflineService {
   }
 
   // Replace an existing image
-  public async addPendingReplaceImage(
+  public async replaceImageInSit(
     photoResult: PhotoResult,
     imageCollectionId: string,
     imageId: string,
     userId: string,
     userName: string
   ): Promise<string> {
-    // Client-side validation using ValidationUtils directly
-    if (!ValidationUtils.canUserReplaceImage(imageId, userId, false)) {
-      throw new Error("You can only replace your own images");
-    }
-
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const pendingUpload: ReplaceImagePendingUpload = {
@@ -294,10 +294,9 @@ export class OfflineService {
   }
 
   // Add this new method to queue image deletions
-  public async addPendingImageDeletion(
+  public async deleteImageFromSit(
     imageId: string,
-    userId: string,
-    userName: string
+    userId: string
   ): Promise<string> {
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -306,7 +305,6 @@ export class OfflineService {
       type: PendingUploadType.DELETE_IMAGE,
       imageId,
       userId,
-      userName,
       timestamp: Date.now()
     };
 

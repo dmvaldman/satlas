@@ -33,7 +33,7 @@ import {
 import { Sit, Image, Location, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { OfflineService } from './OfflineService';
+import { OfflineService, OfflineSuccess } from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
 
 // Conditionally import Apple Sign In plugin only for iOS
@@ -96,25 +96,6 @@ export class FirebaseService {
   static isOnline(): boolean {
     // Use the OfflineService to check network status
     return OfflineService.getInstance().isNetworkOnline();
-  }
-
-  /**
-   * Handle offline photo upload by adding to queue
-   * @param message The success message to show
-   */
-  static handleOfflinePhotoUpload(message: string = "Photo saved and will upload when you're back online"): never {
-    console.log('[Firebase] Offline upload queued:', message);
-    throw new Error(message);
-  }
-
-  /**
-   * Handle offline error
-   * @param originalError The original error that occurred
-   * @param message The error message to show
-   */
-  static handleOfflineError(originalError: any, message: string = 'Failed to save photo for later upload'): never {
-    console.error('[Firebase] Offline upload error:', originalError);
-    throw new Error(message);
   }
 
   // ===== Authentication Methods =====
@@ -185,6 +166,105 @@ export class FirebaseService {
       }
     } catch (error) {
       console.error('[Firebase] Error signing in with Google:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign in with Apple
+   * @returns Promise that resolves when sign-in is complete
+   */
+    static async signInWithApple(): Promise<void> {
+      console.log('[Firebase] Starting Apple sign-in process');
+      try {
+        // First ensure we're signed out
+        await FirebaseService.signOut();
+
+        if (Capacitor.isNativePlatform()) {
+          console.log('[Firebase] Using native Apple Sign In');
+          try {
+            if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
+              // Configure Apple Sign In options
+              console.log('[Firebase] Configuring Apple Sign In options');
+              const options = {
+                clientId: process.env.APPLE_SERVICE_ID || '', // Should be your Apple Service ID
+                scopes: 'email name',
+                state: Math.random().toString(36).substring(7),
+                nonce: Math.random().toString(36).substring(7)
+              };
+              console.log('[Firebase] Apple Sign In options configured:', options);
+
+              // Use the native plugin
+              console.log('[Firebase] Calling SignInWithApple.authorize');
+              const result = await SignInWithApple.authorize(options);
+              console.log('[Firebase] Native Apple sign-in raw result:', result);
+
+              if (!result || !result.response) {
+                console.error('[Firebase] No result from native sign-in');
+                throw new Error('No result from native sign-in');
+              }
+
+              if (!result.response.identityToken) {
+                console.error('[Firebase] No identity token in response');
+                throw new Error('No identity token received from Apple');
+              }
+
+              // Create Firebase credential from Apple ID token
+              console.log('[Firebase] Creating Firebase credential from Apple ID token');
+              const provider = new OAuthProvider('apple.com');
+              const credential = provider.credential({
+                idToken: result.response.identityToken,
+                rawNonce: options.nonce
+              });
+              console.log('[Firebase] Firebase credential created');
+
+              // Sign in to Firebase with the credential
+              console.log('[Firebase] Signing in to Firebase with credential');
+              const userCredential = await signInWithCredential(auth, credential);
+              console.log('[Firebase] Firebase sign-in complete, user:', {
+                uid: userCredential.user.uid,
+                email: userCredential.user.email,
+                displayName: userCredential.user.displayName
+              });
+
+              // Verify the current user
+              const currentUser = auth.currentUser;
+              if (!currentUser) {
+                console.error('[Firebase] No current user after credential sign-in');
+                throw new Error('Failed to get current user after sign-in');
+              }
+
+              console.log('[Firebase] Current user verified:', {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: currentUser.displayName
+              });
+
+            } else {
+              // For Android or web, use Firebase's built-in Apple Sign In
+              console.log('[Firebase] Using Firebase built-in Apple Sign In');
+              const provider = new OAuthProvider('apple.com');
+              await signInWithPopup(auth, provider);
+            }
+          } catch (error: unknown) {
+            console.error('[Firebase] Plugin error:', error);
+            // If we get a specific error about credentials, try web fallback
+            if (error instanceof Error &&
+                (error.message.includes('credentials') || error.message.includes('cancelled'))) {
+              console.log('[Firebase] Falling back to web authentication');
+              const provider = new OAuthProvider('apple.com');
+              await signInWithPopup(auth, provider);
+            } else {
+              throw error;
+            }
+          }
+        } else {
+          console.log('[Firebase] Using web authentication');
+          const provider = new OAuthProvider('apple.com');
+          await signInWithPopup(auth, provider);
+        }
+      } catch (error) {
+      console.error('[Firebase] Error signing in with Apple:', error);
       throw error;
     }
   }
@@ -261,105 +341,6 @@ export class FirebaseService {
         });
         callback(user);
       });
-    }
-  }
-
-  /**
-   * Sign in with Apple
-   * @returns Promise that resolves when sign-in is complete
-   */
-  static async signInWithApple(): Promise<void> {
-    console.log('[Firebase] Starting Apple sign-in process');
-    try {
-      // First ensure we're signed out
-      await FirebaseService.signOut();
-
-      if (Capacitor.isNativePlatform()) {
-        console.log('[Firebase] Using native Apple Sign In');
-        try {
-          if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
-            // Configure Apple Sign In options
-            console.log('[Firebase] Configuring Apple Sign In options');
-            const options = {
-              clientId: process.env.APPLE_SERVICE_ID || '', // Should be your Apple Service ID
-              scopes: 'email name',
-              state: Math.random().toString(36).substring(7),
-              nonce: Math.random().toString(36).substring(7)
-            };
-            console.log('[Firebase] Apple Sign In options configured:', options);
-
-            // Use the native plugin
-            console.log('[Firebase] Calling SignInWithApple.authorize');
-            const result = await SignInWithApple.authorize(options);
-            console.log('[Firebase] Native Apple sign-in raw result:', result);
-
-            if (!result || !result.response) {
-              console.error('[Firebase] No result from native sign-in');
-              throw new Error('No result from native sign-in');
-            }
-
-            if (!result.response.identityToken) {
-              console.error('[Firebase] No identity token in response');
-              throw new Error('No identity token received from Apple');
-            }
-
-            // Create Firebase credential from Apple ID token
-            console.log('[Firebase] Creating Firebase credential from Apple ID token');
-            const provider = new OAuthProvider('apple.com');
-            const credential = provider.credential({
-              idToken: result.response.identityToken,
-              rawNonce: options.nonce
-            });
-            console.log('[Firebase] Firebase credential created');
-
-            // Sign in to Firebase with the credential
-            console.log('[Firebase] Signing in to Firebase with credential');
-            const userCredential = await signInWithCredential(auth, credential);
-            console.log('[Firebase] Firebase sign-in complete, user:', {
-              uid: userCredential.user.uid,
-              email: userCredential.user.email,
-              displayName: userCredential.user.displayName
-            });
-
-            // Verify the current user
-            const currentUser = auth.currentUser;
-            if (!currentUser) {
-              console.error('[Firebase] No current user after credential sign-in');
-              throw new Error('Failed to get current user after sign-in');
-            }
-
-            console.log('[Firebase] Current user verified:', {
-              uid: currentUser.uid,
-              email: currentUser.email,
-              displayName: currentUser.displayName
-            });
-
-          } else {
-            // For Android or web, use Firebase's built-in Apple Sign In
-            console.log('[Firebase] Using Firebase built-in Apple Sign In');
-            const provider = new OAuthProvider('apple.com');
-            await signInWithPopup(auth, provider);
-          }
-        } catch (error: unknown) {
-          console.error('[Firebase] Plugin error:', error);
-          // If we get a specific error about credentials, try web fallback
-          if (error instanceof Error &&
-              (error.message.includes('credentials') || error.message.includes('cancelled'))) {
-            console.log('[Firebase] Falling back to web authentication');
-            const provider = new OAuthProvider('apple.com');
-            await signInWithPopup(auth, provider);
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        console.log('[Firebase] Using web authentication');
-        const provider = new OAuthProvider('apple.com');
-        await signInWithPopup(auth, provider);
-      }
-    } catch (error) {
-      console.error('[Firebase] Error signing in with Apple:', error);
-      throw error;
     }
   }
 
@@ -530,6 +511,79 @@ export class FirebaseService {
   }
 
   /**
+   * Check if a username is already taken by another user
+   * @param username The username to check
+   * @param currentUserId The current user's ID (to exclude from the check)
+   * @param originalUsername The user's original username (to skip check if unchanged)
+   * @returns Promise<boolean> True if the username is taken, false otherwise
+   */
+  static async isUsernameTaken(
+    username: string,
+    currentUserId?: string,
+    originalUsername?: string
+  ): Promise<boolean> {
+    // Skip check if it's the user's current username
+    if (originalUsername && username === originalUsername) {
+      return false;
+    }
+
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('username', '==', username));
+      const querySnapshot = await getDocs(q);
+
+      // If currentUserId is provided, exclude the current user from the check
+      if (currentUserId) {
+        return querySnapshot.docs.some(doc => doc.id !== currentUserId);
+      }
+
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return false; // Assume it's not taken if there's an error
+    }
+  }
+
+    /**
+   * Generates a unique username based on user information
+   * @param userId The user's ID (to exclude from uniqueness check)
+   * @param displayName The user's display name (optional)
+   * @returns Promise<string> A unique username
+   */
+  static async generateUniqueUsername(
+    userId: string,
+    displayName?: string | null
+  ): Promise<string> {
+    // Create base name from user info
+    let baseName = '';
+    if (displayName) {
+      baseName = displayName.split(' ')[0];
+    } else {
+      baseName = `user${Math.floor(Math.random() * 1000)}`;
+    }
+
+    // Clean up the name (remove special chars, lowercase)
+    let cleanName = baseName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Ensure minimum length
+    if (cleanName.length < 3) {
+      cleanName = `user${userId.substring(0, 5)}`;
+    }
+
+    // Try the base name first
+    let uniqueName = cleanName;
+    let counter = 1;
+
+    // Keep trying until we find a unique name
+    while (await this.isUsernameTaken(uniqueName, userId)) {
+      uniqueName = `${cleanName}${counter}`;
+      counter++;
+    }
+
+    return uniqueName;
+  };
+
+  /**
    * Update username in all user's images
    * @param userId User ID
    * @param newUsername New username
@@ -583,7 +637,7 @@ export class FirebaseService {
    * @param bounds Map bounds
    * @returns Map of sits
    */
-  static async loadSits(bounds: { north: number; south: number }): Promise<Map<string, Sit>> {
+  static async loadSitsFromBounds(bounds: { north: number; south: number }): Promise<Map<string, Sit>> {
     try {
       const sitsRef = collection(db, 'sits');
       const q = query(
@@ -619,6 +673,19 @@ export class FirebaseService {
   }
 
   /**
+   * Load sits within a 100m radius of a location
+   * @param location Location
+   * @returns Map of sits
+   */
+  static async loadSitsNearLocation(location: Location): Promise<Map<string, Sit>> {
+    const bounds = {
+      north: location.latitude + 0.01,
+      south: location.latitude - 0.01
+    };
+    return this.loadSitsFromBounds(bounds);
+  }
+
+  /**
    * Get a single sit by ID
    * @param sitId Sit ID
    * @returns Sit object
@@ -648,6 +715,194 @@ export class FirebaseService {
   }
 
   /**
+   * Create a sit with a photo
+   * @param photoResult The photo result containing base64 data and location
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @returns Promise resolving to the created sit
+   * @throws Error when offline
+   */
+  static async createSitWithImage(
+    photoResult: PhotoResult,
+    userId: string,
+    userName: string,
+    validate?: boolean
+  ): Promise<{ sit: Sit, image: Image }> {
+    // Check if we're online
+    if (!this.isOnline()) {
+      try {
+        console.log('[Firebase] Offline, adding to pending uploads queue');
+        await OfflineService.getInstance().createSitWithImage(
+          photoResult,
+          userId,
+          userName
+        );
+        throw new OfflineSuccess("Photo saved and will upload when you're back online");
+      } catch (error: any) {
+        throw error;
+      }
+    }
+
+    if (validate) {
+      // Check if we can create the sit
+      const nearbySits = await this.loadSitsNearLocation(photoResult.location);
+      const nearbySitsArray = Array.from(nearbySits.values());
+
+      const canCreateSit = ValidationUtils.canUserCreateSitAtLocation(
+        photoResult.location,
+        userId,
+        nearbySitsArray
+      );
+
+      if (!canCreateSit) {
+        throw new Error("Sit already exists at this location");
+      }
+    }
+
+    try {
+      const image = await this._createImage(photoResult, userId, userName);
+      const sit = await this._createSit(photoResult.location, image.collectionId, userId, userName);
+
+      return { sit, image };
+    } catch (error: any) {
+      console.error('Error creating sit with photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a photo to an existing sit
+   * @param photoResult The photo result containing base64 data
+   * @param imageCollectionId The image collection ID
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @returns Promise resolving to the created image
+   * @throws Error when offline
+   */
+    static async addImageToSit(
+      photoResult: PhotoResult,
+      imageCollectionId: string,
+      userId: string,
+      userName: string,
+      validate?: boolean
+    ): Promise<Image> {
+      // Check if we're online
+      if (!this.isOnline()) {
+        try {
+          // Add to pending uploads
+          await OfflineService.getInstance().addImageToSit(
+            photoResult,
+            imageCollectionId,
+            userId,
+            userName
+          );
+
+          // Throw a success error to indicate offline handling
+          throw new OfflineSuccess("Photo saved and will upload when you're back online");
+        } catch (error: any) {
+          throw error;
+        }
+      }
+
+      try {
+        if (validate) {
+          // Check if user is authenticated
+          if (!ValidationUtils.isUserAuthenticated(userId)) {
+            throw new Error("You must be logged in to add a photo");
+          }
+
+          // Check if the location is valid
+          if (!ValidationUtils.isLocationValid(photoResult.location)) {
+            throw new Error("Valid location data is required to add a photo");
+          }
+
+          // Check if user already has an image in this collection
+          const existingImages = await this.getImages(imageCollectionId);
+          const canAddPhoto = ValidationUtils.canUserAddImageToSit(
+            imageCollectionId,
+            userId,
+            existingImages
+          );
+
+          if (!canAddPhoto) {
+            throw new Error("You've already added a photo to this sit");
+          }
+
+          // Check if photo location is near the sit
+          const sit = await this.getSitByCollectionId(imageCollectionId);
+          if (sit && !ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
+            throw new Error("Photo location is too far from the sit location");
+          }
+        }
+
+        const image = await this._createImage(photoResult, userId, userName);
+        return image;
+      } catch (error: any) {
+        console.error('Error adding photo to sit:', error);
+        throw error;
+      }
+    }
+
+  /**
+   * Create an image in Firestore
+   * @param photoResult The photo result containing base64 data
+   * @param userId The user ID
+   * @param userName The user's display name
+   * @returns Promise resolving to the created image
+   */
+  static async _createImage(photoResult: PhotoResult, userId: string, userName: string): Promise<Image> {
+    const filename = `sit_${Date.now()}.jpg`;
+    const storageRef = ref(storage, `sits/${filename}`);
+
+    // Detect content type from base64 data
+    let contentType = 'image/jpeg'; // Default
+    if (photoResult.base64Data.startsWith('data:')) {
+      const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
+      if (matches && matches.length > 1) {
+        contentType = matches[1];
+      }
+    }
+
+    const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
+
+    // Add metadata with detected content type
+    const metadata = {
+      contentType: contentType
+    };
+
+    // Upload with metadata
+    await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
+
+    // Use CDN URL
+    const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
+
+    // Create image collection
+    const imageCollectionId = `${Date.now()}_${userId}`;
+    const imageDoc = await addDoc(collection(db, 'images'), {
+      photoURL,
+      userId,
+      userName,
+      collectionId: imageCollectionId,
+      createdAt: new Date(),
+      width: photoResult.dimensions.width,
+      height: photoResult.dimensions.height
+    });
+
+    const image: Image = {
+      id: imageDoc.id,
+      photoURL,
+      userId,
+      userName,
+      collectionId: imageCollectionId,
+      createdAt: new Date(),
+      width: photoResult.dimensions.width,
+      height: photoResult.dimensions.height
+    };
+
+    return image;
+  }
+
+  /**
    * Create a sit in Firestore
    * @param coordinates Location coordinates
    * @param imageCollectionId Image collection ID
@@ -655,7 +910,7 @@ export class FirebaseService {
    * @param userName The user's display name
    * @returns Created sit
    */
-  static async createSit(coordinates: Location, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
+  static async _createSit(coordinates: Location, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
     try {
       const sitRef = doc(collection(db, 'sits'));
       const sitData = {
@@ -679,276 +934,53 @@ export class FirebaseService {
   }
 
   /**
-   * Create a sit with a photo
-   * @param photoResult The photo result containing base64 data and location
-   * @param userId The user ID
-   * @param userName The user's display name
-   * @returns Promise resolving to the created sit
-   * @throws Error when offline
-   */
-  static async createSitWithPhoto(
-    photoResult: PhotoResult,
-    userId: string,
-    userName: string
-  ): Promise<{ sit: Sit, image: Image }> {
-    // Check if we're online
-    if (!this.isOnline()) {
-      try {
-        console.log('[Firebase] Offline, adding to pending uploads queue');
-
-        // Add to pending uploads
-        await OfflineService.getInstance().addPendingNewSit(
-          photoResult,
-          userId,
-          userName
-        );
-
-        // Throw a success error to indicate offline handling
-        throw this.handleOfflinePhotoUpload();
-      } catch (error: any) {
-        // If this is already our offline success error, just rethrow
-        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
-          throw error;
-        }
-
-        // Otherwise, it's a real error from the queue operation
-        throw this.handleOfflineError(error);
-      }
-    }
-
-    try {
-      // Upload photo
-      const filename = `sit_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `sits/${filename}`);
-
-      // Detect content type from base64 data
-      let contentType = 'image/jpeg'; // Default
-      if (photoResult.base64Data.startsWith('data:')) {
-        const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
-        if (matches && matches.length > 1) {
-          contentType = matches[1];
-        }
-      }
-
-      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-      // Add metadata with detected content type
-      const metadata = {
-        contentType: contentType
-      };
-
-      // Upload with metadata
-      await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
-
-      // Use CDN URL
-      const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
-
-      // Create image collection
-      const imageCollectionId = `${Date.now()}_${userId}`;
-      const imageDoc = await addDoc(collection(db, 'images'), {
-        photoURL,
-        userId,
-        userName,
-        collectionId: imageCollectionId,
-        createdAt: new Date(),
-        width: photoResult.dimensions.width,
-        height: photoResult.dimensions.height
-      });
-
-      const image: Image = {
-        id: imageDoc.id,
-        photoURL,
-        userId,
-        userName,
-        collectionId: imageCollectionId,
-        createdAt: new Date(),
-        width: photoResult.dimensions.width,
-        height: photoResult.dimensions.height
-      };
-
-      // Create the sit
-      const sit = await this.createSit(photoResult.location, imageCollectionId, userId, userName);
-
-      return { sit, image };
-    } catch (error: any) {
-      console.error('Error creating sit with photo:', error);
-
-      // Check if this is a network-related error
-      if (!navigator.onLine || error.message?.includes('network')) {
-        console.log('[Firebase] Network error detected, falling back to offline mode');
-
-        try {
-          // Add to pending uploads
-          await OfflineService.getInstance().addPendingNewSit(
-            photoResult,
-            userId,
-            userName
-          );
-
-          // Throw a success error with custom message
-          throw this.handleOfflinePhotoUpload("Network error occurred, but photo was saved for later upload");
-        } catch (queueError: any) {
-          // Only throw a new error if it's not already our offline error
-          if (!(queueError instanceof Error && queueError.message === "Photo saved and will upload when you're back online")) {
-            throw this.handleOfflineError(queueError);
-          }
-          throw queueError;
-        }
-      }
-
-      // For other errors, just rethrow
-      throw error;
-    }
-  }
-
-  /**
-   * Add a photo to an existing sit
+   * Replace an existing image
    * @param photoResult The photo result containing base64 data
    * @param imageCollectionId The image collection ID
+   * @param imageId The image ID to replace
    * @param userId The user ID
    * @param userName The user's display name
-   * @returns Promise resolving to the created image
    * @throws Error when offline
    */
-  static async addPhotoToSit(
+  static async replaceImageInSit(
     photoResult: PhotoResult,
     imageCollectionId: string,
+    imageId: string,
     userId: string,
     userName: string
   ): Promise<Image> {
     // Check if we're online
     if (!this.isOnline()) {
       try {
-        console.log('[Firebase] Offline, adding to pending uploads queue');
-
         // Add to pending uploads
-        await OfflineService.getInstance().addPendingPhotoToSit(
+        await OfflineService.getInstance().replaceImageInSit(
           photoResult,
           imageCollectionId,
+          imageId,
           userId,
           userName
         );
 
         // Throw a success error to indicate offline handling
-        throw this.handleOfflinePhotoUpload();
+        throw new OfflineSuccess("Photo saved and will upload when you're back online");
       } catch (error: any) {
-        // If this is already our offline success error, just rethrow
-        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
-          throw error;
-        }
-
-        // Otherwise, it's a real error from the queue operation
-        throw this.handleOfflineError(error);
+        throw error;
       }
     }
 
     try {
-      // Check if user is authenticated
-      if (!ValidationUtils.isUserAuthenticated(userId)) {
-        throw new Error("You must be logged in to add a photo");
-      }
+      // Delete the old image first
+      await this.deleteImageFromSit(imageId, userId);
 
-      // Check if the location is valid
-      if (!ValidationUtils.isLocationValid(photoResult.location)) {
-        throw new Error("Valid location data is required to add a photo");
-      }
-
-      // Check if user already has an image in this collection
-      const existingImages = await this.getImages(imageCollectionId);
-      const canAddPhoto = ValidationUtils.canUserAddPhotoToSit(
+      // Then add a new photo
+      return await this.addImageToSit(
+        photoResult,
         imageCollectionId,
         userId,
-        true, // isOnline
-        existingImages
+        userName
       );
-
-      if (!canAddPhoto) {
-        throw new Error("You've already added a photo to this sit");
-      }
-
-      // Check if photo location is near the sit
-      const sit = await this.getSitByCollectionId(imageCollectionId);
-      if (sit && !ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
-        throw new Error("Photo location is too far from the sit location");
-      }
-
-      // Upload photo
-      const filename = `sit_${Date.now()}.jpg`;
-      const storageRef = ref(storage, `sits/${filename}`);
-
-      // Detect content type from base64 data
-      let contentType = 'image/jpeg'; // Default
-      if (photoResult.base64Data.startsWith('data:')) {
-        const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
-        if (matches && matches.length > 1) {
-          contentType = matches[1];
-        }
-      }
-
-      const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-      // Add metadata with detected content type
-      const metadata = {
-        contentType: contentType
-      };
-
-      // Upload with metadata
-      await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
-
-      // Use CDN URL
-      const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
-
-      // Create image document in Firestore
-      const imageDoc = await addDoc(collection(db, 'images'), {
-        photoURL,
-        userId,
-        userName,
-        collectionId: imageCollectionId,
-        createdAt: new Date(),
-        width: photoResult.dimensions.width,
-        height: photoResult.dimensions.height
-      });
-
-      console.log(`Added photo to sit at filename ${filename} and id ${imageDoc.id}`);
-
-      return {
-        id: imageDoc.id,
-        photoURL,
-        userId,
-        userName,
-        collectionId: imageCollectionId,
-        createdAt: new Date(),
-        width: photoResult.dimensions.width,
-        height: photoResult.dimensions.height
-      };
     } catch (error: any) {
-      console.error('Error adding photo to sit:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete a sit
-   * @param sitId Sit ID
-   * @returns Whether deletion was successful
-   */
-  static async deleteSit(sitId: string): Promise<boolean> {
-    try {
-      // Get the sit first to verify ownership
-      const sitRef = doc(db, 'sits', sitId);
-      const sitDoc = await getDoc(sitRef);
-
-      if (!sitDoc.exists()) {
-        console.log(`Sit ${sitId} not found`);
-        return false;
-      }
-
-      // Delete the sit
-      await deleteDoc(sitRef);
-      console.log(`Deleted sit ${sitId}`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting sit:', error);
+      console.error('Error replacing image:', error);
       throw error;
     }
   }
@@ -958,7 +990,21 @@ export class FirebaseService {
    * @param imageId Image ID
    * @param userId User ID
    */
-  static async deleteImage(imageId: string, userId: string): Promise<void> {
+  static async deleteImageFromSit(imageId: string, userId: string): Promise<void> {
+    if (!this.isOnline()) {
+      try {
+        // If we're offline, queue the deletion
+        const offlineService = OfflineService.getInstance();
+        await offlineService.deleteImageFromSit(
+          imageId,
+          userId
+        );
+        throw new OfflineSuccess("Photo will be deleted when you're back online");
+      } catch (error: any) {
+        throw error;
+      }
+    }
+
     try {
       // Get image data first
       const imageDoc = await getDoc(doc(db, 'images', imageId));
@@ -1024,6 +1070,141 @@ export class FirebaseService {
       }
     } catch (error) {
       console.error('Error deleting image:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process all pending uploads from the OfflineService
+   * @param onError Optional callback that will be called for each failed upload
+   * @returns Promise that resolves when all uploads are processed
+   */
+  static async processPendingUploads(
+    onError: (uploadId: string, error: any) => void = () => {}
+  ): Promise<void> {
+    try {
+      if (!this.isOnline()) {
+        console.log('[Firebase] Cannot process uploads while offline');
+        return;
+      }
+
+      const offlineService = OfflineService.getInstance();
+      const validate = true;
+
+      // Process new sits
+      const pendingNewSits = offlineService.getPendingNewSits();
+      for (const upload of pendingNewSits) {
+        try {
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload || !('photoResult' in fullUpload)) {
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
+          await this.createSitWithImage(
+            fullUpload.photoResult,
+            fullUpload.userId,
+            fullUpload.userName,
+            validate
+          );
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing new sit upload:', error);
+          onError(upload.id, error);
+        }
+      }
+
+      // Process add to existing sits
+      const pendingAddToSits = offlineService.getPendingAddToSits();
+      for (const upload of pendingAddToSits) {
+        try {
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload || !('photoResult' in fullUpload)) {
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
+          await this.addImageToSit(
+            fullUpload.photoResult,
+            upload.imageCollectionId,
+            upload.userId,
+            upload.userName,
+            validate
+          );
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing add to sit upload:', error);
+          onError(upload.id, error);
+        }
+      }
+
+      // Process replace images
+      const pendingReplaceImages = offlineService.getPendingReplaceImages();
+      for (const upload of pendingReplaceImages) {
+        try {
+          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+          if (!fullUpload || !('photoResult' in fullUpload)) {
+            await offlineService.removePendingUpload(upload.id);
+            continue;
+          }
+
+          // No validation implemented
+          await this.replaceImageInSit(
+            fullUpload.photoResult,
+            upload.imageCollectionId,
+            upload.imageId,
+            upload.userId,
+            upload.userName
+          );
+          await offlineService.removePendingUpload(upload.id);
+        } catch (error) {
+          console.error('[Firebase] Error processing replace image upload:', error);
+          onError(upload.id, error);
+        }
+      }
+
+      // Process pending deletions
+      const pendingDeletions = offlineService.getPendingImageDeletions();
+      for (const deletion of pendingDeletions) {
+        try {
+          await FirebaseService.deleteImageFromSit(deletion.imageId, deletion.userId);
+          await offlineService.removePendingUpload(deletion.id);
+        } catch (error) {
+          console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
+          onError(deletion.id, error);
+        }
+      }
+
+      console.log('[Firebase] Finished processing pending uploads');
+
+    } catch (error) {
+      console.error('[Firebase] Error in processPendingUploads:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a sit
+   * @param sitId Sit ID
+   * @returns Whether deletion was successful
+   */
+  static async deleteSit(sitId: string): Promise<boolean> {
+    try {
+      // Get the sit first to verify ownership
+      const sitRef = doc(db, 'sits', sitId);
+      const sitDoc = await getDoc(sitRef);
+
+      if (!sitDoc.exists()) {
+        console.log(`Sit ${sitId} not found`);
+        return false;
+      }
+
+      // Delete the sit
+      await deleteDoc(sitRef);
+      console.log(`Deleted sit ${sitId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting sit:', error);
       throw error;
     }
   }
@@ -1244,248 +1425,6 @@ export class FirebaseService {
   }
 
   /**
-   * Replace an existing image
-   * @param photoResult The photo result containing base64 data
-   * @param imageCollectionId The image collection ID
-   * @param imageId The image ID to replace
-   * @param userId The user ID
-   * @param userName The user's display name
-   * @throws Error when offline
-   */
-  static async replaceImage(
-    photoResult: PhotoResult,
-    imageCollectionId: string,
-    imageId: string,
-    userId: string,
-    userName: string
-  ): Promise<Image> {
-    // Check if we're online
-    if (!this.isOnline()) {
-      try {
-        console.log('[Firebase] Offline, adding to pending uploads queue');
-
-        // Add to pending uploads
-        await OfflineService.getInstance().addPendingReplaceImage(
-          photoResult,
-          imageCollectionId,
-          imageId,
-          userId,
-          userName
-        );
-
-        // Throw a success error to indicate offline handling
-        throw this.handleOfflinePhotoUpload();
-      } catch (error: any) {
-        // If this is already our offline success error, just rethrow
-        if (error instanceof Error && error.message === "Photo saved and will upload when you're back online") {
-          throw error;
-        }
-
-        // Otherwise, it's a real error from the queue operation
-        throw this.handleOfflineError(error);
-      }
-    }
-
-    try {
-      // We're online, validate first using ValidationUtils directly
-      let canReplaceImage = false;
-
-      // For temporary images, use ValidationUtils directly
-      if (imageId.startsWith('temp_')) {
-        canReplaceImage = ValidationUtils.canUserReplaceImage(imageId, userId, true);
-      } else {
-        // Get the image document
-        const imageDoc = await getDoc(doc(db, 'images', imageId));
-        if (!imageDoc.exists()) {
-          throw new Error('Image not found');
-        }
-
-        // Convert to Image type
-        const imageData = imageDoc.data();
-        const image = {
-          id: imageId,
-          photoURL: imageData.photoURL || '',
-          userId: imageData.userId,
-          userName: imageData.userName,
-          collectionId: imageData.collectionId,
-          createdAt: imageData.createdAt.toDate(),
-          width: imageData.width || undefined,
-          height: imageData.height || undefined
-        };
-
-        // Use ValidationUtils directly
-        canReplaceImage = ValidationUtils.canUserReplaceImage(imageId, userId, true, image);
-      }
-
-      if (!canReplaceImage) {
-        throw new Error("You can only replace your own images");
-      }
-
-      // Proceed with replacement if validation passes
-      console.log('[Firebase] Online, replacing image');
-
-      // Delete the old image first
-      await this.deleteImage(imageId, userId);
-
-      // Then add a new photo
-      return await this.addPhotoToSit(
-        photoResult,
-        imageCollectionId,
-        userId,
-        userName
-      );
-    } catch (error: any) {
-      console.error('Error replacing image:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process all pending uploads from the OfflineService
-   * @param onError Optional callback that will be called for each failed upload
-   * @returns Promise that resolves when all uploads are processed
-   */
-  static async processPendingUploads(
-    onError: (uploadId: string, error: any) => void = () => {}
-  ): Promise<void> {
-    try {
-      if (!this.isOnline()) {
-        console.log('[Firebase] Cannot process uploads while offline');
-        return;
-      }
-
-      const offlineService = OfflineService.getInstance();
-
-      // Process new sits
-      const pendingNewSits = offlineService.getPendingNewSits();
-      for (const upload of pendingNewSits) {
-        try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
-          }
-
-          await this.createSitWithPhoto(
-            fullUpload.photoResult,
-            fullUpload.userId,
-            fullUpload.userName
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing new sit upload:', error);
-          onError(upload.id, error);
-        }
-      }
-
-      // Process add to existing sits
-      const pendingAddToSits = offlineService.getPendingAddToSits();
-      for (const upload of pendingAddToSits) {
-        try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
-          }
-
-          const existingImages = await this.getImages(upload.imageCollectionId);
-          const canAddPhoto = ValidationUtils.canUserAddPhotoToSit(
-            upload.imageCollectionId,
-            upload.userId,
-            true,
-            existingImages
-          );
-
-          if (!canAddPhoto) {
-            onError(upload.id, new Error('You already have an image in this collection'));
-            continue;
-          }
-
-          await this.addPhotoToSit(
-            fullUpload.photoResult,
-            upload.imageCollectionId,
-            upload.userId,
-            upload.userName
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing add to sit upload:', error);
-          onError(upload.id, error);
-        }
-      }
-
-      // Process replace images
-      const pendingReplaceImages = offlineService.getPendingReplaceImages();
-      for (const upload of pendingReplaceImages) {
-        try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
-          }
-
-          let canReplaceImage = false;
-          if (upload.imageId.startsWith('temp_')) {
-            canReplaceImage = ValidationUtils.canUserReplaceImage(upload.imageId, upload.userId, true);
-          } else {
-            const imageDoc = await getDoc(doc(db, 'images', upload.imageId));
-            if (imageDoc.exists()) {
-              const imageData = imageDoc.data();
-              const image = {
-                id: upload.imageId,
-                photoURL: imageData.photoURL || '',
-                userId: imageData.userId,
-                userName: imageData.userName,
-                collectionId: imageData.collectionId,
-                createdAt: imageData.createdAt.toDate(),
-                width: imageData.width || undefined,
-                height: imageData.height || undefined
-              };
-
-              canReplaceImage = ValidationUtils.canUserReplaceImage(upload.imageId, upload.userId, true, image);
-            }
-          }
-
-          if (!canReplaceImage) {
-            onError(upload.id, new Error('You cannot replace this image'));
-            continue;
-          }
-
-          await this.replaceImage(
-            fullUpload.photoResult,
-            upload.imageCollectionId,
-            upload.imageId,
-            upload.userId,
-            upload.userName
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing replace image upload:', error);
-          onError(upload.id, error);
-        }
-      }
-
-      // Process pending deletions
-      const pendingDeletions = offlineService.getPendingImageDeletions();
-      for (const deletion of pendingDeletions) {
-        try {
-          await FirebaseService.deleteImage(deletion.imageId, deletion.userId);
-          await offlineService.removePendingUpload(deletion.id);
-        } catch (error) {
-          console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
-          onError(deletion.id, error);
-        }
-      }
-
-      console.log('[Firebase] Finished processing pending uploads');
-
-    } catch (error) {
-      console.error('[Firebase] Error in processPendingUploads:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get a sit by its image collection ID
    * @param imageCollectionId The image collection ID
    * @returns Sit object or null if not found
@@ -1519,79 +1458,6 @@ export class FirebaseService {
       return null;
     }
   }
-
-  /**
-   * Check if a username is already taken by another user
-   * @param username The username to check
-   * @param currentUserId The current user's ID (to exclude from the check)
-   * @param originalUsername The user's original username (to skip check if unchanged)
-   * @returns Promise<boolean> True if the username is taken, false otherwise
-   */
-  static async isUsernameTaken(
-    username: string,
-    currentUserId?: string,
-    originalUsername?: string
-  ): Promise<boolean> {
-    // Skip check if it's the user's current username
-    if (originalUsername && username === originalUsername) {
-      return false;
-    }
-
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', username));
-      const querySnapshot = await getDocs(q);
-
-      // If currentUserId is provided, exclude the current user from the check
-      if (currentUserId) {
-        return querySnapshot.docs.some(doc => doc.id !== currentUserId);
-      }
-
-      return !querySnapshot.empty;
-    } catch (error) {
-      console.error('Error checking username:', error);
-      return false; // Assume it's not taken if there's an error
-    }
-  }
-
-    /**
-   * Generates a unique username based on user information
-   * @param userId The user's ID (to exclude from uniqueness check)
-   * @param displayName The user's display name (optional)
-   * @returns Promise<string> A unique username
-   */
-  static async generateUniqueUsername(
-    userId: string,
-    displayName?: string | null
-  ): Promise<string> {
-    // Create base name from user info
-    let baseName = '';
-    if (displayName) {
-      baseName = displayName.split(' ')[0];
-    } else {
-      baseName = `user${Math.floor(Math.random() * 1000)}`;
-    }
-
-    // Clean up the name (remove special chars, lowercase)
-    let cleanName = baseName.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // Ensure minimum length
-    if (cleanName.length < 3) {
-      cleanName = `user${userId.substring(0, 5)}`;
-    }
-
-    // Try the base name first
-    let uniqueName = cleanName;
-    let counter = 1;
-
-    // Keep trying until we find a unique name
-    while (await this.isUsernameTaken(uniqueName, userId)) {
-      uniqueName = `${cleanName}${counter}`;
-      counter++;
-    }
-
-    return uniqueName;
-  };
 
   /**
    * Update the user's push notification setting in Firestore

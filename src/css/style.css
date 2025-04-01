@@ -917,13 +917,13 @@ input[type="checkbox"]:checked + .toggle-slider:before {
 }
 
 .offline-notice {
-  background-color: var(--medium-gray);
+  background-color: var(--action-red);
   color: var(--white);
   padding: 10px;
   border-radius: 4px;
   margin-bottom: 15px;
-  text-align: center;
-  font-size: var(--font-size-medium);
+  font-size: var(--font-size-small);
+  line-height: 1.2;
 }
 
 .spinner.small {

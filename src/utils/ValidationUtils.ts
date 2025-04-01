@@ -1,4 +1,4 @@
-import { Location, Sit, Image } from '../types';
+import { Location, Sit, Image, PhotoResult } from '../types';
 import { getDistanceInFeet } from './geo';
 import { OfflineService } from '../services/OfflineService';
 
@@ -89,10 +89,9 @@ export class ValidationUtils {
    * @param existingImages Optional array of existing images (for online mode)
    * @returns True if the user can add a photo
    */
-  static canUserAddPhotoToSit(
+  static canUserAddImageToSit(
     imageCollectionId: string,
     userId: string,
-    isOnline: boolean,
     existingImages?: Image[]
   ): boolean {
     // Check authentication
@@ -101,7 +100,7 @@ export class ValidationUtils {
     }
 
     // First check existing images if we're online and have them
-    if (isOnline && existingImages) {
+    if (existingImages) {
       const userAlreadyHasImage = existingImages.some(img => img.userId === userId);
       if (userAlreadyHasImage) {
         return false;
@@ -124,52 +123,6 @@ export class ValidationUtils {
     }
 
     return true;
-  }
-
-  /**
-   * Check if a user can replace an image
-   * @param imageId The image ID
-   * @param userId The user ID
-   * @param isOnline Whether we're online
-   * @param existingImage Optional existing image (for online mode)
-   * @returns True if the user can replace the image
-   */
-  static canUserReplaceImage(
-    imageId: string,
-    userId: string,
-    isOnline: boolean,
-    existingImage?: Image
-  ): boolean {
-    // Check authentication
-    if (!this.isUserAuthenticated(userId)) {
-      return false;
-    }
-
-    // For temporary images, check if it starts with temp_
-    if (imageId.startsWith('temp_')) {
-      return true; // Temp images can be replaced by anyone (they're local only)
-    }
-
-    // Check offline queue for pending uploads
-    const offlineService = OfflineService.getInstance();
-
-    // For offline mode, check if the image is in the pending uploads
-    if (!isOnline) {
-      const pendingReplaceImages = offlineService.getPendingReplaceImages();
-      const pendingImage = pendingReplaceImages.find(upload => upload.imageId === imageId);
-
-      // If we found a pending image, check if the user owns it
-      if (pendingImage) {
-        return pendingImage.userId === userId;
-      }
-    }
-
-    // If online and we have the existing image, check ownership
-    if (isOnline && existingImage) {
-      return existingImage.userId === userId;
-    }
-
-    return true; // Default to allowing if we can't determine
   }
 
   /**

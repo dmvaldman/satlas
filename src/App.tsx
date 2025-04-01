@@ -16,7 +16,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
 import SitComponent from './components/Sit';
-import { OfflineService } from './services/OfflineService';
+import { OfflineService, OfflineSuccess } from './services/OfflineService';
 import { ValidationUtils, SitTooCloseError } from './utils/ValidationUtils';
 import Notifications from './components/Notifications';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -658,7 +658,7 @@ class App extends React.Component<{}, AppState> {
 
   private handleLoadSits = async (bounds: { north: number; south: number }) => {
     try {
-      const newSits = await FirebaseService.loadSits(bounds);
+      const newSits = await FirebaseService.loadSitsFromBounds(bounds);
 
       // Only update state if there are actual changes
       let hasChanges = false;
@@ -756,7 +756,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleDeleteImage = async (sitId: string, imageId: string) => {
-    const { user, sits, drawer, isOffline } = this.state;
+    const { user, sits, drawer } = this.state;
     if (!user) throw new Error('Must be logged in to delete images');
 
     const sit = sits.get(sitId);
@@ -766,14 +766,19 @@ class App extends React.Component<{}, AppState> {
     if (drawer.isOpen && drawer.sit?.id === sitId) {
       const updatedImages = drawer.images.filter(img => img.id !== imageId);
 
-      // If this was the last image, close the drawer
+      // If this was the last image, close the drawer and remove the sit
       if (updatedImages.length === 0) {
-        this.setState({
-          drawer: {
-            isOpen: false,
-            sit: undefined,
-            images: []
-          }
+        this.setState(prevState => {
+          const updatedSits = new Map(prevState.sits);
+          updatedSits.delete(sitId);
+          return {
+            sits: updatedSits,
+            drawer: {
+              isOpen: false,
+              sit: undefined,
+              images: []
+            }
+          };
         });
       } else {
         // Otherwise just update the images list
@@ -786,19 +791,7 @@ class App extends React.Component<{}, AppState> {
       }
     }
 
-    if (isOffline) {
-      // If we're offline, queue the deletion
-      const offlineService = OfflineService.getInstance();
-      await offlineService.addPendingImageDeletion(
-        imageId,
-        user.uid,
-        this.state.userPreferences.username
-      );
-      this.showNotification('Image will be deleted when you\'re back online', 'success');
-    }
-    else {
-      this.deleteImage(sitId, imageId);
-    }
+    this.deleteImage(sitId, imageId);
   };
 
   private deleteImage = async (sitId: string, imageId: string) => {
@@ -821,7 +814,7 @@ class App extends React.Component<{}, AppState> {
     }
 
     try {
-      await FirebaseService.deleteImage(imageId, user.uid);
+      await FirebaseService.deleteImageFromSit(imageId, user.uid);
 
       // If this was the last image, remove the sit from local state
       const wasLastImage = drawer.images.length <= 1;
@@ -834,9 +827,13 @@ class App extends React.Component<{}, AppState> {
         });
       }
     } catch (error) {
-      console.error('Error deleting image:', error);
-      this.showNotification(error instanceof Error ? error.message : 'Failed to delete image', 'error');
-      throw error;
+      if (error instanceof OfflineSuccess) {
+        this.showNotification(error.message, 'success');
+      } else {
+        console.error('Error deleting image:', error);
+        this.showNotification(error instanceof Error ? error.message : 'Failed to delete image', 'error');
+        throw error;
+      }
     }
   };
 
@@ -881,8 +878,13 @@ class App extends React.Component<{}, AppState> {
         }
       }
     } catch (error) {
-      console.error('[App] Error handling photo upload:', error);
-      this.showNotification('Error uploading photo', 'error');
+      if (error instanceof OfflineSuccess) {
+        this.showNotification(error.message, 'success');
+      } else {
+        console.error('[App] Error creating sit:', error);
+        this.showNotification('Error creating sit', 'error');
+        throw error;
+      }
     }
   };
 
@@ -1048,7 +1050,7 @@ class App extends React.Component<{}, AppState> {
         this.showNotification(`Error uploading photo: ${error.message || 'Unknown error'}`, 'error');
       });
 
-      this.showNotification('Finished processing pending uploads', 'success');
+      this.showNotification('Finished processing pending uploads. Refresh app to see changes.', 'success');
     } catch (error) {
       console.error('[App] Error during pending uploads processing:', error);
     }
@@ -1196,10 +1198,10 @@ class App extends React.Component<{}, AppState> {
       });
 
       // Create sit with photo using FirebaseService in the background
-      const { sit, image } = await FirebaseService.createSitWithPhoto(
+      const { sit, image } = await FirebaseService.createSitWithImage(
         photoResult,
         user.uid,
-        userPreferences.username
+        userPreferences.username,
       );
       this.tempImageMapping.set(tempImage.id, image.id);
 
@@ -1232,9 +1234,7 @@ class App extends React.Component<{}, AppState> {
 
       return sit;
     } catch (error) {
-      console.error('[App] Error creating sit:', error);
-      this.showNotification('Error creating sit', 'error');
-      return null;
+      throw error;
     }
   };
 
@@ -1267,7 +1267,7 @@ class App extends React.Component<{}, AppState> {
       });
 
       // Use FirebaseService to handle the upload (including offline case)
-      const uploadedImage = await FirebaseService.addPhotoToSit(
+      const uploadedImage = await FirebaseService.addImageToSit(
         photoResult,
         sit.imageCollectionId,
         user.uid,
@@ -1277,8 +1277,7 @@ class App extends React.Component<{}, AppState> {
       // Store mapping from temp ID to real Firebase ID
       this.tempImageMapping.set(tempImage.id, uploadedImage.id);
     } catch (error) {
-      console.error('[App] Error adding image to sit:', error);
-      this.showNotification('Error adding image to sit', 'error');
+      throw error;
     }
   };
 
@@ -1323,7 +1322,7 @@ class App extends React.Component<{}, AppState> {
       }
 
       // Upload to server in the background
-      const replacedImage = await FirebaseService.replaceImage(
+      const replacedImage = await FirebaseService.replaceImageInSit(
         photoResult,
         sit.imageCollectionId,
         realImageId,
@@ -1333,8 +1332,7 @@ class App extends React.Component<{}, AppState> {
 
       this.tempImageMapping.set(tempImage.id, replacedImage.id);
     } catch (error) {
-      console.error('[App] Error replacing image:', error);
-      this.showNotification('Error replacing image', 'error');
+      throw error;
     }
   };
 
