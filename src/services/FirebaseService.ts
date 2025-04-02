@@ -88,6 +88,27 @@ export class FirebaseService {
   static auth = auth;
   static db = db;
   static storage = storage;
+  static temporaryImages: Map<string, Image> = new Map();
+
+  static addTemporaryImage(image: Image) {
+    this.temporaryImages.set(image.id, image);
+  }
+
+  static getTemporaryImage(imageId: string) {
+    return this.temporaryImages.get(imageId);
+  }
+
+  static getTemporaryImagesByCollectionId(collectionId: string) {
+    return Array.from(this.temporaryImages.values()).filter(image => image.collectionId === collectionId);
+  }
+
+  static removeTemporaryImage(imageId: string) {
+    this.temporaryImages.delete(imageId);
+  }
+
+  static clearTemporaryImages() {
+    this.temporaryImages.clear();
+  }
 
   /**
    * Check if the app is online
@@ -1215,6 +1236,8 @@ export class FirebaseService {
    * @returns Array of images
    */
   static async getImages(collectionId: string): Promise<Image[]> {
+    const temporaryImages = this.getTemporaryImagesByCollectionId(collectionId);
+
     try {
       console.log('Fetching images for collection:', collectionId);
 
@@ -1225,7 +1248,7 @@ export class FirebaseService {
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      return [...temporaryImages, ...snapshot.docs.map(doc => ({
         id: doc.id,
         photoURL: doc.data().photoURL || '',
         userId: doc.data().userId,
@@ -1234,10 +1257,9 @@ export class FirebaseService {
         createdAt: doc.data().createdAt.toDate(),
         width: doc.data().width || undefined,
         height: doc.data().height || undefined
-      }));
+      }))];
     } catch (error) {
-      console.error('Error getting images:', error);
-      throw error;
+      return temporaryImages;
     }
   }
 
