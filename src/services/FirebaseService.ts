@@ -33,7 +33,11 @@ import {
 import { Sit, Image, Location, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { OfflineService, OfflineSuccess } from './OfflineService';
+import {
+  OfflineService,
+  OfflineSuccess,
+  PendingUploadType
+} from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
 
 // Conditionally import Apple Sign In plugin only for iOS
@@ -1110,89 +1114,90 @@ export class FirebaseService {
       }
 
       const offlineService = OfflineService.getInstance();
-      const validate = true;
+      const validate = true; // Keep validation enabled
 
-      // Process new sits
-      const pendingNewSits = offlineService.getPendingNewSits();
-      for (const upload of pendingNewSits) {
+      // Get all pending uploads and sort them by timestamp
+      const allPendingUploads = offlineService.getPendingUploads();
+      allPendingUploads.sort((a, b) => a.timestamp - b.timestamp);
+
+      console.log(`[Firebase] Processing ${allPendingUploads.length} pending uploads chronologically`);
+
+      for (const upload of allPendingUploads) {
         try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
+          // Handle different upload types
+          switch (upload.type) {
+            case PendingUploadType.NEW_SIT: {
+              const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+              if (!fullUpload || !('photoResult' in fullUpload)) {
+                console.warn(`[Firebase] Invalid NEW_SIT upload data for ${upload.id}, removing.`);
+                await offlineService.removePendingUpload(upload.id);
+                continue; // Skip to the next upload
+              }
+              console.log(`[Firebase] Processing NEW_SIT upload: ${upload.id}`);
+              await this.createSitWithImage(
+                fullUpload.photoResult,
+                fullUpload.userId,
+                fullUpload.userName,
+                validate
+              );
+              await offlineService.removePendingUpload(upload.id);
+              break;
+            }
+            case PendingUploadType.ADD_TO_EXISTING_SIT: {
+              const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+              if (!fullUpload || !('photoResult' in fullUpload) || !('imageCollectionId' in fullUpload) || !('userName' in fullUpload)) {
+                console.warn(`[Firebase] Invalid ADD_TO_EXISTING_SIT upload data for ${upload.id}, removing.`);
+                await offlineService.removePendingUpload(upload.id);
+                continue;
+              }
+              console.log(`[Firebase] Processing ADD_TO_EXISTING_SIT upload: ${upload.id}`);
+              await this.addImageToSit(
+                fullUpload.photoResult,
+                fullUpload.imageCollectionId,
+                fullUpload.userId,
+                fullUpload.userName,
+                validate
+              );
+              await offlineService.removePendingUpload(upload.id);
+              break;
+            }
+            case PendingUploadType.REPLACE_IMAGE: {
+              const fullUpload = await offlineService.getFullPendingUpload(upload.id);
+              if (!fullUpload || !('photoResult' in fullUpload) || !('imageCollectionId' in fullUpload) || !('imageId' in fullUpload)) {
+                 console.warn(`[Firebase] Invalid REPLACE_IMAGE upload data for ${upload.id}, removing.`);
+                await offlineService.removePendingUpload(upload.id);
+                continue;
+              }
+              console.log(`[Firebase] Processing REPLACE_IMAGE upload: ${upload.id}`);
+              // Note: Validation logic might be needed here depending on requirements
+              await this.replaceImageInSit(
+                fullUpload.photoResult,
+                fullUpload.imageCollectionId,
+                fullUpload.imageId,
+                fullUpload.userId,
+                fullUpload.userName
+              );
+              await offlineService.removePendingUpload(upload.id);
+              break;
+            }
+            case PendingUploadType.DELETE_IMAGE: {
+              console.log(`[Firebase] Processing DELETE_IMAGE upload: ${upload.id}`);
+              await FirebaseService.deleteImageFromSit(upload.imageId, upload.userId);
+              await offlineService.removePendingUpload(upload.id);
+              break;
+            }
+            default:
+              // Handle unknown upload types if necessary
+              console.warn(`[Firebase] Unknown pending upload type: ${(upload as any).type}`);
+              continue; // Skip unknown types
           }
 
-          await this.createSitWithImage(
-            fullUpload.photoResult,
-            fullUpload.userId,
-            fullUpload.userName,
-            validate
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing new sit upload:', error);
+          console.log(`[Firebase] Successfully processed and removed upload: ${upload.id}`);
+
+        } catch (error: any) {
+          // Handle errors for individual uploads
+          console.error(`[Firebase] Error processing upload ${upload.id} (Type: ${upload.type}):`, error);
           onError(upload.id, error);
-        }
-      }
-
-      // Process add to existing sits
-      const pendingAddToSits = offlineService.getPendingAddToSits();
-      for (const upload of pendingAddToSits) {
-        try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
-          }
-
-          await this.addImageToSit(
-            fullUpload.photoResult,
-            upload.imageCollectionId,
-            upload.userId,
-            upload.userName,
-            validate
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing add to sit upload:', error);
-          onError(upload.id, error);
-        }
-      }
-
-      // Process replace images
-      const pendingReplaceImages = offlineService.getPendingReplaceImages();
-      for (const upload of pendingReplaceImages) {
-        try {
-          const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-          if (!fullUpload || !('photoResult' in fullUpload)) {
-            await offlineService.removePendingUpload(upload.id);
-            continue;
-          }
-
-          // No validation implemented
-          await this.replaceImageInSit(
-            fullUpload.photoResult,
-            upload.imageCollectionId,
-            upload.imageId,
-            upload.userId,
-            upload.userName
-          );
-          await offlineService.removePendingUpload(upload.id);
-        } catch (error) {
-          console.error('[Firebase] Error processing replace image upload:', error);
-          onError(upload.id, error);
-        }
-      }
-
-      // Process pending deletions
-      const pendingDeletions = offlineService.getPendingImageDeletions();
-      for (const deletion of pendingDeletions) {
-        try {
-          await FirebaseService.deleteImageFromSit(deletion.imageId, deletion.userId);
-          await offlineService.removePendingUpload(deletion.id);
-        } catch (error) {
-          console.error(`[FirebaseService] Error processing pending deletion ${deletion.id}:`, error);
-          onError(deletion.id, error);
         }
       }
 
