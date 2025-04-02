@@ -94,9 +94,9 @@ export class FirebaseService {
   static storage = storage;
   static temporaryImages: Map<string, Image> = new Map();
 
-  static addTemporaryImage(image: Image) {
-    this.temporaryImages.set(image.id, image);
-  }
+  // static addTemporaryImage(image: Image) {
+  //   this.temporaryImages.set(image.id, image);
+  // }
 
   static getTemporaryImage(imageId: string) {
     return this.temporaryImages.get(imageId);
@@ -106,13 +106,13 @@ export class FirebaseService {
     return Array.from(this.temporaryImages.values()).filter(image => image.collectionId === collectionId);
   }
 
-  static removeTemporaryImage(imageId: string) {
-    this.temporaryImages.delete(imageId);
-  }
+  // static removeTemporaryImage(imageId: string) {
+  //   this.temporaryImages.delete(imageId);
+  // }
 
-  static clearTemporaryImages() {
-    this.temporaryImages.clear();
-  }
+  // static clearTemporaryImages() {
+  //   this.temporaryImages.clear();
+  // }
 
   /**
    * Check if the app is online
