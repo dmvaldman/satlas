@@ -52,6 +52,7 @@
     "dotenv": "^16.4.7",
     "exif-parser": "^0.1.12",
     "firebase": "^11.2.0",
+    "idb": "^8.0.2",
     "mapbox-gl": "^3.10.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

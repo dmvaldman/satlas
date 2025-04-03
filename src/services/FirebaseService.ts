@@ -1261,6 +1261,7 @@ export class FirebaseService {
           console.log(`[Firebase] Successfully processed and removed upload: ${upload.id}`);
 
         } catch (error: any) {
+          await offlineService.removePendingUpload(upload.id);
           // Handle errors for individual uploads
           console.error(`[Firebase] Error processing upload ${upload.id} (Type: ${upload.type}):`, error);
           onError(upload.id, error);
