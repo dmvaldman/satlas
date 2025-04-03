@@ -28,24 +28,23 @@ export interface NewSitPendingUpload extends BasePendingUpload {
 // Add photo to existing sit
 export interface AddToSitPendingUpload extends BasePendingUpload {
   type: PendingUploadType.ADD_TO_EXISTING_SIT;
-  userName: string;
-  photoResult: PhotoResult;
-  imageCollectionId: string;
+  tempImage: Image;
+  sit: Sit;
 }
 
 // Replace existing image
 export interface ReplaceImagePendingUpload extends BasePendingUpload {
   type: PendingUploadType.REPLACE_IMAGE;
-  userName: string;
-  photoResult: PhotoResult;
-  imageCollectionId: string;
+  tempImage: Image;
   imageId: string;
+  sit: Sit;
 }
 
 // Add an interface for deletion operations
 export interface DeleteImagePendingUpload extends BasePendingUpload {
   type: PendingUploadType.DELETE_IMAGE;
   imageId: string;
+  userId: string;
 }
 
 // Union type for all pending upload types
@@ -181,111 +180,89 @@ export class OfflineService {
     console.log('[OfflineService] Adding new pending sit for user:', tempSit.uploadedBy);
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const photoResult: PhotoResult = {
-      base64Data: tempImage.base64Data,
-      location: tempSit.location,
-      dimensions: {
-        width: tempImage.width,
-        height: tempImage.height
-      }
-    };
 
     const pendingUpload: NewSitPendingUpload = {
       id,
+      type: PendingUploadType.NEW_SIT,
+      timestamp: Date.now(),
       tempSit,
       tempImage
     };
 
     // Save the image data to filesystem if on native platform
-    if (Capacitor.isNativePlatform()) {
-      console.log('[OfflineService] Saving image data to filesystem for ID:', id);
-      await this.saveImageToFileSystem(id, photoResult.base64Data);
+    const trimmedUpload = await this.trimImageFromPendingUpload(id, pendingUpload) as NewSitPendingUpload;
+    this.pendingUploads.push(trimmedUpload);
 
-      // Replace the base64 data with a reference to save memory
-      const savedPhotoResult = { ...photoResult };
-      // @ts-ignore - we're intentionally replacing the data with a reference
-      savedPhotoResult.base64Data = `file:${id}`;
-      pendingUpload.photoResult = savedPhotoResult;
-      console.log('[OfflineService] Saved image data to filesystem');
-    }
-
-    this.pendingUploads.push(pendingUpload);
-    console.log('[OfflineService] Added pending upload to queue, total pending:', this.pendingUploads.length);
     await this.savePendingUploads();
-    console.log('[OfflineService] Saved pending uploads to storage');
 
     return id;
   }
 
   // Add a photo to an existing sit
   public async addImageToSit(
-    photoResult: PhotoResult,
-    imageCollectionId: string,
-    userId: string,
-    userName: string
+    tempImage: Image,
+    sit: Sit
   ): Promise<string> {
-    console.log('[OfflineService] Adding image to sit for user:', userId);
+    console.log('[OfflineService] Adding image to sit for user:', tempImage.userId);
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const pendingUpload: AddToSitPendingUpload = {
+    let pendingUpload: AddToSitPendingUpload = {
       id,
       type: PendingUploadType.ADD_TO_EXISTING_SIT,
-      photoResult,
-      imageCollectionId,
-      userId,
-      userName,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      tempImage,
+      sit
     };
 
     // Save the image data to filesystem if on native platform
-    if (Capacitor.isNativePlatform()) {
-      await this.saveImageToFileSystem(id, photoResult.base64Data);
+    const trimmedUpload = await this.trimImageFromPendingUpload(id, pendingUpload) as AddToSitPendingUpload;
+    this.pendingUploads.push(trimmedUpload);
 
-      // Replace the base64 data with a reference to save memory
-      const savedPhotoResult = { ...photoResult };
-      // @ts-ignore - we're intentionally replacing the data with a reference
-      savedPhotoResult.base64Data = `file:${id}`;
-      pendingUpload.photoResult = savedPhotoResult;
-    }
-
-    this.pendingUploads.push(pendingUpload);
     await this.savePendingUploads();
 
     return id;
   }
 
+  private async trimImageFromPendingUpload(id: string, upload: PendingUpload): Promise<PendingUpload> {
+    if (Capacitor.isNativePlatform()) {
+      // Now we know 'upload' has 'tempImage'
+      if (upload.type === PendingUploadType.DELETE_IMAGE || !upload.tempImage || !upload.tempImage.base64Data) {
+        return upload; // No image data to process
+      }
+
+      const base64Data = upload.tempImage.base64Data;
+      await this.saveImageToFileSystem(id, base64Data);
+
+      // Replace the base64 data with a file reference
+      const trimmedUpload = { ...upload }; // Create a copy to avoid modifying the original pendingUploads array directly
+      trimmedUpload.tempImage = { ...trimmedUpload.tempImage, base64Data: `file:${id}` };
+      return trimmedUpload;
+    }
+    else {
+      // TODO: implement for web. Save blob to storage.
+      return upload;
+    }
+  }
+
   // Replace an existing image
   public async replaceImageInSit(
-    photoResult: PhotoResult,
-    imageCollectionId: string,
+    tempImage: Image,
     imageId: string,
-    userId: string,
-    userName: string
+    sit: Sit
   ): Promise<string> {
-    console.log('[OfflineService] Replacing image in sit for user:', userId);
+    console.log('[OfflineService] Replacing image in sit for user:', tempImage.userId);
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const pendingUpload: ReplaceImagePendingUpload = {
+    let pendingUpload: ReplaceImagePendingUpload = {
       id,
       type: PendingUploadType.REPLACE_IMAGE,
-      photoResult,
-      imageCollectionId,
+      timestamp: Date.now(),
+      tempImage,
       imageId,
-      userId,
-      userName,
-      timestamp: Date.now()
+      sit
     };
 
-    // Save the image data to filesystem if on native platform
-    if (Capacitor.isNativePlatform()) {
-      await this.saveImageToFileSystem(id, photoResult.base64Data);
+    const trimmedUpload = await this.trimImageFromPendingUpload(id, pendingUpload) as ReplaceImagePendingUpload;
+    this.pendingUploads.push(trimmedUpload);
 
-      // Replace the base64 data with a reference to save memory
-      const savedPhotoResult = { ...photoResult };
-      // @ts-ignore - we're intentionally replacing the data with a reference
-      savedPhotoResult.base64Data = `file:${id}`;
-      pendingUpload.photoResult = savedPhotoResult;
-    }
-
-    this.pendingUploads.push(pendingUpload);
     await this.savePendingUploads();
 
     return id;
@@ -307,6 +284,7 @@ export class OfflineService {
     };
 
     this.pendingUploads.push(pendingDeletion);
+
     await this.savePendingUploads();
 
     return id;
@@ -444,9 +422,9 @@ export class OfflineService {
         (upload.type === PendingUploadType.REPLACE_IMAGE ||
          upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
          upload.type === PendingUploadType.NEW_SIT) &&
-        typeof upload.photoResult?.base64Data === 'string' &&
-        upload.photoResult?.base64Data.startsWith('file:')) {
-      const fileId = upload.photoResult?.base64Data.substring(5);
+        typeof upload.tempImage.base64Data === 'string' &&
+        upload.tempImage.base64Data.startsWith('file:')) {
+      const fileId = upload.tempImage.base64Data.substring(5);
       await this.deleteImageFromFileSystem(fileId);
     }
 
@@ -467,20 +445,20 @@ export class OfflineService {
         (upload.type === PendingUploadType.REPLACE_IMAGE ||
          upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
          upload.type === PendingUploadType.NEW_SIT) &&
-        typeof upload.photoResult?.base64Data === 'string' &&
-        upload.photoResult?.base64Data.startsWith('file:')) {
+        typeof upload.tempImage.base64Data === 'string' &&
+        upload.tempImage.base64Data.startsWith('file:')) {
 
-      const fileId = upload.photoResult?.base64Data.substring(5);
+      const fileId = upload.tempImage.base64Data.substring(5);
 
       try {
         const base64Data = await this.getImageFromFileSystem(fileId);
 
         // Only process photoResult if it exists
-        if (upload.photoResult) {
+        if (upload.tempImage) {
           return {
             ...upload,
-            photoResult: {
-              ...upload.photoResult,
+            tempImage: {
+              ...upload.tempImage,
               base64Data
             }
           };

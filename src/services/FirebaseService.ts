@@ -88,51 +88,68 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 
 // Firebase Service class with static methods
 export class FirebaseService {
-  // Export Firebase instances for direct use if needed
   static auth = auth;
   static db = db;
   static storage = storage;
-  static temporaryImages: Map<string, Image> = new Map();
   static tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
   static tempSitMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
 
-  // static addTemporaryImage(image: Image) {
-  //   this.temporaryImages.set(image.id, image);
-  // }
-
-  static getTemporaryImage(imageId: string) {
-    return this.temporaryImages.get(imageId);
-  }
-
-  static getTemporaryImagesByCollectionId(collectionId: string) {
-    return Array.from(this.temporaryImages.values()).filter(image => image.collectionId === collectionId);
-  }
-
-  // static removeTemporaryImage(imageId: string) {
-  //   this.temporaryImages.delete(imageId);
-  // }
-
-  // static clearTemporaryImages() {
-  //   this.temporaryImages.clear();
-  // }
-
+  // ===== Temporary Image Mapping =====
+  /**
+   * Add a temporary image mapping
+   * @param tempId Temporary ID
+   * @param realId Real ID
+   */
   static addTempImageMapping(tempId: string, realId: string | null) {
+    console.log('[Firebase] Adding temp image mapping:', { tempId, realId });
     this.tempImageMapping.set(tempId, realId);
   }
 
+  /**
+   * Get a temporary image mapping
+   * @param tempId Temporary ID
+   * @returns Real ID
+   */
   static getTempImageMapping(tempId: string) {
     return this.tempImageMapping.get(tempId);
   }
 
+  /**
+   * Remove a temporary image mapping
+   * @param tempId Temporary ID
+   */
+  static removeTempImageMapping(tempId: string) {
+    console.log('[Firebase] Removing temp image mapping:', { tempId });
+    this.tempImageMapping.delete(tempId);
+  }
+
+  // ===== Temporary Sit Mapping =====
+  /**
+   * Add a temporary sit mapping
+   * @param tempId Temporary ID
+   * @param realId Real ID
+   */
   static addTempSitMapping(tempId: string, realId: string | null) {
     this.tempSitMapping.set(tempId, realId);
   }
 
+  /**
+   * Get a temporary sit mapping
+   * @param tempId Temporary ID
+   * @returns Real ID
+   */
   static getTempSitMapping(tempId: string) {
     return this.tempSitMapping.get(tempId);
   }
 
-
+  /**
+   * Remove a temporary sit mapping
+   * @param tempId Temporary ID
+   */
+  static removeTempSitMapping(tempId: string) {
+    console.log('[Firebase] Removing temp sit mapping:', { tempId });
+    this.tempSitMapping.delete(tempId);
+  }
 
   /**
    * Check if the app is online
@@ -751,7 +768,8 @@ export class FirebaseService {
         },
         imageCollectionId: sitData.imageCollectionId,
         createdAt: sitData.createdAt,
-        uploadedBy: sitData.uploadedBy
+        uploadedBy: sitData.uploadedBy,
+        uploadedByUsername: sitData.uploadedByUsername
       };
     } catch (error) {
       console.error('Error getting sit:', error);
@@ -810,9 +828,6 @@ export class FirebaseService {
       const sit = await this._createSit(tempSit);
       const image = await this._createImage(tempImage);
 
-      this.addTempSitMapping(tempSit.id, sit.id);
-      this.addTempImageMapping(tempImage.id, image.id);
-
       return { sit, image };
     } catch (error: any) {
       console.error('Error creating sit with photo:', error);
@@ -823,28 +838,26 @@ export class FirebaseService {
   /**
    * Add a photo to an existing sit
    * @param photoResult The photo result containing base64 data
-   * @param imageCollectionId The image collection ID
-   * @param userId The user ID
-   * @param userName The user's display name
+   * @param sit The sit
+   * @param validate Whether to validate the sit and image
    * @returns Promise resolving to the created image
    * @throws Error when offline
    */
     static async addImageToSit(
-      photoResult: PhotoResult,
-      imageCollectionId: string,
-      userId: string,
-      userName: string,
+      tempImage: Image,
+      sit: Sit,
       validate?: boolean
     ): Promise<Image> {
+
+      this.addTempImageMapping(tempImage.id, null);
+
       // Check if we're online
       if (!this.isOnline()) {
         try {
           // Add to pending uploads
           await OfflineService.getInstance().addImageToSit(
-            photoResult,
-            imageCollectionId,
-            userId,
-            userName
+            tempImage,
+            sit
           );
 
           // Throw a success error to indicate offline handling
@@ -857,35 +870,39 @@ export class FirebaseService {
       try {
         if (validate) {
           // Check if user is authenticated
-          if (!ValidationUtils.isUserAuthenticated(userId)) {
+          if (!ValidationUtils.isUserAuthenticated(tempImage.userId)) {
             throw new Error("You must be logged in to add a photo");
           }
 
+          if (!tempImage.location) {
+            throw new Error("Photo location is required to add a photo to a sit");
+          }
+
           // Check if the location is valid
-          if (!ValidationUtils.isLocationValid(photoResult.location)) {
+          if (!ValidationUtils.isLocationValid(tempImage.location)) {
             throw new Error("Valid location data is required to add a photo");
           }
 
+          // Check if photo location is near the sit
+          if (sit && !ValidationUtils.isLocationNearSit(tempImage.location, sit)) {
+            throw new Error("Photo location is too far from the sit location");
+          }
+
           // Check if user already has an image in this collection
-          const existingImages = await this.getImages(imageCollectionId);
+          const existingImages = await this.getImages(sit.imageCollectionId);
           const canAddPhoto = ValidationUtils.canUserAddImageToSit(
-            imageCollectionId,
-            userId,
+            sit.imageCollectionId,
+            tempImage.userId,
             existingImages
           );
 
           if (!canAddPhoto) {
             throw new Error("You've already added a photo to this sit");
           }
-
-          // Check if photo location is near the sit
-          const sit = await this.getSitByCollectionId(imageCollectionId);
-          if (sit && !ValidationUtils.isLocationNearSit(photoResult.location, sit)) {
-            throw new Error("Photo location is too far from the sit location");
-          }
         }
 
-        const image = await this._createImage(photoResult, userId, userName);
+        const image = await this._createImage(tempImage);
+
         return image;
       } catch (error: any) {
         console.error('Error adding photo to sit:', error);
@@ -895,9 +912,7 @@ export class FirebaseService {
 
   /**
    * Create an image in Firestore
-   * @param photoResult The photo result containing base64 data
-   * @param userId The user ID
-   * @param userName The user's display name
+   * @param tempImage The temporary image
    * @returns Promise resolving to the created image
    */
   static async _createImage(tempImage: Image): Promise<Image> {
@@ -939,7 +954,8 @@ export class FirebaseService {
       collectionId: tempImage.collectionId,
       createdAt: new Date(),
       width: tempImage.width,
-      height: tempImage.height
+      height: tempImage.height,
+      location: tempImage.location
     });
 
     // Add base64Data back in in memory
@@ -952,18 +968,18 @@ export class FirebaseService {
       createdAt: new Date(),
       width: tempImage.width,
       height: tempImage.height,
-      base64Data: tempImage.base64Data
+      base64Data: tempImage.base64Data,
+      location: tempImage.location
     };
+
+    this.addTempImageMapping(tempImage.id, image.id);
 
     return image;
   }
 
   /**
    * Create a sit in Firestore
-   * @param coordinates Location coordinates
-   * @param imageCollectionId Image collection ID
-   * @param userId User ID
-   * @param userName The user's display name
+   * @param tempSit The temporary sit
    * @returns Created sit
    */
   static async _createSit(tempSit: Sit): Promise<Sit> {
@@ -979,6 +995,8 @@ export class FirebaseService {
         uploadedByUsername: tempSit.uploadedByUsername
       };
 
+      this.addTempSitMapping(tempSit.id, sit.id);
+
       return sit;
     } catch (error) {
       console.error('Error creating sit:', error);
@@ -988,30 +1006,24 @@ export class FirebaseService {
 
   /**
    * Replace an existing image
-   * @param photoResult The photo result containing base64 data
-   * @param imageCollectionId The image collection ID
+   * @param tempImage The temporary image
    * @param imageId The image ID to replace
-   * @param userId The user ID
-   * @param userName The user's display name
+   * @param sit The sit
    * @throws Error when offline
    */
   static async replaceImageInSit(
-    photoResult: PhotoResult,
-    imageCollectionId: string,
+    tempImage: Image,
     imageId: string,
-    userId: string,
-    userName: string
+    sit: Sit
   ): Promise<Image> {
     // Check if we're online
     if (!this.isOnline()) {
       try {
         // Add to pending uploads
         await OfflineService.getInstance().replaceImageInSit(
-          photoResult,
-          imageCollectionId,
+          tempImage,
           imageId,
-          userId,
-          userName
+          sit
         );
 
         // Throw a success error to indicate offline handling
@@ -1021,17 +1033,34 @@ export class FirebaseService {
       }
     }
 
-    try {
-      // Delete the old image first
-      await this.deleteImageFromSit(imageId, userId);
+    if (this.tempImageMapping.has(imageId)) {
+      const realId = this.tempImageMapping.get(imageId);
+      if (realId !== null && realId !== undefined) {
+        imageId = realId;
+      }
+      else {
+        throw new Error('Image not yet uploaded. Wait a moment and try again.');
+      }
+    }
 
-      // Then add a new photo
-      return await this.addImageToSit(
-        photoResult,
-        imageCollectionId,
-        userId,
-        userName
-      );
+    if (this.tempSitMapping.has(sit.id)) {
+      const realId = this.tempSitMapping.get(sit.id);
+      if (realId !== null && realId !== undefined) {
+        sit.id = realId;
+      }
+      else {
+        throw new Error('Sit not yet uploaded. Wait a moment and try again.');
+      }
+    }
+
+    try {
+      // Add a new photo first
+      const newImage = await this.addImageToSit(tempImage, sit);
+
+      // Delete the old image
+      await this.deleteImageFromSit(imageId, tempImage.userId);
+
+      return newImage;
     } catch (error: any) {
       console.error('Error replacing image:', error);
       throw error;
@@ -1058,10 +1087,23 @@ export class FirebaseService {
       }
     }
 
+    if (this.tempImageMapping.has(imageId)) {
+      const realId = this.tempImageMapping.get(imageId);
+      if (realId !== null && realId !== undefined) {
+        imageId = realId;
+      }
+      else {
+        throw new Error('Image not yet uploaded. Wait a moment and try again.');
+      }
+    }
+
     try {
       // Get image data first
       const imageDoc = await getDoc(doc(db, 'images', imageId));
-      if (!imageDoc.exists()) throw new Error('Image not found');
+      if (!imageDoc.exists()) {
+        debugger;
+        throw new Error('Image not found');
+      }
 
       const imageData = imageDoc.data();
 
@@ -1092,6 +1134,7 @@ export class FirebaseService {
       // Delete the image document from Firestore
       const imageRef = doc(db, 'images', imageId);
       await deleteDoc(imageRef);
+
       console.log(`Deleted image document: ${imageId}`);
 
       // Check if this was the last image in the collection
@@ -1156,16 +1199,15 @@ export class FirebaseService {
           switch (upload.type) {
             case PendingUploadType.NEW_SIT: {
               const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-              if (!fullUpload || !('photoResult' in fullUpload)) {
+              if (!fullUpload || !('tempSit' in fullUpload) || !('tempImage' in fullUpload)) {
                 console.warn(`[Firebase] Invalid NEW_SIT upload data for ${upload.id}, removing.`);
                 await offlineService.removePendingUpload(upload.id);
                 continue; // Skip to the next upload
               }
               console.log(`[Firebase] Processing NEW_SIT upload: ${upload.id}`);
               await this.createSitWithImage(
-                fullUpload.photoResult,
-                fullUpload.userId,
-                fullUpload.userName,
+                fullUpload.tempSit,
+                fullUpload.tempImage,
                 validate
               );
               await offlineService.removePendingUpload(upload.id);
@@ -1173,17 +1215,15 @@ export class FirebaseService {
             }
             case PendingUploadType.ADD_TO_EXISTING_SIT: {
               const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-              if (!fullUpload || !('photoResult' in fullUpload) || !('imageCollectionId' in fullUpload) || !('userName' in fullUpload)) {
+              if (!fullUpload || !('tempImage' in fullUpload) || !('sit' in fullUpload)) {
                 console.warn(`[Firebase] Invalid ADD_TO_EXISTING_SIT upload data for ${upload.id}, removing.`);
                 await offlineService.removePendingUpload(upload.id);
                 continue;
               }
               console.log(`[Firebase] Processing ADD_TO_EXISTING_SIT upload: ${upload.id}`);
               await this.addImageToSit(
-                fullUpload.photoResult,
-                fullUpload.imageCollectionId,
-                fullUpload.userId,
-                fullUpload.userName,
+                fullUpload.tempImage,
+                fullUpload.sit,
                 validate
               );
               await offlineService.removePendingUpload(upload.id);
@@ -1191,19 +1231,17 @@ export class FirebaseService {
             }
             case PendingUploadType.REPLACE_IMAGE: {
               const fullUpload = await offlineService.getFullPendingUpload(upload.id);
-              if (!fullUpload || !('photoResult' in fullUpload) || !('imageCollectionId' in fullUpload) || !('imageId' in fullUpload)) {
-                 console.warn(`[Firebase] Invalid REPLACE_IMAGE upload data for ${upload.id}, removing.`);
+              if (!fullUpload || !('tempImage' in fullUpload) || !('imageId' in fullUpload) || !('sit' in fullUpload)) {
+                console.warn(`[Firebase] Invalid REPLACE_IMAGE upload data for ${upload.id}, removing.`);
                 await offlineService.removePendingUpload(upload.id);
                 continue;
               }
               console.log(`[Firebase] Processing REPLACE_IMAGE upload: ${upload.id}`);
               // Note: Validation logic might be needed here depending on requirements
               await this.replaceImageInSit(
-                fullUpload.photoResult,
-                fullUpload.imageCollectionId,
+                fullUpload.tempImage,
                 fullUpload.imageId,
-                fullUpload.userId,
-                fullUpload.userName
+                fullUpload.sit
               );
               await offlineService.removePendingUpload(upload.id);
               break;
@@ -1269,8 +1307,6 @@ export class FirebaseService {
    * @returns Array of images
    */
   static async getImages(collectionId: string): Promise<Image[]> {
-    const temporaryImages = this.getTemporaryImagesByCollectionId(collectionId);
-
     try {
       console.log('Fetching images for collection:', collectionId);
 
@@ -1281,7 +1317,7 @@ export class FirebaseService {
       );
 
       const snapshot = await getDocs(q);
-      return [...temporaryImages, ...snapshot.docs.map(doc => ({
+      return snapshot.docs.map(doc => ({
         id: doc.id,
         photoURL: doc.data().photoURL || '',
         userId: doc.data().userId,
@@ -1290,9 +1326,9 @@ export class FirebaseService {
         createdAt: doc.data().createdAt.toDate(),
         width: doc.data().width || undefined,
         height: doc.data().height || undefined
-      }))];
+      }));
     } catch (error) {
-      return temporaryImages;
+      throw error;
     }
   }
 

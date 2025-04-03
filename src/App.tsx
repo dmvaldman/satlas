@@ -404,7 +404,6 @@ class App extends React.Component<{}, AppState> {
           this.setState({ isOffline: false }, () => {
             console.log('[App] Processing pending uploads with existing user state');
             this.handleProcessPendingUploads();
-            // FirebaseService.clearTemporaryImages();
           });
           return;
         }
@@ -420,7 +419,6 @@ class App extends React.Component<{}, AppState> {
           }, () => {
             console.log('[App] Processing pending uploads with authenticated user');
             this.handleProcessPendingUploads();
-            // FirebaseService.clearTemporaryImages();
           });
         } else {
           // If we don't have a user in state and Firebase is null, we're logged out
@@ -789,16 +787,12 @@ class App extends React.Component<{}, AppState> {
       }
     }
 
-    this.deleteImage(imageId);
+    this.deleteImage(imageId, user.uid);
   };
 
   private deleteSit = async (sitId: string) => {
     const { sits } = this.state;
     if (!sits.has(sitId)) return;
-
-    if (this.tempSitMapping.has(sitId)) {
-      this.tempSitMapping.delete(sitId);
-    }
 
     const updatedSits = new Map(sits);
     updatedSits.delete(sitId);
@@ -806,22 +800,9 @@ class App extends React.Component<{}, AppState> {
     this.setState({ sits: updatedSits });
   };
 
-  private deleteImage = async (imageId: string) => {
-    // Check if this is a temporary image (starts with 'temp_')
-    const isTemporaryImage = imageId.startsWith('temp_');
-
-    if (isTemporaryImage) {
-      const realImageId = FirebaseService.getTempImageMapping(imageId);
-      if (!realImageId) {
-        console.error('No real image ID found for temporary image:', imageId);
-        return;
-      }
-      this.removeTemporaryImage(imageId);
-      imageId = realImageId;
-    }
-
+  private deleteImage = async (imageId: string, userId: string) => {
     try {
-      // await FirebaseService.deleteImageFromSit(imageId, user.uid);
+      await FirebaseService.deleteImageFromSit(imageId, userId);
     } catch (error) {
       if (error instanceof OfflineSuccess) {
         this.showNotification(error.message, 'success');
@@ -895,11 +876,9 @@ class App extends React.Component<{}, AppState> {
       createdAt: new Date(),
       base64Data: photoResult.base64Data,
       width: photoResult.dimensions.width,
-      height: photoResult.dimensions.height
+      height: photoResult.dimensions.height,
+      location: photoResult.location
     };
-
-    // Store mapping from temp ID to real Firebase ID
-    FirebaseService.addTempImageMapping(tempImageId, null);
 
     return tempImage;
   }
@@ -916,18 +895,8 @@ class App extends React.Component<{}, AppState> {
       createdAt: new Date()
     };
 
-    // Store mapping from temp ID to real Firebase ID
-    FirebaseService.addTempSitMapping(tempSitId, null);
-
     return tempSit;
   }
-
-  // private removeTemporaryImage = (imageId: string) => {
-  //   if (this.tempImageMapping.has(imageId)) {
-  //     this.tempImageMapping.delete(imageId);
-  //   }
-  //   // FirebaseService.removeTemporaryImage(imageId);
-  // }
 
   private findNearbySit = async (coordinates: Location): Promise<Sit | null> => {
     const { sits } = this.state;
@@ -1229,6 +1198,9 @@ class App extends React.Component<{}, AppState> {
 
           // Update drawer if it's showing the initial sit
           if (prevState.drawer.sit?.id === tempSit.id) {
+            // new images with new image
+            const newImages = prevState.drawer.images.map(img => img.id === tempImage.id ? image : img);
+
             return {
               ...prevState,
               sits: newSits,
@@ -1242,9 +1214,7 @@ class App extends React.Component<{}, AppState> {
               drawer: {
                 ...prevState.drawer,
                 sit,
-                images: sit.imageCollectionId ?
-                  prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
-                  prevState.drawer.images
+                images: newImages
               }
             };
           }
@@ -1293,16 +1263,19 @@ class App extends React.Component<{}, AppState> {
       });
 
       // Use FirebaseService to handle the upload (including offline case)
-      // const uploadedImage = await FirebaseService.addImageToSit(
-      //   photoResult,
-      //   sit.imageCollectionId,
-      //   user.uid,
-      //   userPreferences.username
-      // );
+      const uploadedImage = await FirebaseService.addImageToSit(
+        tempImage,
+        sit
+      );
 
-      // Store mapping from temp ID to real Firebase ID
-      // this.tempImageMapping.set(tempImage.id, uploadedImage.id);
-      // FirebaseService.removeTemporaryImage(tempImage.id);
+      // replace imageIds in state with the new imageId
+      this.setState({
+        drawer: {
+          ...this.state.drawer,
+          images: this.state.drawer.images.map(img => img.id === tempImage.id ? uploadedImage : img)
+        }
+      });
+
     } catch (error) {
       throw error;
     }
@@ -1332,8 +1305,6 @@ class App extends React.Component<{}, AppState> {
         img.id === imageId ? tempImage : img
       );
 
-
-
       // Update drawer with optimistic data
       this.setState({
         drawer: {
@@ -1343,36 +1314,21 @@ class App extends React.Component<{}, AppState> {
         }
       });
 
-      const isReplacingTemporaryImage = imageId.startsWith('temp_');
-      if (isReplacingTemporaryImage) {
-        this.removeTemporaryImage(imageId);
-        imageId = this.tempImageMapping.get(imageId) || '';
-        if (!imageId) {
-          console.error('No real image ID found for temporary image:', imageId);
-          return;
-        }
-      }
-
-      const isSitTemporary = sit.id.startsWith('temp_');
-      if (isSitTemporary) {
-        sit.id = this.tempSitMapping.get(sit.id) || '';
-        if (!sit.id) {
-          console.error('No real sit ID found for temporary sit:', sit.id);
-          return;
-        }
-      }
 
       // Upload to server in the background
-      // const replacedImage = await FirebaseService.replaceImageInSit(
-      //   photoResult,
-      //   sit.imageCollectionId,
-      //   imageId,
-      //   user.uid,
-      //   userPreferences.username
-      // );
+      const replacedImage = await FirebaseService.replaceImageInSit(
+        tempImage,
+        imageId,
+        sit
+      );
 
-      // this.tempImageMapping.set(tempImage.id, replacedImage.id);
-      // FirebaseService.removeTemporaryImage(tempImage.id);
+      // replace imageIds in state with the new imageId
+      this.setState({
+        drawer: {
+          ...this.state.drawer,
+          images: this.state.drawer.images.map(img => img.id === imageId ? replacedImage : img)
+        }
+      });
     } catch (error) {
       throw error;
     }

@@ -114,7 +114,7 @@ export class ValidationUtils {
 
     // Count how many pending uploads this user has for this collection
     const userPendingUploadsCount = pendingAddToSits.filter(
-      upload => upload.imageCollectionId === imageCollectionId && upload.userId === userId
+      upload => upload.sit.imageCollectionId === imageCollectionId && upload.sit.uploadedBy === userId
     ).length;
 
     // If the user has more than one pending upload for this collection, don't allow another

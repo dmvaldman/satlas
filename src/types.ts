@@ -10,9 +10,10 @@ export interface Image {
   userName: string;
   collectionId: string;
   createdAt: Date;
-  base64Data?: string;
   width: number;
   height: number;
+  base64Data?: string;
+  location?: Location;
 }
 
 export interface Location {
