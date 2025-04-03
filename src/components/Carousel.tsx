@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image } from '../types';
+import { OfflineService } from '../services/OfflineService';
 
 interface CarouselProps {
   images: Image[];
@@ -467,6 +468,15 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.props.onOpenFullscreenImage(image);
   };
 
+  private isImageUploading = (image: Image) => {
+    // If we're offline, images are never "uploading"
+    if (!OfflineService.getInstance().isNetworkOnline()) {
+      return false;
+    }
+    // If the image ID starts with "temp_", it's still uploading
+    return image.id.startsWith('temp_');
+  };
+
   render() {
     const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
     const {
@@ -560,28 +570,36 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
                   {canShowControls && (
                     <div className="image-controls">
-                      <button
-                        className="image-control-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onImageReplace(image.id);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                        </svg>
-                      </button>
-                      <button
-                        className="image-control-button delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onImageDelete(image.id);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                        </svg>
-                      </button>
+                      {this.isImageUploading(image) ? (
+                        <div className="image-upload-loading active">
+                          <div className="spinner"></div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            className="image-control-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onImageReplace(image.id);
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                            </svg>
+                          </button>
+                          <button
+                            className="image-control-button delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onImageDelete(image.id);
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

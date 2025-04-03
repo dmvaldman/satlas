@@ -624,12 +624,54 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   align-items: center;
   cursor: pointer;
   padding: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-control-button:hover {
+  opacity: 1;
 }
 
 .image-control-button svg {
   width: 20px;
   height: 20px;
   fill: white;
+}
+
+/* Image upload loading animation */
+.image-upload-loading {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.image-upload-loading.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.image-upload-loading .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Hide controls when loading is active */
+.image-controls.hidden {
+  display: none;
 }
 
 /* Image uploader info */
