@@ -24,9 +24,9 @@ export interface Sit {
   id: string;
   location: Location;
   imageCollectionId: string;
-  createdAt?: Date;
-  uploadedBy?: string;
-  uploadedByUsername?: string;
+  createdAt: Date;
+  uploadedBy: string;
+  uploadedByUsername: string;
 }
 
 export interface ImageCollection {

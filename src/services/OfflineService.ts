@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Network } from '@capacitor/network';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { PhotoResult } from '../types';
+import { PhotoResult, Sit, Image } from '../types';
 
 // Define explicit types for different kinds of pending uploads
 export enum PendingUploadType {
@@ -16,14 +16,13 @@ interface BasePendingUpload {
   id: string;
   type: PendingUploadType;
   timestamp: number;
-  userId: string;
 }
 
 // New sit upload
 export interface NewSitPendingUpload extends BasePendingUpload {
   type: PendingUploadType.NEW_SIT;
-  userName: string;
-  photoResult: PhotoResult;
+  tempSit: Sit;
+  tempImage: Image;
 }
 
 // Add photo to existing sit
@@ -176,20 +175,25 @@ export class OfflineService {
 
   // Add a new sit with photo
   public async createSitWithImage(
-    photoResult: PhotoResult,
-    userId: string,
-    userName: string
+    tempSit: Sit,
+    tempImage: Image
   ): Promise<string> {
-    console.log('[OfflineService] Adding new pending sit for user:', userId);
+    console.log('[OfflineService] Adding new pending sit for user:', tempSit.uploadedBy);
     const id = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const photoResult: PhotoResult = {
+      base64Data: tempImage.base64Data,
+      location: tempSit.location,
+      dimensions: {
+        width: tempImage.width,
+        height: tempImage.height
+      }
+    };
 
     const pendingUpload: NewSitPendingUpload = {
       id,
-      type: PendingUploadType.NEW_SIT,
-      photoResult,
-      userId,
-      userName,
-      timestamp: Date.now()
+      tempSit,
+      tempImage
     };
 
     // Save the image data to filesystem if on native platform

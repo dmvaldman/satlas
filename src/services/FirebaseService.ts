@@ -93,6 +93,8 @@ export class FirebaseService {
   static db = db;
   static storage = storage;
   static temporaryImages: Map<string, Image> = new Map();
+  static tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
+  static tempSitMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
 
   // static addTemporaryImage(image: Image) {
   //   this.temporaryImages.set(image.id, image);
@@ -113,6 +115,24 @@ export class FirebaseService {
   // static clearTemporaryImages() {
   //   this.temporaryImages.clear();
   // }
+
+  static addTempImageMapping(tempId: string, realId: string | null) {
+    this.tempImageMapping.set(tempId, realId);
+  }
+
+  static getTempImageMapping(tempId: string) {
+    return this.tempImageMapping.get(tempId);
+  }
+
+  static addTempSitMapping(tempId: string, realId: string | null) {
+    this.tempSitMapping.set(tempId, realId);
+  }
+
+  static getTempSitMapping(tempId: string) {
+    return this.tempSitMapping.get(tempId);
+  }
+
+
 
   /**
    * Check if the app is online
@@ -741,26 +761,28 @@ export class FirebaseService {
 
   /**
    * Create a sit with a photo
-   * @param photoResult The photo result containing base64 data and location
-   * @param userId The user ID
-   * @param userName The user's display name
+   * @param tempSit The temporary sit
+   * @param tempImage The temporary image
+   * @param validate Whether to validate the sit and image
    * @returns Promise resolving to the created sit
    * @throws Error when offline
    */
   static async createSitWithImage(
-    photoResult: PhotoResult,
-    userId: string,
-    userName: string,
+    tempSit: Sit,
+    tempImage: Image,
     validate?: boolean
   ): Promise<{ sit: Sit, image: Image }> {
+
+    this.addTempSitMapping(tempSit.id, null);
+    this.addTempImageMapping(tempImage.id, null);
+
     // Check if we're online
     if (!this.isOnline()) {
       try {
         console.log('[Firebase] Offline, adding to pending uploads queue');
         await OfflineService.getInstance().createSitWithImage(
-          photoResult,
-          userId,
-          userName
+          tempSit,
+          tempImage
         );
         throw new OfflineSuccess("Photo saved and will upload when you're back online");
       } catch (error: any) {
@@ -770,12 +792,12 @@ export class FirebaseService {
 
     if (validate) {
       // Check if we can create the sit
-      const nearbySits = await this.loadSitsNearLocation(photoResult.location);
+      const nearbySits = await this.loadSitsNearLocation(tempSit.location);
       const nearbySitsArray = Array.from(nearbySits.values());
 
       const canCreateSit = ValidationUtils.canUserCreateSitAtLocation(
-        photoResult.location,
-        userId,
+        tempSit.location,
+        tempSit.uploadedBy,
         nearbySitsArray
       );
 
@@ -785,8 +807,11 @@ export class FirebaseService {
     }
 
     try {
-      const image = await this._createImage(photoResult, userId, userName);
-      const sit = await this._createSit(photoResult.location, image.collectionId, userId, userName);
+      const sit = await this._createSit(tempSit);
+      const image = await this._createImage(tempImage);
+
+      this.addTempSitMapping(tempSit.id, sit.id);
+      this.addTempImageMapping(tempImage.id, image.id);
 
       return { sit, image };
     } catch (error: any) {
@@ -875,20 +900,24 @@ export class FirebaseService {
    * @param userName The user's display name
    * @returns Promise resolving to the created image
    */
-  static async _createImage(photoResult: PhotoResult, userId: string, userName: string): Promise<Image> {
+  static async _createImage(tempImage: Image): Promise<Image> {
     const filename = `sit_${Date.now()}.jpg`;
     const storageRef = ref(storage, `sits/${filename}`);
 
+    if (!tempImage.base64Data) {
+      throw new Error('Base64 data is required to create an image');
+    }
+
     // Detect content type from base64 data
     let contentType = 'image/jpeg'; // Default
-    if (photoResult.base64Data.startsWith('data:')) {
-      const matches = photoResult.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
+    if (tempImage.base64Data.startsWith('data:')) {
+      const matches = tempImage.base64Data.match(/^data:([A-Za-z-+/]+);base64,/);
       if (matches && matches.length > 1) {
         contentType = matches[1];
       }
     }
 
-    const base64WithoutPrefix = photoResult.base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const base64WithoutPrefix = tempImage.base64Data.replace(/^data:image\/\w+;base64,/, '');
 
     // Add metadata with detected content type
     const metadata = {
@@ -902,26 +931,28 @@ export class FirebaseService {
     const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
 
     // Create image collection
-    const imageCollectionId = `${Date.now()}_${userId}`;
+    // Remove base64Data from upload. Rely on photoURL to get the image
     const imageDoc = await addDoc(collection(db, 'images'), {
-      photoURL,
-      userId,
-      userName,
-      collectionId: imageCollectionId,
+      photoURL: photoURL,
+      userId: tempImage.userId,
+      userName: tempImage.userName,
+      collectionId: tempImage.collectionId,
       createdAt: new Date(),
-      width: photoResult.dimensions.width,
-      height: photoResult.dimensions.height
+      width: tempImage.width,
+      height: tempImage.height
     });
 
+    // Add base64Data back in in memory
     const image: Image = {
       id: imageDoc.id,
-      photoURL,
-      userId,
-      userName,
-      collectionId: imageCollectionId,
+      photoURL: photoURL,
+      userId: tempImage.userId,
+      userName: tempImage.userName,
+      collectionId: tempImage.collectionId,
       createdAt: new Date(),
-      width: photoResult.dimensions.width,
-      height: photoResult.dimensions.height
+      width: tempImage.width,
+      height: tempImage.height,
+      base64Data: tempImage.base64Data
     };
 
     return image;
@@ -935,23 +966,20 @@ export class FirebaseService {
    * @param userName The user's display name
    * @returns Created sit
    */
-  static async _createSit(coordinates: Location, imageCollectionId: string, userId: string, userName: string): Promise<Sit> {
+  static async _createSit(tempSit: Sit): Promise<Sit> {
     try {
-      const sitRef = doc(collection(db, 'sits'));
-      const sitData = {
-        location: coordinates,
-        imageCollectionId,
-        createdAt: new Date(),
-        uploadedBy: userId,
-        uploadedByUsername: userName
+      const sitDoc = await addDoc(collection(db, 'sits'), tempSit);
+
+      const sit: Sit = {
+        id: sitDoc.id,
+        location: tempSit.location,
+        imageCollectionId: tempSit.imageCollectionId,
+        createdAt: tempSit.createdAt,
+        uploadedBy: tempSit.uploadedBy,
+        uploadedByUsername: tempSit.uploadedByUsername
       };
 
-      await setDoc(sitRef, sitData);
-
-      return {
-        id: sitRef.id,
-        ...sitData
-      };
+      return sit;
     } catch (error) {
       console.error('Error creating sit:', error);
       throw error;

@@ -84,8 +84,6 @@ class App extends React.Component<{}, AppState> {
   private mapContainer = React.createRef<HTMLDivElement>();
   private mapComponentRef = React.createRef<MapComponent>();
   private locationService: LocationService;
-  private tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
-  private tempSitMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
 
@@ -813,7 +811,7 @@ class App extends React.Component<{}, AppState> {
     const isTemporaryImage = imageId.startsWith('temp_');
 
     if (isTemporaryImage) {
-      const realImageId = this.tempImageMapping.get(imageId);
+      const realImageId = FirebaseService.getTempImageMapping(imageId);
       if (!realImageId) {
         console.error('No real image ID found for temporary image:', imageId);
         return;
@@ -901,39 +899,35 @@ class App extends React.Component<{}, AppState> {
     };
 
     // Store mapping from temp ID to real Firebase ID
-    this.tempImageMapping.set(tempImageId, null);
-    console.log(`Mapped temp image ${tempImageId} to null`);
-
-    // if (!FirebaseService.isOnline()) {
-    //   FirebaseService.addTemporaryImage(tempImage);
-    // }
+    FirebaseService.addTempImageMapping(tempImageId, null);
 
     return tempImage;
   }
 
   private createTemporarySit = (photoResult: PhotoResult, userId: string, userName: string) => {
     const tempSitId = `temp_${Date.now()}`;
+    const imageCollectionId = `${userId}_${Date.now()}`;
     const tempSit: Sit = {
       id: tempSitId,
       location: photoResult.location,
-      imageCollectionId: `temp_${Date.now()}`,
+      imageCollectionId: imageCollectionId,
       uploadedBy: userId,
       uploadedByUsername: userName,
       createdAt: new Date()
     };
 
     // Store mapping from temp ID to real Firebase ID
-    this.tempSitMapping.set(tempSitId, null);
+    FirebaseService.addTempSitMapping(tempSitId, null);
 
     return tempSit;
   }
 
-  private removeTemporaryImage = (imageId: string) => {
-    if (this.tempImageMapping.has(imageId)) {
-      this.tempImageMapping.delete(imageId);
-    }
-    // FirebaseService.removeTemporaryImage(imageId);
-  }
+  // private removeTemporaryImage = (imageId: string) => {
+  //   if (this.tempImageMapping.has(imageId)) {
+  //     this.tempImageMapping.delete(imageId);
+  //   }
+  //   // FirebaseService.removeTemporaryImage(imageId);
+  // }
 
   private findNearbySit = async (coordinates: Location): Promise<Sit | null> => {
     const { sits } = this.state;
@@ -1223,87 +1217,51 @@ class App extends React.Component<{}, AppState> {
         });
       });
 
-      return tempSit;
+      // Create sit with photo using FirebaseService in the background
+      try {
+        const { sit, image } = await FirebaseService.createSitWithImage(tempSit, tempImage);
+
+        // Replace initial sit with complete sit
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.delete(tempSit.id);
+          newSits.set(sit.id, sit);
+
+          // Update drawer if it's showing the initial sit
+          if (prevState.drawer.sit?.id === tempSit.id) {
+            return {
+              ...prevState,
+              sits: newSits,
+              modals: {
+                ...prevState.modals,
+                photo: {
+                  ...prevState.modals.photo,
+                  sitId: sit.id
+                }
+              },
+              drawer: {
+                ...prevState.drawer,
+                sit,
+                images: sit.imageCollectionId ?
+                  prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
+                  prevState.drawer.images
+              }
+            };
+          }
+          else {
+            return {
+              ...prevState,
+              sits: newSits
+            };
+          }
+        });
+        return sit;
+      } catch (error) {
+        return tempSit
+      }
     } catch (error) {
       throw error;
     }
-
-      // Create sit with photo using FirebaseService in the background
-      // const { sit, image } = await FirebaseService.createSitWithImage(
-      //   photoResult,
-      //   user.uid,
-      //   userPreferences.username,
-      // );
-
-      // this.tempImageMapping.set(tempImage.id, image.id);
-      // this.tempSitMapping.set(tempSit.id, sit.id);
-
-      // FirebaseService.removeTemporaryImage(tempImage.id);
-
-      // Replace initial sit with complete sit
-      // this.setState(prevState => {
-      //   const newSits = new Map(prevState.sits);
-      //   newSits.delete(tempSit.id);
-      //   newSits.set(sit.id, sit);
-
-        // Update drawer if it's showing the initial sit
-      //   if (prevState.drawer.sit?.id === tempSit.id) {
-      //     return {
-      //       ...prevState,
-      //       sits: newSits,
-      //       modals: {
-      //         ...prevState.modals,
-      //         photo: {
-      //           ...prevState.modals.photo,
-      //           sitId: sit.id
-      //         }
-      //       },
-      //       drawer: {
-      //         ...prevState.drawer,
-      //         sit,
-      //         images: sit.imageCollectionId ?
-      //           prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
-      //           prevState.drawer.images
-      //       }
-      //     };
-      //   }
-
-      //   return {
-      //     ...prevState,
-      //     sits: newSits
-      //   };
-      // });
-
-    //   if (prevState.drawer.sit?.id === tempSit.id) {
-    //     return {
-    //       ...prevState,
-    //       sits: newSits,
-    //       modals: {
-    //         ...prevState.modals,
-    //         photo: {
-    //           ...prevState.modals.photo,
-    //           sitId: sit.id
-    //         }
-    //       },
-    //       drawer: {
-    //         ...prevState.drawer,
-    //         images: sit.imageCollectionId ?
-    //           prevState.drawer.images.map(img => ({...img, collectionId: sit.imageCollectionId || ''})) :
-    //           prevState.drawer.images
-    //       }
-    //     };
-    //   }
-
-    //   return {
-    //     ...prevState,
-    //     sits: newSits
-    //   };
-    // });
-
-    //   return tempSit;
-    // } catch (error) {
-    //   throw error;
-    // }
   };
 
   private addImageToSit = async (sit: Sit, photoResult: PhotoResult): Promise<void> => {
