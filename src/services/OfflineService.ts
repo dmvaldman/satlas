@@ -1,8 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Network } from '@capacitor/network';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-import { PhotoResult, Sit, Image } from '../types';
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { Sit, Image } from '../types';
+import FileStorageService from './FileStorageService';
 
 // Define explicit types for different kinds of pending uploads
 export enum PendingUploadType {
@@ -10,18 +9,6 @@ export enum PendingUploadType {
   ADD_TO_EXISTING_SIT = 'ADD_TO_EXISTING_SIT',
   REPLACE_IMAGE = 'REPLACE_IMAGE',
   DELETE_IMAGE = 'DELETE_IMAGE'
-}
-
-// Define the schema for our IndexedDB
-interface OfflineImagesDB extends DBSchema {
-  images: {
-    key: string;
-    value: {
-      id: string;
-      data: string;
-      timestamp: number;
-    };
-  };
 }
 
 // Base interface for all pending uploads
@@ -63,6 +50,38 @@ export interface DeleteImagePendingUpload extends BasePendingUpload {
 // Union type for all pending upload types
 export type PendingUpload = NewSitPendingUpload | AddToSitPendingUpload | ReplaceImagePendingUpload | DeleteImagePendingUpload;
 
+// Helper functions for safely encoding/decoding Unicode strings with base64
+function utf8ToBase64(str: string): string {
+  // For base64 image data, we need to handle the data URI prefix
+  if (str.startsWith('data:')) {
+    // Extract the base64 part after the comma
+    const base64Part = str.split(',')[1];
+    return base64Part;
+  }
+
+  // For regular JSON strings, use the standard encoding
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16))
+    )
+  );
+}
+
+function base64ToUtf8(str: string): string {
+  // For base64 image data, we need to reconstruct the data URI
+  if (str.match(/^[A-Za-z0-9+/=]+$/)) {
+    // If it's pure base64 (no data URI prefix), assume it's an image
+    return `data:image/jpeg;base64,${str}`;
+  }
+
+  // For regular JSON strings, use the standard decoding
+  return decodeURIComponent(
+    Array.prototype.map.call(atob(str), (c) =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join('')
+  );
+}
+
 export class OfflineError extends Error {}
 export class OfflineSuccess extends Error {}
 
@@ -73,7 +92,7 @@ export class OfflineService {
   private listeners: Set<(isOnline: boolean) => void> = new Set();
   private networkListener: any = null; // Store the network listener reference
   private isInitialized: boolean = false; // Track initialization state
-  private db: IDBPDatabase<OfflineImagesDB> | null = null; // IndexedDB instance
+  private fileStorageService: FileStorageService = FileStorageService.getInstance();
 
   public static getInstance(): OfflineService {
     if (!OfflineService.instance) {
@@ -94,24 +113,8 @@ export class OfflineService {
     // Clean up any existing listeners before reinitializing
     await this.cleanup();
 
-    // Initialize IndexedDB for web platforms
-    if (!Capacitor.isNativePlatform()) {
-      try {
-        this.db = await openDB<OfflineImagesDB>('offline-images-db', 1, {
-          upgrade(db) {
-            // Create a store for images if it doesn't exist
-            if (!db.objectStoreNames.contains('images')) {
-              db.createObjectStore('images', { keyPath: 'id' });
-              console.log('[OfflineService] Created IndexedDB store for images');
-            }
-          },
-        });
-        console.log('[OfflineService] IndexedDB initialized successfully');
-      } catch (error) {
-        console.error('[OfflineService] Error initializing IndexedDB:', error);
-        this.db = null;
-      }
-    }
+    // Initialize the file storage service
+    await this.fileStorageService.initialize();
 
     // Load any saved pending uploads
     console.log('[OfflineService] Loading pending uploads during initialization');
@@ -165,12 +168,8 @@ export class OfflineService {
   public async cleanup(): Promise<void> {
     console.log('[OfflineService] Cleaning up...');
 
-    // Close IndexedDB connection if open
-    if (this.db) {
-      this.db.close();
-      this.db = null;
-      console.log('[OfflineService] Closed IndexedDB connection');
-    }
+    // Cleanup FileStorageService
+    await this.fileStorageService.cleanup();
 
     // Remove network listeners
     if (Capacitor.isNativePlatform() && this.networkListener) {
@@ -268,24 +267,20 @@ export class OfflineService {
       return upload; // No image data to process
     }
 
-    const base64Data = upload.tempImage.base64Data;
+    try {
+      const base64Data = upload.tempImage.base64Data;
 
-    if (Capacitor.isNativePlatform()) {
-      await this.saveImageToFileSystem(id, base64Data);
+      // Use FileStorageService to save the file
+      const fileReference = await this.fileStorageService.saveFile(id, base64Data);
 
-      // Replace the base64 data with a file reference
-      const strippedUpload = { ...upload }; // Create a copy to avoid modifying the original pendingUploads array directly
-      strippedUpload.tempImage = { ...strippedUpload.tempImage, base64Data: `file:${id}` };
-      return strippedUpload;
-    }
-    else {
-      // For web, save to IndexedDB
-      await this.saveImageToIndexedDB(id, base64Data);
-
-      // Replace the base64 data with a reference
+      // Create a copy to avoid modifying the original pendingUploads array directly
       const strippedUpload = { ...upload };
-      strippedUpload.tempImage = { ...strippedUpload.tempImage, base64Data: `idb:${id}` };
+      strippedUpload.tempImage = { ...strippedUpload.tempImage, base64Data: fileReference };
+
       return strippedUpload;
+    } catch (error) {
+      console.error('[OfflineService] Error stripping image from pending upload:', error);
+      throw error;
     }
   }
 
@@ -336,146 +331,16 @@ export class OfflineService {
     return id;
   }
 
-  private async saveImageToFileSystem(id: string, base64Data: string): Promise<void> {
-    try {
-      // Clean the data - remove any existing data URL prefix and any whitespace
-      const cleanData = base64Data.replace(/^data:image\/\w+;base64,/, '').trim();
-
-      // Create directory if it doesn't exist
-      try {
-        await Filesystem.mkdir({
-          path: 'offline_uploads',
-          directory: Directory.Cache,
-          recursive: true
-        });
-      } catch (e) {
-        // Directory might already exist, that's fine
-      }
-
-      await Filesystem.writeFile({
-        path: `offline_uploads/${id}.jpg`,
-        data: cleanData,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8
-      });
-    } catch (error) {
-      console.error('[OfflineService] Error saving image to filesystem:', error);
-      // Remove the pending upload if saving fails
-      await this.removePendingUpload(id);
-      throw error;
-    }
-  }
-
-  private async getImageFromFileSystem(id: string): Promise<string> {
-    try {
-      console.log('[OfflineService] Reading file from filesystem:', id);
-      const result = await Filesystem.readFile({
-        path: `offline_uploads/${id}.jpg`,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8
-      });
-
-      // Convert to string if it's a Blob
-      const data = typeof result.data === 'string' ? result.data : await result.data.text();
-
-      // Clean the data - remove any existing data URL prefix and any whitespace
-      const cleanData = data.replace(/^data:image\/\w+;base64,/, '').trim();
-
-      // Add the data URL prefix back
-      return `data:image/jpeg;base64,${cleanData}`;
-    } catch (error) {
-      console.error('[OfflineService] Error reading image from filesystem:', error);
-      throw error;
-    }
-  }
-
-  private async deleteImageFromFileSystem(id: string): Promise<void> {
-    try {
-      await Filesystem.deleteFile({
-        path: `offline_uploads/${id}.jpg`,
-        directory: Directory.Cache
-      });
-    } catch (error) {
-      console.error('Error deleting image from filesystem:', error);
-      // Don't throw, just log the error
-    }
-  }
-
-  private async saveImageToIndexedDB(id: string, base64Data: string): Promise<void> {
-    try {
-      if (!this.db) {
-        throw new Error('IndexedDB not initialized');
-      }
-
-      // Clean the data (optional - might want to keep the data URL prefix for web)
-      const data = base64Data;
-
-      await this.db.put('images', {
-        id,
-        data,
-        timestamp: Date.now()
-      });
-
-      console.log('[OfflineService] Successfully saved image to IndexedDB:', id);
-    } catch (error) {
-      console.error('[OfflineService] Error saving image to IndexedDB:', error);
-      // Remove the pending upload if saving fails
-      await this.removePendingUpload(id);
-      throw error;
-    }
-  }
-
-  private async getImageFromIndexedDB(id: string): Promise<string> {
-    try {
-      if (!this.db) {
-        throw new Error('IndexedDB not initialized');
-      }
-
-      console.log('[OfflineService] Reading image from IndexedDB:', id);
-      const image = await this.db.get('images', id);
-
-      if (!image) {
-        throw new Error(`Image with ID ${id} not found in IndexedDB`);
-      }
-
-      return image.data;
-    } catch (error) {
-      console.error('[OfflineService] Error reading image from IndexedDB:', error);
-      throw error;
-    }
-  }
-
-  private async deleteImageFromIndexedDB(id: string): Promise<void> {
-    try {
-      if (!this.db) {
-        throw new Error('IndexedDB not initialized');
-      }
-
-      await this.db.delete('images', id);
-      console.log('[OfflineService] Deleted image from IndexedDB:', id);
-    } catch (error) {
-      console.error('[OfflineService] Error deleting image from IndexedDB:', error);
-      // Don't throw, just log the error
-    }
-  }
-
   private async savePendingUploads(): Promise<void> {
     try {
       console.log('[OfflineService] Saving pending uploads:', this.pendingUploads.length);
       const data = JSON.stringify(this.pendingUploads);
 
-      if (Capacitor.isNativePlatform()) {
-        await Filesystem.writeFile({
-          path: 'pending_uploads.json',
-          data,
-          directory: Directory.Cache,
-          encoding: Encoding.UTF8
-        });
-        console.log('[OfflineService] Successfully saved pending uploads to filesystem');
-      } else {
-        localStorage.setItem('pendingUploads', data);
-        console.log('[OfflineService] Successfully saved pending uploads to localStorage');
-      }
+      // Use our helper function to properly encode the JSON string
+      const base64Data = utf8ToBase64(data);
+      const encodedData = `data:application/json;base64,${base64Data}`;
+      await this.fileStorageService.saveFile('pending_uploads_json', encodedData);
+      console.log('[OfflineService] Successfully saved pending uploads');
     } catch (error) {
       console.error('[OfflineService] Error saving pending uploads:', error);
     }
@@ -484,35 +349,26 @@ export class OfflineService {
   private async loadPendingUploads(): Promise<void> {
     try {
       console.log('[OfflineService] Loading pending uploads');
-      let data: string | null = null;
 
-      if (Capacitor.isNativePlatform()) {
-        try {
-          const result = await Filesystem.readFile({
-            path: 'pending_uploads.json',
-            directory: Directory.Cache,
-            encoding: Encoding.UTF8
-          });
-          data = result.data as string;
-          console.log('[OfflineService] Successfully loaded pending uploads from filesystem');
-        } catch (e) {
-          console.log('[OfflineService] No pending uploads found in filesystem');
-          data = null;
-        }
-      } else {
-        data = localStorage.getItem('pendingUploads');
-        console.log('[OfflineService] Loaded pending uploads from localStorage:', data ? 'found' : 'not found');
-      }
+      try {
+        // Use FileStorageService to load the JSON data
+        const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
+        const fileData = await this.fileStorageService.loadFile(fileRef);
 
-      if (data) {
-        this.pendingUploads = JSON.parse(data);
-        console.log('[OfflineService] Loaded pending uploads:', this.pendingUploads.length);
-      } else {
-        console.log('[OfflineService] No pending uploads to load');
+        // Extract the JSON data from the base64 data URI
+        const base64Data = fileData.replace('data:application/json;base64,', '');
+
+        // Decode using our helper function
+        const jsonString = base64ToUtf8(base64Data);
+
+        this.pendingUploads = JSON.parse(jsonString);
+        console.log('[OfflineService] Successfully loaded pending uploads:', this.pendingUploads.length);
+      } catch (e) {
+        console.log('[OfflineService] No pending uploads found or error loading:', e);
         this.pendingUploads = [];
       }
     } catch (error) {
-      console.error('[OfflineService] Error loading pending uploads:', error);
+      console.error('[OfflineService] Error in loadPendingUploads:', error);
       this.pendingUploads = [];
     }
   }
@@ -521,26 +377,33 @@ export class OfflineService {
     const upload = this.pendingUploads.find(upload => upload.id === id);
     if (!upload) return;
 
-    // Handle image deletion based on platform
+    // Clean up any stored files
     if ((upload.type === PendingUploadType.REPLACE_IMAGE ||
          upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
          upload.type === PendingUploadType.NEW_SIT) &&
-        typeof upload.tempImage.base64Data === 'string') {
+        typeof upload.tempImage.base64Data === 'string' &&
+        (upload.tempImage.base64Data.startsWith('file:') || upload.tempImage.base64Data.startsWith('idb:'))) {
 
-      if (Capacitor.isNativePlatform() && upload.tempImage.base64Data.startsWith('file:')) {
-        // Delete from filesystem for native platforms
-        const fileId = upload.tempImage.base64Data.substring(5);
-        await this.deleteImageFromFileSystem(fileId);
-      }
-      else if (!Capacitor.isNativePlatform() && upload.tempImage.base64Data.startsWith('idb:')) {
-        // Delete from IndexedDB for web platforms
-        const idbId = upload.tempImage.base64Data.substring(4);
-        await this.deleteImageFromIndexedDB(idbId);
-      }
+      // Delete the file using FileStorageService
+      await this.fileStorageService.deleteFile(upload.tempImage.base64Data);
     }
 
     this.pendingUploads = this.pendingUploads.filter(upload => upload.id !== id);
-    await this.savePendingUploads();
+
+    // If there are no more pending uploads, clean up the storage file
+    if (this.pendingUploads.length === 0) {
+      try {
+        const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
+        await this.fileStorageService.deleteFile(fileRef);
+        console.log('[OfflineService] Removed pending uploads storage file');
+      } catch (e) {
+        // It's ok if this fails - the file might not exist
+        console.log('[OfflineService] No pending uploads storage file to remove');
+      }
+    } else {
+      // Otherwise save the updated list
+      await this.savePendingUploads();
+    }
   }
 
   public getPendingUploads(): PendingUpload[] {
@@ -555,25 +418,12 @@ export class OfflineService {
     if ((upload.type === PendingUploadType.REPLACE_IMAGE ||
          upload.type === PendingUploadType.ADD_TO_EXISTING_SIT ||
          upload.type === PendingUploadType.NEW_SIT) &&
-        typeof upload.tempImage.base64Data === 'string') {
+        typeof upload.tempImage.base64Data === 'string' &&
+        (upload.tempImage.base64Data.startsWith('file:') || upload.tempImage.base64Data.startsWith('idb:'))) {
 
       try {
-        let base64Data: string;
-
-        if (Capacitor.isNativePlatform() && upload.tempImage.base64Data.startsWith('file:')) {
-          // Load from filesystem for native platforms
-          const fileId = upload.tempImage.base64Data.substring(5);
-          base64Data = await this.getImageFromFileSystem(fileId);
-        }
-        else if (!Capacitor.isNativePlatform() && upload.tempImage.base64Data.startsWith('idb:')) {
-          // Load from IndexedDB for web platforms
-          const idbId = upload.tempImage.base64Data.substring(4);
-          base64Data = await this.getImageFromIndexedDB(idbId);
-        }
-        else {
-          // No transformation needed
-          return { ...upload };
-        }
+        // Load the file using FileStorageService
+        const base64Data = await this.fileStorageService.loadFile(upload.tempImage.base64Data);
 
         // Process the upload with the loaded image data
         return {
