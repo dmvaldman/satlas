@@ -261,72 +261,65 @@ export class FirebaseService {
   }
 
   /**
+   * Generate a secure nonce
+   * @returns Promise that resolves to a secure nonce
+   */
+  static async generateSecureNonce(): Promise<string> {
+    // Generate a random string of 32 alphanumeric characters
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+
+    // Convert to alphanumeric string
+    return Array.from(array)
+      .map(x => chars[x % chars.length])
+      .join('');
+  }
+
+  /**
    * Sign in with Apple
    * @returns Promise that resolves when sign-in is complete
    */
   static async signInWithApple(): Promise<void> {
     console.log('[Firebase] Starting Apple sign-in process');
     try {
-      // First ensure we're signed out
-      console.log('[Firebase] Ensuring user is signed out');
+      // First ensure we're signed out completely
+      console.log('[Firebase] Ensuring user is signed out from all sources');
       await FirebaseService.signOut();
       console.log('[Firebase] User signed out successfully');
 
       if (Capacitor.isNativePlatform()) {
         console.log('[Firebase] Using native authentication');
         try {
-          debugger;
-
           // Check if the plugin is available
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
 
+          // Call the plugin's signInWithApple method.
+          // The plugin might handle the nonce implicitly, or it might be part of the result.
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithApple');
           const result = await FirebaseAuthentication.signInWithApple();
+
           console.log('[Firebase] Native Apple sign-in raw result:', result);
 
-          if (!result?.credential) {
-            console.error('[Firebase] No credential received from native sign-in');
-            throw new Error('No credential received from native sign-in');
+          if (!result?.credential?.idToken) { // Check specifically for idToken
+            console.error('[Firebase] No idToken received from native sign-in');
+            throw new Error('No idToken received from native sign-in');
           }
 
-          // Log the credential structure for debugging
-          console.log('[Firebase] Credential structure:', {
-            hasIdToken: !!result.credential.idToken,
-            hasAccessToken: !!result.credential.accessToken,
-            hasProviderId: !!result.credential.providerId
-          });
+          console.log('[Firebase] User successfully authenticated with Apple via native plugin.');
 
-          // Create a Firebase credential from the plugin result
-          const provider = new OAuthProvider('apple.com');
-          const credential = provider.credential({
-            idToken: result.credential.idToken,
-            accessToken: result.credential.accessToken
-          });
+          // The plugin handles the web sign-in implicitly, so no manual signInWithCredential is needed here.
 
-          // Sign in to Firebase with the credential
-          console.log('[Firebase] Signing in to Firebase with credential');
-          const userCredential = await signInWithCredential(auth, credential);
-          console.log('[Firebase] Firebase sign-in complete, user:', {
-            uid: userCredential.user.uid,
-            email: userCredential.user.email,
-            displayName: userCredential.user.displayName
-          });
+          // Keep debugger for now if needed
+          // debugger;
 
-          // Verify the current user
-          const currentUser = auth.currentUser;
-          console.log('[Firebase] Current user after credential sign-in:', {
-            hasUser: !!currentUser,
-            userId: currentUser?.uid
-          });
+          // Removed the immediate check for auth.currentUser - rely on onAuthStateChanged
 
-          if (!currentUser) {
-            throw new Error('Failed to get current user after sign-in');
-          }
         } catch (error) {
-          console.error('[Firebase] Native sign-in error:', error);
+          console.error('[Firebase] Native sign-in or credential sign-in error:', error);
           throw error;
         }
       } else {

@@ -9,8 +9,7 @@ interface SignInModalProps {
   isOpen: boolean;
   message?: string;
   onClose: () => void;
-  onSignInSuccess: (user: User) => Promise<void>;
-  onSignInError: () => void;
+  showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
 class SignInModal extends React.Component<SignInModalProps> {
@@ -25,13 +24,6 @@ class SignInModal extends React.Component<SignInModalProps> {
 
       await signInMethod();
 
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        // Handle success in the background
-        this.props.onSignInSuccess(currentUser)
-      } else {
-        this.props.onSignInError();
-      }
     } catch (error) {
       console.error('[SignInModal] Sign-in error:', error);
       // Check if error is a user cancellation
@@ -41,10 +33,13 @@ class SignInModal extends React.Component<SignInModalProps> {
             errorMessage.includes('popup-closed') ||
             errorMessage.includes('popup-blocked')) {
           console.log('[SignInModal] Sign-in cancelled by user');
-          return;
+          // Optionally show a less prominent notification or do nothing for cancellations
+          // this.props.showNotification('Sign-in cancelled');
+          return; // Don't show the generic error notification for cancellations
         }
       }
-      this.props.onSignInError();
+      // Show error notification for actual sign-in failures
+      this.props.showNotification('Failed to sign in. Please try again.', 'error');
     }
   };
 

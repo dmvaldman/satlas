@@ -1439,24 +1439,26 @@ class App extends React.Component<{}, AppState> {
 
         <Notifications />
 
-        <SitComponent
-          isOpen={drawer.isOpen}
-          photoModalIsOpen={modals.photo.isOpen}
-          sit={drawer.sit}
-          images={drawer.images}
-          user={user}
-          marks={marks.get(drawer.sit?.id || '') || new Set()}
-          favoriteCount={favoriteCount.get(drawer.sit?.id || '') || 0}
-          currentLocation={currentLocation}
-          onClose={this.closeDrawer}
-          onToggleMark={this.handleToggleMark}
-          onDeleteImage={this.handleDeleteImage}
-          onReplaceImage={this.handleReplaceImage}
-          onOpenPhotoModal={this.openPhotoUploadModal}
-          onSignIn={this.handleSignInModalOpen}
-          onOpenFullscreenImage={this.openFullscreenImage}
-          showNotification={this.showNotification}
-        />
+        {drawer.sit && (
+          <SitComponent
+            isOpen={drawer.isOpen}
+            photoModalIsOpen={modals.photo.isOpen}
+            sit={drawer.sit}
+            images={drawer.images}
+            user={user}
+            marks={marks.get(drawer.sit.id) || new Set()}
+            favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
+            currentLocation={currentLocation}
+            onClose={this.closeDrawer}
+            onToggleMark={this.handleToggleMark}
+            onDeleteImage={this.handleDeleteImage}
+            onReplaceImage={this.handleReplaceImage}
+            onOpenPhotoModal={this.openPhotoUploadModal}
+            onSignIn={this.handleSignInModalOpen}
+            onOpenFullscreenImage={this.openFullscreenImage}
+            showNotification={this.showNotification}
+          />
+        )}
 
         <FullscreenImage
           isOpen={modals.fullscreenImage.isOpen}
@@ -1468,8 +1470,7 @@ class App extends React.Component<{}, AppState> {
           isOpen={modals.signIn.isOpen}
           onClose={this.handleSignInModalClose}
           message={modals.signIn.message}
-          onSignInSuccess={this.handleSignInSuccess}
-          onSignInError={this.handleSignInError}
+          showNotification={this.showNotification}
         />
       </div>
     );
