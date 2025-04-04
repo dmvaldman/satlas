@@ -40,28 +40,6 @@ import {
 } from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
 
-// Conditionally import Apple Sign In plugin only for iOS
-let SignInWithApple: any;
-const loadAppleSignIn = async () => {
-  if (Capacitor.getPlatform() === 'ios') {
-    try {
-      // Use window.require to avoid Vite's static analysis
-      // @ts-ignore
-      const module = window.require('@capacitor-community/apple-sign-in');
-      SignInWithApple = module.SignInWithApple;
-    } catch (error) {
-      console.log('[Firebase] Apple Sign In module not available:', error);
-      SignInWithApple = null;
-    }
-  }
-};
-
-// Load Apple Sign In module if we're on iOS
-loadAppleSignIn().catch(error => {
-  console.error('[Firebase] Error loading Apple Sign In module:', error);
-  SignInWithApple = null;
-});
-
 // Your web app's Firebase configuration
 // This should match what's in your current firebase.ts file
 const firebaseConfig = {
@@ -286,96 +264,78 @@ export class FirebaseService {
    * Sign in with Apple
    * @returns Promise that resolves when sign-in is complete
    */
-    static async signInWithApple(): Promise<void> {
-      console.log('[Firebase] Starting Apple sign-in process');
-      try {
-        // First ensure we're signed out
-        await FirebaseService.signOut();
+  static async signInWithApple(): Promise<void> {
+    console.log('[Firebase] Starting Apple sign-in process');
+    try {
+      // First ensure we're signed out
+      console.log('[Firebase] Ensuring user is signed out');
+      await FirebaseService.signOut();
+      console.log('[Firebase] User signed out successfully');
 
-        if (Capacitor.isNativePlatform()) {
-          console.log('[Firebase] Using native Apple Sign In');
-          try {
-            if (Capacitor.getPlatform() === 'ios' && SignInWithApple) {
-              // Configure Apple Sign In options
-              console.log('[Firebase] Configuring Apple Sign In options');
-              const options = {
-                clientId: process.env.APPLE_SERVICE_ID || '', // Should be your Apple Service ID
-                scopes: 'email name',
-                state: Math.random().toString(36).substring(7),
-                nonce: Math.random().toString(36).substring(7)
-              };
-              console.log('[Firebase] Apple Sign In options configured:', options);
+      if (Capacitor.isNativePlatform()) {
+        console.log('[Firebase] Using native authentication');
+        try {
+          debugger;
 
-              // Use the native plugin
-              console.log('[Firebase] Calling SignInWithApple.authorize');
-              const result = await SignInWithApple.authorize(options);
-              console.log('[Firebase] Native Apple sign-in raw result:', result);
-
-              if (!result || !result.response) {
-                console.error('[Firebase] No result from native sign-in');
-                throw new Error('No result from native sign-in');
-              }
-
-              if (!result.response.identityToken) {
-                console.error('[Firebase] No identity token in response');
-                throw new Error('No identity token received from Apple');
-              }
-
-              // Create Firebase credential from Apple ID token
-              console.log('[Firebase] Creating Firebase credential from Apple ID token');
-              const provider = new OAuthProvider('apple.com');
-              const credential = provider.credential({
-                idToken: result.response.identityToken,
-                rawNonce: options.nonce
-              });
-              console.log('[Firebase] Firebase credential created');
-
-              // Sign in to Firebase with the credential
-              console.log('[Firebase] Signing in to Firebase with credential');
-              const userCredential = await signInWithCredential(auth, credential);
-              console.log('[Firebase] Firebase sign-in complete, user:', {
-                uid: userCredential.user.uid,
-                email: userCredential.user.email,
-                displayName: userCredential.user.displayName
-              });
-
-              // Verify the current user
-              const currentUser = auth.currentUser;
-              if (!currentUser) {
-                console.error('[Firebase] No current user after credential sign-in');
-                throw new Error('Failed to get current user after sign-in');
-              }
-
-              console.log('[Firebase] Current user verified:', {
-                uid: currentUser.uid,
-                email: currentUser.email,
-                displayName: currentUser.displayName
-              });
-
-            } else {
-              // For Android or web, use Firebase's built-in Apple Sign In
-              console.log('[Firebase] Using Firebase built-in Apple Sign In');
-              const provider = new OAuthProvider('apple.com');
-              await signInWithPopup(auth, provider);
-            }
-          } catch (error: unknown) {
-            console.error('[Firebase] Plugin error:', error);
-            // If we get a specific error about credentials, try web fallback
-            if (error instanceof Error &&
-                (error.message.includes('credentials') || error.message.includes('cancelled'))) {
-              console.log('[Firebase] Falling back to web authentication');
-              const provider = new OAuthProvider('apple.com');
-              await signInWithPopup(auth, provider);
-            } else {
-              throw error;
-            }
+          // Check if the plugin is available
+          if (!FirebaseAuthentication) {
+            console.error('[Firebase] FirebaseAuthentication plugin not available');
+            throw new Error('FirebaseAuthentication plugin not available');
           }
-        } else {
-          console.log('[Firebase] Using web authentication');
+
+          console.log('[Firebase] Calling FirebaseAuthentication.signInWithApple');
+          const result = await FirebaseAuthentication.signInWithApple();
+          console.log('[Firebase] Native Apple sign-in raw result:', result);
+
+          if (!result?.credential) {
+            console.error('[Firebase] No credential received from native sign-in');
+            throw new Error('No credential received from native sign-in');
+          }
+
+          // Log the credential structure for debugging
+          console.log('[Firebase] Credential structure:', {
+            hasIdToken: !!result.credential.idToken,
+            hasAccessToken: !!result.credential.accessToken,
+            hasProviderId: !!result.credential.providerId
+          });
+
+          // Create a Firebase credential from the plugin result
           const provider = new OAuthProvider('apple.com');
-          await signInWithPopup(auth, provider);
+          const credential = provider.credential({
+            idToken: result.credential.idToken,
+            accessToken: result.credential.accessToken
+          });
+
+          // Sign in to Firebase with the credential
+          console.log('[Firebase] Signing in to Firebase with credential');
+          const userCredential = await signInWithCredential(auth, credential);
+          console.log('[Firebase] Firebase sign-in complete, user:', {
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            displayName: userCredential.user.displayName
+          });
+
+          // Verify the current user
+          const currentUser = auth.currentUser;
+          console.log('[Firebase] Current user after credential sign-in:', {
+            hasUser: !!currentUser,
+            userId: currentUser?.uid
+          });
+
+          if (!currentUser) {
+            throw new Error('Failed to get current user after sign-in');
+          }
+        } catch (error) {
+          console.error('[Firebase] Native sign-in error:', error);
+          throw error;
         }
-      } catch (error) {
+      } else {
+        console.log('[Firebase] Using web authentication');
+        const provider = new OAuthProvider('apple.com');
+        await signInWithPopup(auth, provider);
+        console.log('[Firebase] Web Apple sign-in completed successfully');
+      }
+    } catch (error) {
       console.error('[Firebase] Error signing in with Apple:', error);
       throw error;
     }

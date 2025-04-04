@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.dmvaldman.Satlas',
+  appId: process.env.BUNDLE_ID,
   appName: 'Satlas',
   webDir: 'dist',
   server: {
@@ -21,8 +21,6 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
       androidScaleType: "CENTER",
       androidSplashResourceName: "splash",
-      // splashFullScreen: true,
-      // splashImmersive: true,
     },
     StatusBar: {
       style: 'LIGHT',
@@ -49,17 +47,6 @@ const config: CapacitorConfig = {
   }
 };
 
-// Add iOS-specific configurations
-const iosConfig = process.env.PLATFORM === 'ios' ? {
-  plugins: {
-    SignInWithApple: {
-      clientId: 'com.dmvaldman.Satlas',
-      redirectURI: 'com.dmvaldman.Satlas://login',
-      scopes: 'email name'
-    }
-  }
-} : {};
-
 const devConfig = process.env.NODE_ENV === 'development' ? {
   server: {
     url: 'http://localhost:5173',
@@ -69,6 +56,6 @@ const devConfig = process.env.NODE_ENV === 'development' ? {
 } : {};
 
 // Merge configurations
-const mergedConfig = { ...config, ...iosConfig, ...devConfig };
+const mergedConfig = { ...config, ...devConfig };
 
 export default mergedConfig;
