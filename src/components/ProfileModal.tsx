@@ -373,14 +373,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         return;
       }
 
-      const originalUsername = preferences?.username || '';
-      const usernameChanged = username !== originalUsername;
-
-      // Update images with new username if needed
-      if (usernameChanged && user) {
-        await FirebaseService.updateUserWithNewUsername(user.uid, username);
-      }
-
       // Create the updated preferences object
       const updatedPreferences: UserPreferences = {
         username,

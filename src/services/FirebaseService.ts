@@ -487,18 +487,25 @@ export class FirebaseService {
   /**
    * Load user preferences from Firestore
    * @param userId User ID
+   * @param displayName User display name
    * @returns User preferences
    */
-  static async loadUserPreferences(userId: string): Promise<UserPreferences> {
+  static async loadUserPreferences(userId: string, displayName: string | null): Promise<UserPreferences> {
     try {
       const userDoc = await getDoc(doc(db, 'users', userId));
       if (userDoc.exists()) {
         const userData = userDoc.data() as UserPreferences;
 
         // Validate username
-        if (!userData.username || userData.username.length < 3) {
-          console.error('Invalid username in user document:', userData);
-          throw new Error('User document contains invalid username');
+        if (!userData.username) {
+          // If no username exists and we have a user, generate one
+          const username = await this.generateUniqueUsername(
+            userId,
+            displayName || ''
+          );
+          userData.username = username;
+          // Save the updated preferences
+          await this.saveUserPreferences(userId, userData);
         }
 
         return userData;
@@ -520,12 +527,26 @@ export class FirebaseService {
    */
   static async saveUserPreferences(userId: string, preferences: UserPreferences): Promise<void> {
     try {
+      // If username is not null and is different from the original username, update the images
+      // get the original username from the database
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const originalUsername = userDoc.data()?.username;
+
       await setDoc(doc(db, 'users', userId), {
         username: preferences.username,
         pushNotificationsEnabled: preferences.pushNotificationsEnabled,
         lastVisit: Date.now(),
         cityCoordinates: preferences.cityCoordinates || null
       }, { merge: true }); // Use merge to preserve other fields
+
+      // If username is not null and is different from the original username, update the images
+      if (originalUsername !== preferences.username) {
+        try {
+          await FirebaseService.updateUserWithNewUsername(userId, preferences.username);
+        } catch (error) {
+          console.error('Error updating images with new username:', error);
+        }
+      }
     } catch (error) {
       console.error('Error saving preferences:', error);
       throw error;
@@ -656,14 +677,14 @@ export class FirebaseService {
    */
   static async generateUniqueUsername(
     userId: string,
-    displayName?: string | null
+    displayName: string | null
   ): Promise<string> {
     // Create base name from user info
     let baseName = '';
     if (displayName) {
       baseName = displayName.split(' ')[0];
     } else {
-      baseName = `user${Math.floor(Math.random() * 1000)}`;
+      baseName = `user${Math.floor(Math.random() * 10000)}`;
     }
 
     // Clean up the name (remove special chars, lowercase)

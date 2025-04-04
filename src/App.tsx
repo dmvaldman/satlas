@@ -227,7 +227,7 @@ class App extends React.Component<{}, AppState> {
           authIsReady: true
         });
 
-        await this.loadUserData(user.uid);
+        await this.loadUserData(user);
       } else {
         console.log('[App] Setting unauthenticated state');
         this.setState({
@@ -254,7 +254,7 @@ class App extends React.Component<{}, AppState> {
 
     // 3. Load user data if authenticated
     if (currentUser) {
-      await this.loadUserData(currentUser.uid);
+      await this.loadUserData(currentUser);
     }
   };
 
@@ -439,24 +439,13 @@ class App extends React.Component<{}, AppState> {
     this.offlineServiceUnsubscribe = offlineService.addStatusListener(networkHandler);
   };
 
-  private async loadUserData(userId: string) {
+  private async loadUserData(user: User) {
+    const userId = user.uid;
     try {
       const marksMap = await FirebaseService.loadUserMarks(userId);
       const favoriteCounts = await FirebaseService.loadFavoriteCounts();
-      const userData = await FirebaseService.loadUserPreferences(userId);
+      const userData = await FirebaseService.loadUserPreferences(userId, user.displayName);
       const seenSits = await FirebaseService.getUserSeenSits(userId);
-
-      // If no username exists and we have a user, generate one
-      if (!userData.username && this.state.user?.displayName) {
-        const username = await FirebaseService.generateUniqueUsername(
-          userId,
-          this.state.user.displayName
-        );
-        userData.username = username;
-
-        // Save the updated preferences
-        await FirebaseService.saveUserPreferences(userId, userData);
-      }
 
       this.setState({
         marks: marksMap,
@@ -500,7 +489,7 @@ class App extends React.Component<{}, AppState> {
 
       // Load user preferences after state is updated
       try {
-        await this.loadUserData(user.uid);
+        await this.loadUserData(user);
         console.log('[App] User preferences loaded after sign-in');
       } catch (error) {
         console.error('[App] Error loading preferences after sign-in:', error);
