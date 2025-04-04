@@ -227,11 +227,19 @@ export class FirebaseService {
 
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithGoogle');
           const result = await FirebaseAuthentication.signInWithGoogle();
-          console.log('[Firebase] Native Google sign-in completed successfully');
+          console.log('[Firebase] Native Google sign-in raw result:', result);
 
-          if (!result?.credential?.idToken || !result?.credential?.accessToken) {
-            throw new Error('Invalid credential received from native sign-in');
+          if (!result?.credential) {
+            console.error('[Firebase] No credential received from native sign-in');
+            throw new Error('No credential received from native sign-in');
           }
+
+          // Log the credential structure for debugging
+          console.log('[Firebase] Credential structure:', {
+            hasIdToken: !!result.credential.idToken,
+            hasAccessToken: !!result.credential.accessToken,
+            hasProviderId: !!result.credential.providerId
+          });
 
           // Create a credential from the native result
           const credential = GoogleAuthProvider.credential(
