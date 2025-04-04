@@ -766,7 +766,9 @@ class App extends React.Component<{}, AppState> {
     if (!user) throw new Error('Must be logged in to delete images');
 
     const sit = sits.get(sitId);
-    if (!sit) throw new Error('Sit not found');
+    if (!sit) {
+      throw new Error('Sit not found');
+    }
 
     // Optimistically update UI first
     if (drawer.isOpen && drawer.sit?.id === sitId) {
@@ -820,7 +822,6 @@ class App extends React.Component<{}, AppState> {
 
   private getImagesForSit = async (imageCollectionId: string): Promise<Image[]> => {
     try {
-      // Use FirebaseService to get images
       return await FirebaseService.getImages(imageCollectionId);
     } catch (error) {
       console.error('Error fetching images:', error);
@@ -1314,7 +1315,6 @@ class App extends React.Component<{}, AppState> {
         }
       });
 
-
       // Upload to server in the background
       const replacedImage = await FirebaseService.replaceImageInSit(
         tempImage,
@@ -1323,11 +1323,14 @@ class App extends React.Component<{}, AppState> {
       );
 
       // replace imageIds in state with the new imageId
-      this.setState({
-        drawer: {
-          ...this.state.drawer,
-          images: this.state.drawer.images.map(img => img.id === imageId ? replacedImage : img)
-        }
+      this.setState(prevState => {
+        const newImages = prevState.drawer.images.map(img => img.id === tempImage.id ? replacedImage : img);
+        return {
+          drawer: {
+            ...prevState.drawer,
+            images: newImages
+          }
+        };
       });
     } catch (error) {
       throw error;

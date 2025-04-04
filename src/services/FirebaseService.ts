@@ -104,7 +104,6 @@ export class FirebaseService {
   static addTempImageMapping(tempId: string, realId: string | null) {
     console.log('[Firebase] Adding temp image mapping:', { tempId, realId });
     this.tempImageMapping.set(tempId, realId);
-    console.log('NUM TEMP IMAGES', this.tempImages.size);
   }
 
   /**
@@ -161,6 +160,7 @@ export class FirebaseService {
   static addTempImage(image: Image) {
     console.log('[Firebase] Adding temp image to in-memory storage:', image.id);
     this.tempImages.set(image.id, image);
+    console.log('NUM TEMP IMAGES', this.tempImages.size);
   }
 
   /**
@@ -184,7 +184,13 @@ export class FirebaseService {
    */
   static removeTempImage(imageId: string) {
     console.log('[Firebase] Removing temp image from in-memory storage:', imageId);
-    this.tempImages.delete(imageId);
+    if (this.tempImages.has(imageId)) {
+      this.tempImages.delete(imageId);
+      console.log('NUM TEMP IMAGES', this.tempImages.size);
+    }
+    else {
+      console.log('[Firebase] Temp image not found in in-memory storage:', imageId);
+    }
   }
 
   /**
@@ -1012,6 +1018,7 @@ export class FirebaseService {
     };
 
     this.addTempImageMapping(tempImage.id, image.id);
+    this.removeTempImage(tempImage.id);
 
     return image;
   }
@@ -1126,10 +1133,14 @@ export class FirebaseService {
       }
     }
 
+    let tempImageId: string | null = null;
     if (this.tempImageMapping.has(imageId)) {
       const realId = this.tempImageMapping.get(imageId);
       if (realId !== null && realId !== undefined) {
+        tempImageId = imageId;
         imageId = realId;
+        this.removeTempImageMapping(tempImageId);
+        this.removeTempImage(tempImageId);
       }
       else {
         throw new Error('Image not yet uploaded. Wait a moment and try again.');
@@ -1385,11 +1396,6 @@ export class FirebaseService {
       tempImages.forEach(image => {
         const realId = this.getTempImageMapping(image.id);
         if (realId) {
-          // Has a realID and we're online so we are using it => No longer a temp image.
-          if (this.isOnline()) {
-            this.removeTempImage(image.id);
-          }
-
           // If the image is not in the backend, add it to the uniqueImages
           if (!backendImages.find(backendImage => backendImage.id === realId)) {
             combinedImages.set(image.id, image);
