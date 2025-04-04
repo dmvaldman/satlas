@@ -16,7 +16,7 @@ interface ProfileModalProps {
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
-  onUpdatePreferences: (preferences: UserPreferences) => void;
+  onUpdatePreferences: (preferences: UserPreferences, usernameChanged?: boolean) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -365,32 +365,30 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const { username, pushNotifications, cityCoordinates, preferences } = data;
     const { user, showNotification } = this.props;
 
-    try {
-      // Check if username is taken
-      const isTaken = await FirebaseService.isUsernameTaken(username, user?.uid, preferences?.username);
-      if (isTaken) {
-        showNotification('Username is already taken. Changes were not saved.', 'error');
-        return;
+    // Create the updated preferences object
+    const updatedPreferences: UserPreferences = {
+      username,
+      pushNotificationsEnabled: pushNotifications,
+      lastVisit: Date.now(),
+      cityCoordinates: cityCoordinates || undefined
+    };
+
+    // Check if preferences are changed
+    const usernameChanged = username !== (preferences?.username || '');
+    const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
+    const cityChanged = JSON.stringify(cityCoordinates) !== JSON.stringify(preferences?.cityCoordinates);
+
+    const preferencesChanged = usernameChanged || notificationsChanged || cityChanged;
+
+    if (preferencesChanged) {
+      await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences, usernameChanged);
+      try {
+        this.props.onUpdatePreferences(updatedPreferences, usernameChanged);
+        showNotification('Profile settings saved', 'success');
+      } catch (error) {
+        console.error('Error updating preferences:', error);
+        showNotification('Failed to save profile settings. Please try again.', 'error');
       }
-
-      // Create the updated preferences object
-      const updatedPreferences: UserPreferences = {
-        username,
-        pushNotificationsEnabled: pushNotifications,
-        lastVisit: Date.now(),
-        cityCoordinates: cityCoordinates || undefined
-      };
-
-      // Save to Firebase
-      await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences);
-
-      // Important: Update the state in the parent component
-      this.props.onUpdatePreferences(updatedPreferences);
-
-      showNotification('Profile settings saved', 'success');
-    } catch (error) {
-      console.error('Error saving profile in background:', error);
-      showNotification('Failed to save profile settings. Please try again.', 'error');
     }
   };
 
