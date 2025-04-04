@@ -93,6 +93,7 @@ export class FirebaseService {
   static storage = storage;
   static tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
   static tempSitMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
+  static tempImages: Map<string, Image> = new Map(); // In-memory storage for temporary images
 
   // ===== Temporary Image Mapping =====
   /**
@@ -103,6 +104,7 @@ export class FirebaseService {
   static addTempImageMapping(tempId: string, realId: string | null) {
     console.log('[Firebase] Adding temp image mapping:', { tempId, realId });
     this.tempImageMapping.set(tempId, realId);
+    console.log('NUM TEMP IMAGES', this.tempImages.size);
   }
 
   /**
@@ -149,6 +151,40 @@ export class FirebaseService {
   static removeTempSitMapping(tempId: string) {
     console.log('[Firebase] Removing temp sit mapping:', { tempId });
     this.tempSitMapping.delete(tempId);
+  }
+
+  // ===== Temporary Images In-Memory Storage =====
+  /**
+   * Add a temporary image to in-memory storage
+   * @param image The temporary image to store
+   */
+  static addTempImage(image: Image) {
+    console.log('[Firebase] Adding temp image to in-memory storage:', image.id);
+    this.tempImages.set(image.id, image);
+  }
+
+  /**
+   * Get all temporary images for a collection
+   * @param collectionId The collection ID to filter by
+   * @returns Array of temporary images for the collection
+   */
+  static getTempImagesForCollection(collectionId: string): Image[] {
+    const images: Image[] = [];
+    this.tempImages.forEach(image => {
+      if (image.collectionId === collectionId) {
+        images.push(image);
+      }
+    });
+    return images;
+  }
+
+  /**
+   * Remove a temporary image from in-memory storage
+   * @param imageId The ID of the image to remove
+   */
+  static removeTempImage(imageId: string) {
+    console.log('[Firebase] Removing temp image from in-memory storage:', imageId);
+    this.tempImages.delete(imageId);
   }
 
   /**
@@ -721,7 +757,8 @@ export class FirebaseService {
           },
           imageCollectionId: sitData.imageCollectionId,
           createdAt: sitData.createdAt,
-          uploadedBy: sitData.uploadedBy
+          uploadedBy: sitData.uploadedBy,
+          uploadedByUsername: sitData.uploadedByUsername
         };
 
         sits.set(sit.id, sit);
@@ -793,6 +830,7 @@ export class FirebaseService {
 
     this.addTempSitMapping(tempSit.id, null);
     this.addTempImageMapping(tempImage.id, null);
+    this.addTempImage(tempImage);
 
     // Check if we're online
     if (!this.isOnline()) {
@@ -850,6 +888,7 @@ export class FirebaseService {
     ): Promise<Image> {
 
       this.addTempImageMapping(tempImage.id, null);
+      this.addTempImage(tempImage);
 
       // Check if we're online
       if (!this.isOnline()) {
@@ -1101,7 +1140,6 @@ export class FirebaseService {
       // Get image data first
       const imageDoc = await getDoc(doc(db, 'images', imageId));
       if (!imageDoc.exists()) {
-        debugger;
         throw new Error('Image not found');
       }
 
@@ -1308,26 +1346,67 @@ export class FirebaseService {
    * @returns Array of images
    */
   static async getImages(collectionId: string): Promise<Image[]> {
+    let tempImages = this.getTempImagesForCollection(collectionId);
+
     try {
       console.log('Fetching images for collection:', collectionId);
 
-      const imagesRef = collection(db, 'images');
-      const q = query(
-        imagesRef,
-        where('collectionId', '==', collectionId)
-      );
+      let backendImages: Image[] = [];
+      if (this.isOnline()) {
+        const imagesRef = collection(db, 'images');
+        const q = query(
+          imagesRef,
+          where('collectionId', '==', collectionId)
+        );
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        photoURL: doc.data().photoURL || '',
-        userId: doc.data().userId,
-        userName: doc.data().userName,
-        collectionId: doc.data().collectionId,
-        createdAt: doc.data().createdAt.toDate(),
-        width: doc.data().width || undefined,
-        height: doc.data().height || undefined
-      }));
+        const snapshot = await getDocs(q);
+        backendImages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          photoURL: doc.data().photoURL || '',
+          userId: doc.data().userId,
+          userName: doc.data().userName,
+          collectionId: doc.data().collectionId,
+          createdAt: doc.data().createdAt.toDate(),
+          width: doc.data().width || undefined,
+          height: doc.data().height || undefined
+        }));
+      }
+      else {
+        backendImages = [];
+      }
+
+      const combinedImages = new Map<string, Image>();
+
+      // Loop through temp Images
+      // If they have a realID remove them from tempImages
+      // If their realID is in backendImages, don't add to uniqueImages
+      // If they don't have a realId, add to uniqueImages
+      // Append backendImages to the rest
+      tempImages.forEach(image => {
+        const realId = this.getTempImageMapping(image.id);
+        if (realId) {
+          // Has a realID and we're online so we are using it => No longer a temp image.
+          if (this.isOnline()) {
+            this.removeTempImage(image.id);
+          }
+
+          // If the image is not in the backend, add it to the uniqueImages
+          if (!backendImages.find(backendImage => backendImage.id === realId)) {
+            combinedImages.set(image.id, image);
+          }
+        }
+        else {
+          // No realID. Still a temp image. Keep.
+          combinedImages.set(image.id, image);
+        }
+      });
+
+      // Append backendImages to the rest
+      backendImages.forEach(image => {
+        combinedImages.set(image.id, image);
+      });
+
+      return Array.from(combinedImages.values());
     } catch (error) {
       throw error;
     }
