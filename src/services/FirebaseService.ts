@@ -212,38 +212,8 @@ export class FirebaseService {
             throw new Error('No credential received from native sign-in');
           }
 
-          // Log the credential structure for debugging
-          console.log('[Firebase] Credential structure:', {
-            hasIdToken: !!result.credential.idToken,
-            hasAccessToken: !!result.credential.accessToken,
-            hasProviderId: !!result.credential.providerId
-          });
+          console.log('[Firebase] Assuming native plugin handles web SDK sign-in implicitly.');
 
-          // Create a credential from the native result
-          const credential = GoogleAuthProvider.credential(
-            result.credential.idToken,
-            result.credential.accessToken
-          );
-
-          // Sign in to Firebase with the credential
-          console.log('[Firebase] Signing in to Firebase with credential');
-          const userCredential = await signInWithCredential(auth, credential);
-          console.log('[Firebase] Firebase sign-in complete, user:', {
-            uid: userCredential.user.uid,
-            email: userCredential.user.email,
-            displayName: userCredential.user.displayName
-          });
-
-          // Verify the current user
-          const currentUser = auth.currentUser;
-          console.log('[Firebase] Current user after credential sign-in:', {
-            hasUser: !!currentUser,
-            userId: currentUser?.uid
-          });
-
-          if (!currentUser) {
-            throw new Error('Failed to get current user after sign-in');
-          }
         } catch (error) {
           console.error('[Firebase] Native sign-in error:', error);
           throw error;
@@ -310,14 +280,6 @@ export class FirebaseService {
           }
 
           console.log('[Firebase] User successfully authenticated with Apple via native plugin.');
-
-          // The plugin handles the web sign-in implicitly, so no manual signInWithCredential is needed here.
-
-          // Keep debugger for now if needed
-          // debugger;
-
-          // Removed the immediate check for auth.currentUser - rely on onAuthStateChanged
-
         } catch (error) {
           console.error('[Firebase] Native sign-in or credential sign-in error:', error);
           throw error;
@@ -382,9 +344,51 @@ export class FirebaseService {
         if (event.user) {
           // User is signed in
           console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
-          // hack because I used the wrong capitalization
-          const userClone = { photoURL: event.user.photoUrl, ...event.user };
-          callback(userClone as unknown as User);
+          console.log('[Firebase] Raw event.user object from native listener:', JSON.stringify(event.user));
+
+          // Extract potential photoURL and displayName, preferring top-level if available
+          let finalPhotoURL = event.user.photoUrl;
+          let finalDisplayName = event.user.displayName;
+
+          // If top-level is null, check providerData (common for Google sign-in via plugin)
+          if ((!finalPhotoURL || !finalDisplayName) && event.user.providerData) {
+            for (const provider of event.user.providerData) {
+              // Prioritize Google data if multiple providers exist
+              if (provider.providerId === 'google.com') {
+                if (!finalPhotoURL && provider.photoUrl) {
+                  finalPhotoURL = provider.photoUrl;
+                }
+                if (!finalDisplayName && provider.displayName) {
+                  finalDisplayName = provider.displayName;
+                }
+                // Found Google data, no need to check others
+                break;
+              } else if (provider.providerId === 'apple.com') {
+                // Add similar logic for Apple if needed, though top-level usually works
+                if (!finalDisplayName && provider.displayName) {
+                  finalDisplayName = provider.displayName;
+                }
+              }
+            }
+          }
+
+          // Construct the final user object for the callback
+          // Ensure all essential User properties are included
+          const finalUser = {
+            uid: event.user.uid,
+            email: event.user.email,
+            emailVerified: event.user.emailVerified,
+            isAnonymous: event.user.isAnonymous,
+            metadata: event.user.metadata, // Assuming metadata structure matches
+            phoneNumber: event.user.phoneNumber,
+            providerId: event.user.providerId,
+            tenantId: event.user.tenantId,
+            // Use the derived/found values
+            displayName: finalDisplayName,
+            photoURL: finalPhotoURL,
+          } as unknown as User;
+
+          callback(finalUser);
         } else {
           console.log('[Firebase] Auth state changed to signed out');
           callback(null);
@@ -486,12 +490,10 @@ export class FirebaseService {
    * @param userId User ID
    * @param preferences User preferences to save
    */
-  static async saveUserPreferences(userId: string, preferences: UserPreferences): Promise<void> {
+  static async saveUserPreferences(userId: string, preferences: UserPreferences, usernameChanged?: boolean): Promise<void> {
     try {
       // If username is not null and is different from the original username, update the images
       // get the original username from the database
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const originalUsername = userDoc.data()?.username;
 
       await setDoc(doc(db, 'users', userId), {
         username: preferences.username,
@@ -501,11 +503,15 @@ export class FirebaseService {
       }, { merge: true }); // Use merge to preserve other fields
 
       // If username is not null and is different from the original username, update the images
-      if (originalUsername !== preferences.username) {
-        try {
-          await FirebaseService.updateUserWithNewUsername(userId, preferences.username);
-        } catch (error) {
-          console.error('Error updating images with new username:', error);
+      if (usernameChanged === true || usernameChanged === undefined) {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        const originalUsername = userDoc.data()?.username;
+        if (originalUsername !== preferences.username) {
+          try {
+            await FirebaseService.updateUserWithNewUsername(userId, preferences.username);
+          } catch (error) {
+            console.error('Error updating images with new username:', error);
+          }
         }
       }
     } catch (error) {
