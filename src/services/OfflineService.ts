@@ -116,6 +116,16 @@ export class OfflineService {
     // Initialize the file storage service
     await this.fileStorageService.initialize();
 
+    // Create empty pending uploads file if it doesn't exist
+    const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
+    try {
+      await this.fileStorageService.loadFile(fileRef);
+    } catch (e) {
+      console.log('[OfflineService] Creating initial empty pending uploads file');
+      this.pendingUploads = [];
+      await this.savePendingUploads();
+    }
+
     // Load any saved pending uploads
     console.log('[OfflineService] Loading pending uploads during initialization');
     await this.loadPendingUploads();
@@ -130,10 +140,9 @@ export class OfflineService {
 
       // Store the listener reference so we can remove it later
       this.networkListener = Network.addListener('networkStatusChange', (status) => {
-        console.log(`[OfflineService] Network status changed - Connected: ${status.connected}, Type: ${status.connectionType}, Previous: ${this.isOnline}, Time: ${new Date().toISOString()}`);
-
         // Only process if this is a real state change
         if (status.connected !== this.isOnline) {
+          console.log(`[OfflineService] Network status changed - Connected: ${status.connected}, Online: ${this.isOnline}, Type: ${status.connectionType}, Time: ${new Date().toISOString()}`);
           this.isOnline = status.connected;
           this.notifyListeners();
         }
@@ -350,25 +359,20 @@ export class OfflineService {
     try {
       console.log('[OfflineService] Loading pending uploads');
 
-      try {
-        // Use FileStorageService to load the JSON data
-        const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
-        const fileData = await this.fileStorageService.loadFile(fileRef);
+      // Use FileStorageService to load the JSON data
+      const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
+      const fileData = await this.fileStorageService.loadFile(fileRef);
 
-        // Extract the JSON data from the base64 data URI
-        const base64Data = fileData.replace('data:application/json;base64,', '');
+      // Extract the JSON data from the base64 data URI
+      const base64Data = fileData.replace('data:application/json;base64,', '');
 
-        // Decode using our helper function
-        const jsonString = base64ToUtf8(base64Data);
+      // Decode using our helper function
+      const jsonString = base64ToUtf8(base64Data);
 
-        this.pendingUploads = JSON.parse(jsonString);
-        console.log('[OfflineService] Successfully loaded pending uploads:', this.pendingUploads.length);
-      } catch (e) {
-        console.log('[OfflineService] No pending uploads found or error loading:', e);
-        this.pendingUploads = [];
-      }
+      this.pendingUploads = JSON.parse(jsonString);
+      console.log('[OfflineService] Successfully loaded pending uploads:', this.pendingUploads.length);
     } catch (error) {
-      console.error('[OfflineService] Error in loadPendingUploads:', error);
+      console.error('[OfflineService] Error loading pending uploads:', error);
       this.pendingUploads = [];
     }
   }
