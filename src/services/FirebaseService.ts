@@ -1362,29 +1362,23 @@ export class FirebaseService {
     try {
       console.log('Fetching images for collection:', collectionId);
 
-      let backendImages: Image[] = [];
-      if (this.isOnline()) {
-        const imagesRef = collection(db, 'images');
-        const q = query(
-          imagesRef,
-          where('collectionId', '==', collectionId)
-        );
+      const imagesRef = collection(db, 'images');
+      const q = query(
+        imagesRef,
+        where('collectionId', '==', collectionId)
+      );
 
-        const snapshot = await getDocs(q);
-        backendImages = snapshot.docs.map(doc => ({
-          id: doc.id,
-          photoURL: doc.data().photoURL || '',
-          userId: doc.data().userId,
-          userName: doc.data().userName,
-          collectionId: doc.data().collectionId,
-          createdAt: doc.data().createdAt.toDate(),
-          width: doc.data().width || undefined,
-          height: doc.data().height || undefined
-        }));
-      }
-      else {
-        backendImages = [];
-      }
+      const snapshot = await getDocs(q);
+      const backendImages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        photoURL: doc.data().photoURL,
+        userId: doc.data().userId,
+        userName: doc.data().userName,
+        collectionId: doc.data().collectionId,
+        createdAt: doc.data().createdAt.toDate(),
+        width: doc.data().width || undefined,
+        height: doc.data().height || undefined
+      }));
 
       const combinedImages = new Map<string, Image>();
 
@@ -1628,7 +1622,8 @@ export class FirebaseService {
         },
         imageCollectionId: sitData.imageCollectionId,
         createdAt: sitData.createdAt,
-        uploadedBy: sitData.uploadedBy
+        uploadedBy: sitData.uploadedBy,
+        uploadedByUsername: sitData.uploadedByUsername
       };
     } catch (error) {
       console.error('Error getting sit by collection ID:', error);
