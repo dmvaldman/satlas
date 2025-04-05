@@ -266,7 +266,7 @@ body {
   background: var(--light-gray-opacity);
   width: 100%;
   border-radius: 14px 14px 0 0;
-  padding: 16px;
+  padding: 22px;
   cursor: default;
   padding-bottom: calc(var(--safe-area-bottom) + 16px);
   max-height: 80vh;
@@ -334,12 +334,6 @@ body {
   transform: translateY(-2px);
 }
 
-.profile-content.keyboard-visible {
-  transform: translateY(-50%);
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
 .profile-section {
   margin-bottom: 1.5rem;
 }
@@ -350,7 +344,7 @@ body {
 
 .profile-section label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: .5rem;
   font-weight: 500;
 }
 
@@ -371,6 +365,12 @@ body {
   outline: none;
 }
 
+.profile-section .profile-content.keyboard-visible {
+  transform: translateY(-50%);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
 .profile-section .log-out-text {
   font-size: var(--font-size-medium);
   color: var(--white);
@@ -380,12 +380,12 @@ body {
 }
 
 /* City input container and autocomplete styling */
-.city-input-container {
+.profile-section .city-input-container {
   position: relative;
   background: transparent;
 }
 
-#city {
+.profile-section #city {
   top: 0;
   left: 0;
   padding: 12px;
@@ -398,12 +398,12 @@ body {
   color: var(--black);
 }
 
-#city:focus {
+.profile-section #city:focus {
   border-color: var(--primary-color);
   outline: none;
 }
 
-.city-suggestion {
+.profile-section .city-suggestion {
   top: 0;
   padding: 12px;
   border: 1px solid var(--medium-gray);
@@ -411,9 +411,20 @@ body {
   font-size: var(--font-size-medium);
   position: absolute;
   width: calc(100% - 24px);
-  pointer-events: none;
-  z-index: 1;
+  pointer-events: auto;
   color: var(--dark-gray);
+}
+
+.profile-section .swipe-helper-text {
+  color: var(--black);
+  font-size: var(--font-size-small);
+  margin-top: 2px;
+  height: 1em;
+  opacity: 0.6;
+}
+
+.profile-section .swipe-helper-text.hidden {
+  visibility: hidden;
 }
 
 .profile-section .error-message {
@@ -422,24 +433,26 @@ body {
   margin-bottom: 8px;
 }
 
-.toggle-label {
+.profile-section .toggle-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   height: 40px;
+  margin-bottom: 2.5rem;
 }
 
 .profile-section label {
   font-size: var(--font-size-large);
 }
 
-.toggle-label span {
+.profile-section span {
   vertical-align: middle;
   font-size: var(--font-size-large);
+  font-weight: 500;
 }
 
-.toggle-slider {
+.profile-section .toggle-slider {
   position: relative;
   display: inline-block;
   width: 54px;
@@ -452,7 +465,7 @@ body {
   margin-left: 20px;
 }
 
-.toggle-slider:before {
+.profile-section .toggle-slider:before {
   position: absolute;
   content: "";
   height: 24px;
@@ -465,48 +478,34 @@ body {
 }
 
 /* Hidden but toggle slider affects it. Common pattern. */
-input[type="checkbox"] {
+.profile-section input[type="checkbox"] {
   display: none;
 }
 
-input[type="checkbox"]:checked + .toggle-slider {
+.profile-section input[type="checkbox"]:checked + .toggle-slider {
   background-color: var(--dark-green);
 }
 
-input[type="checkbox"]:checked + .toggle-slider:before {
+.profile-section input[type="checkbox"]:checked + .toggle-slider:before {
   transform: translateX(24px);
 }
 
-.profile-button {
+.profile-section .sign-out-button {
   padding: 0.85rem 1rem;
-  border: none;
   border-radius: 4px;
   cursor: pointer;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
-}
-
-.profile-button.primary {
-  background-color: var(--action-green);
-  color: var(--white);
-}
-
-.profile-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.profile-button.danger {
   background-color: var(--action-red);
   color: var(--white);
   width: 100%;
   border: 1px solid var(--dark-red);
 }
 
-.profile-button.danger:hover {
+.profile-section .sign-out-button:hover {
   background-color: var(--dark-red);
 }
+
+/* Image carousel */
 
 .image-carousel {
   position: relative;
@@ -1057,4 +1056,3 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   height: 24px;
   fill: var(--white);
 }
-

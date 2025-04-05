@@ -28,6 +28,9 @@ interface ProfileModalState {
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
+  touchStartX: number | null;
+  touchCurrentX: number | null;
+  isSwiping: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
@@ -50,7 +53,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null
+      usernameError: null,
+      // Initialize swipe state
+      touchStartX: null,
+      touchCurrentX: null,
+      isSwiping: false
     };
 
     // Create the permission change handler bound to this instance
@@ -144,13 +151,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     if (this.contentRef.current) {
       this.contentRef.current.classList.add('keyboard-visible');
 
-      setTimeout(() => {
-        // Determine which input is active and scroll to it
-        const activeElement = document.activeElement;
-        if (activeElement && (activeElement === this.inputRef.current || activeElement === this.cityInputRef.current)) {
-          activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
+      // Determine which input is active and scroll to it
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement === this.inputRef.current || activeElement === this.cityInputRef.current)) {
+        activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 
@@ -599,6 +604,82 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
+  // Function to handle tapping the suggestion
+  private handleSuggestionTap = () => {
+    const { cityTopResult } = this.state;
+    if (cityTopResult) {
+      this.setState({
+        city: cityTopResult, // Update input field
+        cityTopResult: null    // Clear suggestion
+      }, () => {
+        // Get coordinates after state is updated
+        this.getCoordinatesFromCity(cityTopResult);
+        // Unfocus the input field
+        this.cityInputRef.current?.blur();
+      });
+    }
+  }
+
+  // --- Swipe Detection Logic ---
+  private handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Only track single touch
+    if (e.touches.length === 1) {
+      this.setState({
+        touchStartX: e.touches[0].clientX,
+        touchCurrentX: e.touches[0].clientX, // Initialize current X
+        isSwiping: true
+      });
+    }
+  };
+
+  private handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!this.state.isSwiping || e.touches.length !== 1) return;
+
+    this.setState({ touchCurrentX: e.touches[0].clientX });
+
+    // Optionally prevent vertical scroll while swiping horizontally
+    // This might be needed if the modal itself becomes scrollable later
+    // const diffX = this.state.touchStartX! - e.touches[0].clientX;
+    // const diffY = this.state.touchStartY! - e.touches[0].clientY; // Need touchStartY too
+    // if (Math.abs(diffX) > Math.abs(diffY)) {
+    //   e.preventDefault();
+    // }
+  };
+
+  private handleTouchEnd = () => {
+    if (!this.state.isSwiping || this.state.touchStartX === null || this.state.touchCurrentX === null) {
+      this.resetSwipeState();
+      return;
+    }
+
+    const diffX = this.state.touchCurrentX - this.state.touchStartX;
+    const swipeThreshold = 20; // Minimum pixels to count as a swipe
+
+    // Check for swipe right
+    if (diffX > swipeThreshold) {
+      console.log('Swipe right detected!');
+      this.handleSuggestionTap(); // Trigger autocomplete
+    }
+
+    this.resetSwipeState();
+  };
+
+  private resetSwipeState = () => {
+    this.setState({
+      touchStartX: null,
+      touchCurrentX: null,
+      isSwiping: false
+    });
+  }
+
+  private handleCityBlur = () => {
+    const { cityTopResult } = this.state;
+    if (cityTopResult) {
+      this.handleSuggestionTap();
+    }
+  }
+  // --- End Swipe Detection Logic ---
+
   render() {
     const { isOpen, onClose, onSignOut } = this.props;
     const {
@@ -683,7 +764,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
           <div className="profile-section">
             <label htmlFor="city">Home City</label>
-            <div className="city-input-container">
+            <div
+              className="city-input-container"
+              onTouchStart={this.handleTouchStart}
+              onTouchMove={this.handleTouchMove}
+              onTouchEnd={this.handleTouchEnd}
+              onTouchCancel={this.resetSwipeState}
+            >
               <input
                 type="text"
                 id="city"
@@ -693,6 +780,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 onKeyDown={this.handleCityKeyDown}
                 placeholder="Your city"
                 autoComplete="off"
+                onBlur={this.handleCityBlur}
               />
               {suggestion && (
                 <div className="city-suggestion">
@@ -700,25 +788,31 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 </div>
               )}
             </div>
+            <div className={`swipe-helper-text ${(suggestion && city.length > 0) ? 'visible' : 'hidden'}`}>
+              Swipe to complete
+            </div>
           </div>
 
           {Capacitor.isNativePlatform() && (
             <div className="profile-section">
-              <label className="toggle-label">
-                <span>Push Notifications Enabled</span>
+              <div className="toggle-label">
+                <span className="toggle-label-text">Push Notifications Enabled</span>
                 <input
                   type="checkbox"
                   checked={pushNotifications}
-                  onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
+                  readOnly
                 />
-                <span className="toggle-slider"></span>
-              </label>
+                <span
+                  className="toggle-slider"
+                  onClick={() => this.handlePushNotificationToggle(!pushNotifications)}
+                ></span>
+              </div>
             </div>
           )}
 
           <div className="profile-section">
             <button
-              className="profile-button danger"
+              className="sign-out-button"
               onClick={async () => {
                 await onSignOut();
                 onClose();
