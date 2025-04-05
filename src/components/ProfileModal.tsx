@@ -2,7 +2,6 @@ import React from 'react';
 import { User, UserPreferences, Location } from '../types';
 import { FirebaseService } from '../services/FirebaseService';
 import { Capacitor } from '@capacitor/core';
-import { Keyboard } from '@capacitor/keyboard';
 import { PushNotificationService } from '../services/PushNotificationService';
 import mapboxgl from 'mapbox-gl';
 import { App } from '@capacitor/app';
@@ -16,7 +15,7 @@ interface ProfileModalProps {
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
-  onUpdatePreferences: (preferences: UserPreferences, usernameChanged?: boolean) => void;
+  onUpdatePreferences: (preferences: UserPreferences) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -28,17 +27,12 @@ interface ProfileModalState {
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
-  touchStartX: number | null;
-  touchCurrentX: number | null;
-  isSwiping: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
   private static loadedUserIds = new Set<string>();
   private inputRef = React.createRef<HTMLInputElement>();
   private cityInputRef = React.createRef<HTMLInputElement>();
-  private contentRef = React.createRef<HTMLDivElement>();
-  private keyboardListenersAdded = false;
   private notificationService: PushNotificationService | null = null;
   private permissionChangeHandler: ((isGranted: boolean) => void) | null = null;
   private appStateListenerHandle: { remove: () => void } | null = null;
@@ -53,11 +47,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null,
-      // Initialize swipe state
-      touchStartX: null,
-      touchCurrentX: null,
-      isSwiping: false
+      usernameError: null
     };
 
     // Create the permission change handler bound to this instance
@@ -66,10 +56,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
   componentDidMount() {
     this.initializeFromProps();
-
-    if (Capacitor.isNativePlatform() && !this.keyboardListenersAdded) {
-      this.setupKeyboardListeners();
-    }
 
     // Initialize notification service if user is available
     this.initializeNotificationService();
@@ -121,10 +107,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   componentWillUnmount() {
-    if (Capacitor.isNativePlatform() && this.keyboardListenersAdded) {
-      this.removeKeyboardListeners();
-    }
-
     // Remove permission change listener and clean up notification service
     this.cleanupNotificationService();
 
@@ -135,35 +117,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       console.log('[ProfileModal] App state listener removed');
     }
   }
-
-  private setupKeyboardListeners() {
-    Keyboard.addListener('keyboardWillShow', this.handleKeyboardShow);
-    Keyboard.addListener('keyboardWillHide', this.handleKeyboardHide);
-    this.keyboardListenersAdded = true;
-  }
-
-  private removeKeyboardListeners() {
-    Keyboard.removeAllListeners();
-    this.keyboardListenersAdded = false;
-  }
-
-  private handleKeyboardShow = () => {
-    if (this.contentRef.current) {
-      this.contentRef.current.classList.add('keyboard-visible');
-
-      // Determine which input is active and scroll to it
-      const activeElement = document.activeElement;
-      if (activeElement && (activeElement === this.inputRef.current || activeElement === this.cityInputRef.current)) {
-        activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-  };
-
-  private handleKeyboardHide = () => {
-    if (this.contentRef.current) {
-      this.contentRef.current.classList.remove('keyboard-visible');
-    }
-  };
 
   private initializeFromProps() {
     const { user, preferences } = this.props;
@@ -201,33 +154,26 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   private handleUsernameChange = async (username: string) => {
-    // Store the username exactly as typed
     this.setState({
-      username: username,
+      username,
       usernameError: null
     });
 
-    // Convert to lowercase for checks
-    const lowerCaseUsername = username.toLowerCase();
     const originalUsername = this.props.preferences?.username;
-
-    // If the lowercase version is empty or matches the original (case-insensitively), skip further checks
-    if (!lowerCaseUsername || lowerCaseUsername === originalUsername?.toLowerCase()) {
+    if (!username || username === originalUsername) {
       return;
     }
 
-    // Validate the lowercase version
-    const validation = this.validateUsername(lowerCaseUsername);
+    const validation = this.validateUsername(username);
     if (!validation.isValid) {
       this.setState({ usernameError: validation.error || null });
       return;
     }
 
-    // Check if the lowercase version is taken
     const isTaken = await FirebaseService.isUsernameTaken(
-      lowerCaseUsername,
+      username,
       this.props.user?.uid,
-      originalUsername // Pass original for comparison inside isUsernameTaken
+      originalUsername
     );
 
     this.setState({
@@ -377,30 +323,40 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     const { username, pushNotifications, cityCoordinates, preferences } = data;
     const { user, showNotification } = this.props;
 
-    // Create the updated preferences object
-    const updatedPreferences: UserPreferences = {
-      username,
-      pushNotificationsEnabled: pushNotifications,
-      lastVisit: Date.now(),
-      cityCoordinates: cityCoordinates || undefined
-    };
-
-    // Check if preferences are changed
-    const usernameChanged = username !== (preferences?.username || '');
-    const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
-    const cityChanged = JSON.stringify(cityCoordinates) !== JSON.stringify(preferences?.cityCoordinates);
-
-    const preferencesChanged = usernameChanged || notificationsChanged || cityChanged;
-
-    if (preferencesChanged) {
-      await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences, usernameChanged);
-      try {
-        this.props.onUpdatePreferences(updatedPreferences, usernameChanged);
-        showNotification('Profile settings saved', 'success');
-      } catch (error) {
-        console.error('Error updating preferences:', error);
-        showNotification('Failed to save profile settings. Please try again.', 'error');
+    try {
+      // Check if username is taken
+      const isTaken = await FirebaseService.isUsernameTaken(username, user?.uid, preferences?.username);
+      if (isTaken) {
+        showNotification('Username is already taken. Changes were not saved.', 'error');
+        return;
       }
+
+      const originalUsername = preferences?.username || '';
+      const usernameChanged = username !== originalUsername;
+
+      // Update images with new username if needed
+      if (usernameChanged && user) {
+        await FirebaseService.updateUserWithNewUsername(user.uid, username);
+      }
+
+      // Create the updated preferences object
+      const updatedPreferences: UserPreferences = {
+        username,
+        pushNotificationsEnabled: pushNotifications,
+        lastVisit: Date.now(),
+        cityCoordinates: cityCoordinates || undefined
+      };
+
+      // Save to Firebase
+      await FirebaseService.saveUserPreferences(user?.uid || '', updatedPreferences);
+
+      // Important: Update the state in the parent component
+      this.props.onUpdatePreferences(updatedPreferences);
+
+      showNotification('Profile settings saved', 'success');
+    } catch (error) {
+      console.error('Error saving profile in background:', error);
+      showNotification('Failed to save profile settings. Please try again.', 'error');
     }
   };
 
@@ -604,82 +560,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
-  // Function to handle tapping the suggestion
-  private handleSuggestionTap = () => {
-    const { cityTopResult } = this.state;
-    if (cityTopResult) {
-      this.setState({
-        city: cityTopResult, // Update input field
-        cityTopResult: null    // Clear suggestion
-      }, () => {
-        // Get coordinates after state is updated
-        this.getCoordinatesFromCity(cityTopResult);
-        // Unfocus the input field
-        this.cityInputRef.current?.blur();
-      });
-    }
-  }
-
-  // --- Swipe Detection Logic ---
-  private handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    // Only track single touch
-    if (e.touches.length === 1) {
-      this.setState({
-        touchStartX: e.touches[0].clientX,
-        touchCurrentX: e.touches[0].clientX, // Initialize current X
-        isSwiping: true
-      });
-    }
-  };
-
-  private handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!this.state.isSwiping || e.touches.length !== 1) return;
-
-    this.setState({ touchCurrentX: e.touches[0].clientX });
-
-    // Optionally prevent vertical scroll while swiping horizontally
-    // This might be needed if the modal itself becomes scrollable later
-    // const diffX = this.state.touchStartX! - e.touches[0].clientX;
-    // const diffY = this.state.touchStartY! - e.touches[0].clientY; // Need touchStartY too
-    // if (Math.abs(diffX) > Math.abs(diffY)) {
-    //   e.preventDefault();
-    // }
-  };
-
-  private handleTouchEnd = () => {
-    if (!this.state.isSwiping || this.state.touchStartX === null || this.state.touchCurrentX === null) {
-      this.resetSwipeState();
-      return;
-    }
-
-    const diffX = this.state.touchCurrentX - this.state.touchStartX;
-    const swipeThreshold = 20; // Minimum pixels to count as a swipe
-
-    // Check for swipe right
-    if (diffX > swipeThreshold) {
-      console.log('Swipe right detected!');
-      this.handleSuggestionTap(); // Trigger autocomplete
-    }
-
-    this.resetSwipeState();
-  };
-
-  private resetSwipeState = () => {
-    this.setState({
-      touchStartX: null,
-      touchCurrentX: null,
-      isSwiping: false
-    });
-  }
-
-  private handleCityBlur = () => {
-    const { cityTopResult } = this.state;
-    if (cityTopResult) {
-      this.handleSuggestionTap();
-    }
-  }
-  // --- End Swipe Detection Logic ---
-
   render() {
     const { isOpen, onClose, onSignOut } = this.props;
     const {
@@ -691,6 +571,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       isSubmitting,
       usernameError
     } = this.state;
+
+    if (!isOpen) return null;
 
     // Update the handleClose function to avoid event propagation issues
     const handleClose = (e?: React.MouseEvent) => {
@@ -743,7 +625,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         onClose={handleClose}
         contentClassName="profile-content"
       >
-        <div ref={this.contentRef}>
+        <div>
           <h2>Profile Settings</h2>
 
           <div className="profile-section">
@@ -764,13 +646,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
           <div className="profile-section">
             <label htmlFor="city">Home City</label>
-            <div
-              className="city-input-container"
-              onTouchStart={this.handleTouchStart}
-              onTouchMove={this.handleTouchMove}
-              onTouchEnd={this.handleTouchEnd}
-              onTouchCancel={this.resetSwipeState}
-            >
+            <div className="city-input-container">
               <input
                 type="text"
                 id="city"
@@ -780,7 +656,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 onKeyDown={this.handleCityKeyDown}
                 placeholder="Your city"
                 autoComplete="off"
-                onBlur={this.handleCityBlur}
               />
               {suggestion && (
                 <div className="city-suggestion">
@@ -788,31 +663,25 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 </div>
               )}
             </div>
-            <div className={`swipe-helper-text ${(suggestion && city.length > 0) ? 'visible' : 'hidden'}`}>
-              Swipe to complete
-            </div>
           </div>
 
           {Capacitor.isNativePlatform() && (
             <div className="profile-section">
-              <div className="toggle-label">
-                <span className="toggle-label-text">Push Notifications Enabled</span>
+              <label className="toggle-label">
+                <span>Push Notifications Enabled</span>
                 <input
                   type="checkbox"
                   checked={pushNotifications}
-                  readOnly
+                  onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
                 />
-                <span
-                  className="toggle-slider"
-                  onClick={() => this.handlePushNotificationToggle(!pushNotifications)}
-                ></span>
-              </div>
+                <span className="toggle-slider"></span>
+              </label>
             </div>
           )}
 
           <div className="profile-section">
             <button
-              className="sign-out-button"
+              className="profile-button danger"
               onClick={async () => {
                 await onSignOut();
                 onClose();

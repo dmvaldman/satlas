@@ -1,4 +1,6 @@
 import React from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -11,6 +13,8 @@ interface BaseModalProps {
 interface BaseModalState {
   isActive: boolean;
   isVisible: boolean;
+  isKeyboardVisible: boolean;
+  keyboardHeight: number;
 }
 
 class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
@@ -20,7 +24,9 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
     super(props);
     this.state = {
       isActive: false,
-      isVisible: false
+      isVisible: false,
+      isKeyboardVisible: false,
+      keyboardHeight: 0
     };
   }
 
@@ -31,6 +37,10 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
           this.setState({ isActive: true });
         });
       });
+    }
+    if (Capacitor.isNativePlatform()) {
+      Keyboard.addListener('keyboardWillShow', this.handleKeyboardShow);
+      Keyboard.addListener('keyboardWillHide', this.handleKeyboardHide);
     }
   }
 
@@ -62,7 +72,24 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
     if (this.animationTimeout) {
       window.clearTimeout(this.animationTimeout);
     }
+    if (Capacitor.isNativePlatform()) {
+      Keyboard.removeAllListeners();
+    }
   }
+
+  private handleKeyboardShow = (event: { keyboardHeight: number }) => {
+    this.setState({
+      isKeyboardVisible: true,
+      keyboardHeight: event.keyboardHeight
+    });
+  };
+
+  private handleKeyboardHide = () => {
+    this.setState({
+      isKeyboardVisible: false,
+      keyboardHeight: 0
+    });
+  };
 
   private handleClose = (e?: React.MouseEvent) => {
     if (e) {
@@ -73,7 +100,7 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
 
   render() {
     const { children, className = '', contentClassName = '' } = this.props;
-    const { isActive, isVisible } = this.state;
+    const { isActive, isVisible, isKeyboardVisible, keyboardHeight } = this.state;
 
     if (!isVisible) return null;
 
@@ -83,8 +110,9 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
         onClick={this.handleClose}
       >
         <div
-          className={`modal-content ${isActive ? 'active' : ''} ${contentClassName}`}
+          className={`modal-content ${isActive ? 'active' : ''} ${isKeyboardVisible ? 'keyboard-visible' : ''} ${contentClassName}`}
           onClick={e => e.stopPropagation()}
+          style={{ '--keyboard-height-px': `${keyboardHeight}px` } as React.CSSProperties}
         >
           {children}
         </div>
