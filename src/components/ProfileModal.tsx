@@ -196,26 +196,33 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   }
 
   private handleUsernameChange = async (username: string) => {
+    // Store the username exactly as typed
     this.setState({
-      username,
+      username: username,
       usernameError: null
     });
 
+    // Convert to lowercase for checks
+    const lowerCaseUsername = username.toLowerCase();
     const originalUsername = this.props.preferences?.username;
-    if (!username || username === originalUsername) {
+
+    // If the lowercase version is empty or matches the original (case-insensitively), skip further checks
+    if (!lowerCaseUsername || lowerCaseUsername === originalUsername?.toLowerCase()) {
       return;
     }
 
-    const validation = this.validateUsername(username);
+    // Validate the lowercase version
+    const validation = this.validateUsername(lowerCaseUsername);
     if (!validation.isValid) {
       this.setState({ usernameError: validation.error || null });
       return;
     }
 
+    // Check if the lowercase version is taken
     const isTaken = await FirebaseService.isUsernameTaken(
-      username,
+      lowerCaseUsername,
       this.props.user?.uid,
-      originalUsername
+      originalUsername // Pass original for comparison inside isUsernameTaken
     );
 
     this.setState({

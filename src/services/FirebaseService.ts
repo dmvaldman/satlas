@@ -438,7 +438,8 @@ export class FirebaseService {
           createdAt: new Date(),
           email: user.email,
           displayName: user.displayName,
-          photoURL: user.photoURL
+          photoURL: user.photoURL,
+          username_lowercase: username.toLowerCase()
         });
 
         console.log(`Created new user document with username: ${username}`);
@@ -499,7 +500,8 @@ export class FirebaseService {
         username: preferences.username,
         pushNotificationsEnabled: preferences.pushNotificationsEnabled,
         lastVisit: Date.now(),
-        cityCoordinates: preferences.cityCoordinates || null
+        cityCoordinates: preferences.cityCoordinates || null,
+        username_lowercase: preferences.username?.toLowerCase() || ''
       }, { merge: true }); // Use merge to preserve other fields
 
       // If username is not null and is different from the original username, update the images
@@ -614,14 +616,18 @@ export class FirebaseService {
     currentUserId?: string,
     originalUsername?: string
   ): Promise<boolean> {
-    // Skip check if it's the user's current username
-    if (originalUsername && username === originalUsername) {
+    // Convert username to check to lowercase for case-insensitive comparison
+    const lowerCaseUsername = username.toLowerCase();
+
+    // Skip check if it's the user's current username (case-insensitive check)
+    if (originalUsername && lowerCaseUsername === originalUsername.toLowerCase()) {
       return false;
     }
 
     try {
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', username));
+      // Query Firestore using the lowercase version
+      const q = query(usersRef, where('username_lowercase', '==', lowerCaseUsername));
       const querySnapshot = await getDocs(q);
 
       // If currentUserId is provided, exclude the current user from the check
