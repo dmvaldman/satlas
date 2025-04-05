@@ -15,7 +15,9 @@ export class LocationService {
   private trackingPollId: number | null = null;
   private readonly TRACKING_POLL_INTERVAL = 1000; // 1 second
   private readonly LOCATION_TIMEOUT = 3000; // 3 seconds
-  private readonly LOCATION_MAX_AGE = 5000; // 5 seconds
+  private readonly LOCATION_MAX_AGE = 10000; // 10 seconds
+  private readonly MIN_UPDATE_INTERVAL_MS = 5000; // Only process updates every 5 seconds
+  private lastUpdateTime: number = 0; // Timestamp of the last processed update
   private isConnected: boolean = false;
 
   constructor() {
@@ -289,21 +291,30 @@ export class LocationService {
 
   private async setupNativeWatch(): Promise<void> {
     this.locationWatchId = await Geolocation.watchPosition(
-      { enableHighAccuracy: true },
+      { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT },
       (position, error) => {
         if (error) {
           this.handleLocationError(error);
+          // Don't reset lastUpdateTime here, allow immediate processing after error recovery
           this.handleConnectionStateChange(false);
           return;
         }
         if (position) {
+          // --- Throttling Logic ---
+          const now = Date.now();
+          if (now - this.lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
+            // console.log('[LocationService] Throttled native update'); // Optional debug log
+            return; // Not enough time passed, ignore this update
+          }
+          this.lastUpdateTime = now; // Update timestamp for the processed update
+          // --- End Throttling ---
+
           const coordinates = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           };
-          // Stop polling if we get a successful watch update
           this._stopTrackingPoll();
-          console.log('[LocationService] Native watch received position update.');
+          console.log('[LocationService] Native watch processed position update.');
           this.handleConnectionStateChange(true, coordinates);
           this.handleLocationUpdate(coordinates);
         }
@@ -318,16 +329,27 @@ export class LocationService {
 
     this.locationWatchId = navigator.geolocation.watchPosition(
       position => {
+        // --- Throttling Logic ---
+        const now = Date.now();
+        if (now - this.lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
+          // console.log('[LocationService] Throttled web update'); // Optional debug log
+          return; // Not enough time passed
+        }
+        this.lastUpdateTime = now;
+        // --- End Throttling ---
+
         const coordinates = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
         this._stopTrackingPoll();
+        console.log('[LocationService] Web watch processed position update.');
         this.handleConnectionStateChange(true, coordinates);
         this.handleLocationUpdate(coordinates);
       },
       error => {
         this.handleLocationError(error);
+        // Don't reset lastUpdateTime here
         this.handleConnectionStateChange(false);
         console.error('Web geolocation error:', error);
       },
