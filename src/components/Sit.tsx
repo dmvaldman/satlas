@@ -310,7 +310,7 @@ class PopupComponent extends React.Component<PopupProps> {
                   <>
                     Sit found {sit.uploadedByUsername && (
                       <>
-                        by <span className="uploader-name">@{sit.uploadedByUsername}</span>{' '}
+                        by <span className="uploader-name">{sit.uploadedByUsername}</span>{' '}
                       </>
                     )}
                     {formatRelativeTime(sit.createdAt)}

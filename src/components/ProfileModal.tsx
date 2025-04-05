@@ -667,29 +667,29 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
           {Capacitor.isNativePlatform() && (
             <div className="profile-section">
-              <label className="toggle-label">
-                <span>Push Notifications Enabled</span>
-                <input
-                  type="checkbox"
-                  checked={pushNotifications}
-                  onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
+              <div className="toggle-section">
+                <label className="toggle-label">Enable Push Notifications</label>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={pushNotifications}
+                    onChange={(e) => this.handlePushNotificationToggle(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </div>
             </div>
           )}
 
           <div className="profile-section">
             <button
-              className="profile-button danger"
+              className="logout-button"
               onClick={async () => {
                 await onSignOut();
                 onClose();
               }}
             >
-              <span className="log-out-text">
-                Log Out
-              </span>
+              <span className="log-out-text">Log Out</span>
             </button>
           </div>
         </div>

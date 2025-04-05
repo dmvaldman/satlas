@@ -329,7 +329,6 @@ body {
 
 /* Rule for keyboard adjustment, applied to the modal content */
 .modal-content.keyboard-visible {
-  /* Use CSS variable for exact translation */
   transform: translateY(calc(-1 * var(--keyboard-height-px, 0px)));
   max-height: calc(100vh - var(--keyboard-height-px, 0px) - 32px);
   transition: transform 0.2s ease-out;
@@ -347,6 +346,7 @@ body {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
+  font-size: var(--font-size-large);
 }
 
 .profile-section input[type="text"] {
@@ -418,15 +418,7 @@ body {
 }
 
 .toggle-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  height: 40px;
-}
-
-.profile-section label {
-  font-size: var(--font-size-large);
+  cursor: default;
 }
 
 .toggle-label span {
@@ -444,7 +436,6 @@ body {
   background-color: var(--medium-gray);
   vertical-align: middle;
   cursor: pointer;
-  margin-left: 20px;
 }
 
 .toggle-slider:before {
@@ -457,6 +448,19 @@ body {
   background-color: var(--white);
   border-radius: 50%;
   transition: 0.4s;
+}
+
+/* NEW: Style the container for the toggle */
+.toggle-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1rem;
+}
+
+/* Override general label styles ONLY for direct children of .toggle-section */
+.toggle-section > label {
+  display: inline-block; /* Allow side-by-side placement */
 }
 
 /* Hidden but toggle slider affects it. Common pattern. */
@@ -492,14 +496,18 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   margin-top: 2rem;
 }
 
-.profile-button.danger {
+.logout-button {
   background-color: var(--action-red);
   color: var(--white);
   width: 100%;
+  height: 44px;
   border: 1px solid var(--dark-red);
+  border-radius: 4px;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
-.profile-button.danger:hover {
+.profile-section .logout-button:hover {
   background-color: var(--dark-red);
 }
 
@@ -1008,4 +1016,3 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   height: 24px;
   fill: var(--white);
 }
-

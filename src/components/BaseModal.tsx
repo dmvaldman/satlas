@@ -78,17 +78,21 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   }
 
   private handleKeyboardShow = (event: { keyboardHeight: number }) => {
-    this.setState({
-      isKeyboardVisible: true,
-      keyboardHeight: event.keyboardHeight
-    });
+    if (Capacitor.getPlatform() !== 'ios') {
+      this.setState({
+        isKeyboardVisible: true,
+        keyboardHeight: event.keyboardHeight
+      });
+    }
   };
 
   private handleKeyboardHide = () => {
-    this.setState({
-      isKeyboardVisible: false,
-      keyboardHeight: 0
-    });
+    if (Capacitor.getPlatform() !== 'ios') {
+      this.setState({
+        isKeyboardVisible: false,
+        keyboardHeight: 0
+      });
+    }
   };
 
   private handleClose = (e?: React.MouseEvent) => {
