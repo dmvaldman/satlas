@@ -155,12 +155,7 @@ class App extends React.Component<{}, AppState> {
       // Add resume listener for native platforms
       CapacitorApp.addListener('resume', () => {
         console.log('[App] App resumed from background');
-        if (!this.state.currentLocation) {
-          this.locationService.getCurrentLocation()
-            .then(coordinates => {
-              this.setState({ currentLocation: coordinates });
-            });
-        }
+        this.locationService.startTracking();
         if (this.state.map && this.state.currentLocation) {
           this.state.map.flyTo({
             center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],

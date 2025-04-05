@@ -24,17 +24,19 @@ export class LocationService {
 
   // Start watching location changes
   public async startTracking(): Promise<void> {
-    if (this.locationWatchId || this.trackingPollId) return;
+    await this.stopTracking();
 
     try {
       await this._startTracking();
     } catch (error) {
       this.handleLocationError(error);
-      this._startTrackingPoll();
     }
   }
 
   private async _startTracking(): Promise<void> {
+    // Stop any existing poll immediately if we're attempting to start tracking
+    this._stopTrackingPoll();
+
     if (Capacitor.getPlatform() !== 'web') {
       const permissionStatus = await Geolocation.requestPermissions();
       this.hasLocationPermission = permissionStatus.location === 'granted';
@@ -225,14 +227,23 @@ export class LocationService {
   }
 
   private handleLocationError(error: any): void {
-    console.error('Location error:', error);
+    console.error('LocationService error:', error?.code, error?.message, error);
 
-    if (error?.message?.includes('permission') || error?.code === 1) {
+    // Assume disconnected on error
+    this.handleConnectionStateChange(false);
+
+    // Check for explicit permission denial (code 1 or specific message)
+    const isPermissionDenied = error?.code === 1 || error?.message?.toLowerCase().includes('permission denied');
+
+    if (isPermissionDenied) {
       this.hasLocationPermission = false;
-      console.warn('Location permission revoked');
+      console.warn('Location permission explicitly denied by user.');
+      // Optionally, stop trying altogether if permission is denied
+      this.stopTracking(); // Stop polling and watching if denied
+    } else {
+      // For other errors (timeout, unavailable, unknown), start polling to recover
+      console.warn('Location error occurred, starting recovery poll.');
       this._startTrackingPoll();
-    } else if (error?.code === 3) { // Position unavailable
-      this.handleConnectionStateChange(false);
     }
   }
 
@@ -290,6 +301,9 @@ export class LocationService {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           };
+          // Stop polling if we get a successful watch update
+          this._stopTrackingPoll();
+          console.log('[LocationService] Native watch received position update.');
           this.handleConnectionStateChange(true, coordinates);
           this.handleLocationUpdate(coordinates);
         }
@@ -308,6 +322,7 @@ export class LocationService {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
+        this._stopTrackingPoll();
         this.handleConnectionStateChange(true, coordinates);
         this.handleLocationUpdate(coordinates);
       },
