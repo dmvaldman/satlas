@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
-import fs from 'fs';
+
 // Load env file
 dotenv.config();
 
@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
+    minify: false,
   },
   server: {
     host: '0.0.0.0',

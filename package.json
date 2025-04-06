@@ -12,16 +12,17 @@
     "deploy": "node -r dotenv/config scripts/deploy.js",
     "gen-assets": "npx capacitor-assets generate",
     "logs": "adb logcat | grep -E 'Capacitor'",
-    "android:build": "NODE_ENV=production npm run build && npx cap sync android && npx cap run android",
-    "android:clean": "cd android && ./gradlew clean && cd ..",
-    "android:release": "cd android && ./gradlew assembleRelease && cd .. && adb install android/app/build/outputs/apk/release/app-release.apk",
-    "ios:build": "NODE_ENV=production PLATFORM=ios npm run gen-assets && npm run build && npx cap sync ios && npx cap run ios",
-    "ios:clean": "cd ios/App && xcodebuild clean && cd ../..",
+    "build:android": "NODE_ENV=production npm run gen-assets && npm run build && npx cap sync android && npx cap run android",
+    "clean:android": "cd android && ./gradlew clean && cd ..",
+    "release:android": "cd android && ./gradlew assembleRelease && cd .. && adb install android/app/build/outputs/apk/release/app-release.apk",
     "dev:android": "NODE_ENV=development npx cap sync android && npx cap run android --live-reload --port=5173",
     "dev:android-build": "NODE_ENV=development npx cap sync android && cd android && ./gradlew assembleDebug && cd ..",
-    "dev:ios": "NODE_ENV=development PLATFORM=ios npx cap sync && npx cap run ios --live-reload --port=5173",
+    "dev:ios": "NODE_ENV=development npx cap sync && npx cap run ios --live-reload --port=5173",
+    "build:ios": "NODE_ENV=production npm run gen-assets && npm run build && npx cap sync ios && npx cap run ios",
+    "clean:ios": "cd ios/App && xcodebuild clean && cd ../..",
     "setup:ios": "bash scripts/setup-ios.sh",
-    "nuke:ios": "rm -rf ios && npx cap add ios && npm run setup:ios"
+    "nuke:ios": "rm -rf ios && npx cap add ios && npm run setup:ios",
+    "archive:ios": "NODE_ENV=production npm run build && npx cap sync ios && cd ios/App && agvtool next-version -all && xcodebuild archive -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' && cd ../.."
   },
   "main": "index.js",
   "dependencies": {
@@ -66,6 +67,7 @@
     "eslint": "^9.22.0",
     "eslint-plugin-react": "^7.37.4",
     "globals": "^16.0.0",
+    "terser": "^5.39.0",
     "typescript-eslint": "^8.26.1",
     "vite": "^5.4.2"
   },
