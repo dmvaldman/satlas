@@ -221,8 +221,9 @@ export class FirebaseService {
       } else {
         console.log('[Firebase] Using web authentication');
         const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
         console.log('[Firebase] Web Google sign-in completed successfully');
+        return
       }
     } catch (error) {
       console.error('[Firebase] Error signing in with Google:', error);
@@ -343,50 +344,28 @@ export class FirebaseService {
 
         if (event.user) {
           // User is signed in
-          console.log('[Firebase] Auth state changed to signed in user:', event.user.uid);
-          console.log('[Firebase] Raw event.user object from native listener:', JSON.stringify(event.user));
+          console.log('[Firebase] Native auth state changed to signed in user:', event.user.uid);
 
-          // Extract potential photoURL and displayName, preferring top-level if available
-          let finalPhotoURL = event.user.photoUrl;
-          let finalDisplayName = event.user.displayName;
-
-          // If top-level is null, check providerData (common for Google sign-in via plugin)
-          if ((!finalPhotoURL || !finalDisplayName) && event.user.providerData) {
-            for (const provider of event.user.providerData) {
-              // Prioritize Google data if multiple providers exist
-              if (provider.providerId === 'google.com') {
-                if (!finalPhotoURL && provider.photoUrl) {
-                  finalPhotoURL = provider.photoUrl;
-                }
-                if (!finalDisplayName && provider.displayName) {
-                  finalDisplayName = provider.displayName;
-                }
-                // Found Google data, no need to check others
-                break;
-              } else if (provider.providerId === 'apple.com') {
-                // Add similar logic for Apple if needed, though top-level usually works
-                if (!finalDisplayName && provider.displayName) {
-                  finalDisplayName = provider.displayName;
-                }
-              }
-            }
-          }
+          // Use the helper method to get display name and photo URL
+          const { displayName, photoURL } = this._extractUserInfo(event.user);
 
           // Construct the final user object for the callback
-          // Ensure all essential User properties are included
           const finalUser = {
+            // Essential properties from event.user
             uid: event.user.uid,
             email: event.user.email,
             emailVerified: event.user.emailVerified,
             isAnonymous: event.user.isAnonymous,
-            metadata: event.user.metadata, // Assuming metadata structure matches
+            metadata: event.user.metadata,
             phoneNumber: event.user.phoneNumber,
             providerId: event.user.providerId,
             tenantId: event.user.tenantId,
-            // Use the derived/found values
-            displayName: finalDisplayName,
-            photoURL: finalPhotoURL,
-          } as unknown as User;
+            // Use the extracted values
+            displayName: displayName,
+            photoURL: photoURL,
+            providerData: event.user.providerData || [],
+             // Add other potentially missing properties if the native type differs significantly
+          } as unknown as User; // Cast to unknown first to satisfy linter
 
           callback(finalUser);
         } else {
@@ -408,7 +387,25 @@ export class FirebaseService {
           newUser: user?.uid,
           currentUser: auth.currentUser?.uid
         });
-        callback(user);
+
+        if (user) {
+          // --- Use helper method for web ---
+          // Use the helper method to get display name and photo URL
+          const { displayName, photoURL } = this._extractUserInfo(user);
+
+          // Construct the final user object, spreading original and overriding display info
+          const finalUser = {
+            ...user, // Spread all original user properties
+            displayName: displayName, // Override with potentially updated value
+            photoURL: photoURL,     // Override with potentially updated value
+          } as User; // Web user object should already conform, but cast for consistency
+
+          callback(finalUser); // Pass the potentially enhanced user object
+          // --- End helper method usage ---
+        } else {
+          // User is signed out
+          callback(null);
+        }
       });
     }
   }
@@ -1642,6 +1639,53 @@ export class FirebaseService {
       console.error('[Firebase] Error updating push notification setting:', error);
       throw error;
     }
+  }
+
+  /**
+   * Helper method to extract displayName and photoURL, checking providerData as fallback.
+   * @param user Raw user object from auth event/listener
+   * @returns Object containing the best available displayName and photoURL
+   */
+  private static _extractUserInfo(user: any): { displayName: string | null, photoURL: string | null } {
+    // Use 'any' for input type flexibility between native plugin and web SDK user objects
+    // Native plugin uses photoUrl, web SDK uses photoURL
+    let finalDisplayName = user.displayName || null;
+    let finalPhotoURL = user.photoURL || user.photoUrl || null; // Handle both casings
+
+    if ((!finalPhotoURL || !finalDisplayName) && user.providerData && user.providerData.length > 0) {
+      console.log('[Firebase] _extractUserInfo: Checking providerData...');
+      for (const provider of user.providerData) {
+        if (provider.providerId === 'google.com') {
+          if (!finalPhotoURL && provider.photoURL) { // Web SDK uses photoURL
+            finalPhotoURL = provider.photoURL;
+            console.log('[Firebase] _extractUserInfo: Found photoURL in Google providerData');
+          } else if (!finalPhotoURL && provider.photoUrl) { // Native plugin might use photoUrl
+             finalPhotoURL = provider.photoUrl;
+             console.log('[Firebase] _extractUserInfo: Found photoUrl in Google providerData (native)');
+          }
+          if (!finalDisplayName && provider.displayName) {
+            finalDisplayName = provider.displayName;
+            console.log('[Firebase] _extractUserInfo: Found displayName in Google providerData');
+          }
+          if (finalDisplayName && finalPhotoURL) break;
+        } else if (provider.providerId === 'apple.com') {
+          // Apple data fallback (less likely to have photoURL)
+           if (!finalPhotoURL && provider.photoURL) {
+            finalPhotoURL = provider.photoURL;
+             console.log('[Firebase] _extractUserInfo: Found photoURL in Apple providerData');
+          } else if (!finalPhotoURL && provider.photoUrl) {
+             finalPhotoURL = provider.photoUrl;
+             console.log('[Firebase] _extractUserInfo: Found photoUrl in Apple providerData (native)');
+          }
+          if (!finalDisplayName && provider.displayName) {
+            finalDisplayName = provider.displayName;
+            console.log('[Firebase] _extractUserInfo: Found displayName in Apple providerData');
+          }
+          if (finalDisplayName && finalPhotoURL) break;
+        }
+      }
+    }
+    return { displayName: finalDisplayName, photoURL: finalPhotoURL };
   }
 }
 
