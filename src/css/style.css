@@ -271,8 +271,8 @@ body {
   padding-bottom: calc(var(--safe-area-bottom) + 16px);
   max-height: 80vh;
   transform: translateY(100%);
-  transition: transform 0.3s ease-out;
-  will-change: transform;
+  transition: transform 0.3s ease-out, padding-bottom 0.2s ease-out;
+  will-change: transform, padding-bottom;
   z-index: 2001; /* Ensure it's above the overlay */
   max-width: 500px;
   border: 1px solid var(--medium-gray);
@@ -285,9 +285,8 @@ body {
 
 /* Rule for keyboard adjustment, applied to the modal content */
 .modal-content.keyboard-visible {
-  transform: translateY(calc(-1 * var(--keyboard-height-px, 0px)));
+  padding-bottom: calc(var(--safe-area-bottom) + 16px + var(--keyboard-height-px, 0px));
   max-height: calc(100vh - var(--keyboard-height-px, 0px) - 32px);
-  transition: transform 0.2s ease-out;
 }
 
 .modal-content.active {
