@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, FirebaseApp } from 'firebase/app';
 import {
   User,
   getAuth,
@@ -6,9 +6,9 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  signInWithCredential,
-  setPersistence,
-  browserLocalPersistence,
+  initializeAuth,
+  indexedDBLocalPersistence,
+  Auth,
   OAuthProvider,
 } from 'firebase/auth';
 import {
@@ -52,17 +52,29 @@ const firebaseConfig = {
     databaseURL: process.env.FIREBASE_DATABASE_URL,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Initialize Firebase App
+const app: FirebaseApp = initializeApp(firebaseConfig);
+
+// See
+// - https://github.com/capawesome-team/capacitor-firebase/issues/221
+// - https://stackoverflow.com/questions/71630326/firebase-authentication-sticks-capacitor-ionic-on-ios
+// Conditionally initialize Auth based on platform
+let auth: Auth;
+if (Capacitor.isNativePlatform()) {
+  console.log("[Firebase] Initializing Auth for NATIVE platform with indexedDBLocalPersistence.");
+  // Use initializeAuth for native platforms with specific persistence
+  auth = initializeAuth(app, {
+    persistence: indexedDBLocalPersistence
+  });
+} else {
+  console.log("[Firebase] Initializing Auth for WEB platform.");
+  // Use getAuth for web platform (uses browserLocalPersistence by default)
+  auth = getAuth(app);
+}
+
+// Initialize other services
 const db = getFirestore(app);
 const storage = getStorage(app);
-
-// Set persistence to LOCAL (survives browser restarts)
-// This needs to be done before any auth operations
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('[Firebase] Error setting persistence:', error);
-});
 
 // Firebase Service class with static methods
 export class FirebaseService {
@@ -1689,5 +1701,5 @@ export class FirebaseService {
   }
 }
 
-// Export auth for direct access (moved outside the class)
+// Export the initialized auth instance if needed elsewhere
 export { auth };
