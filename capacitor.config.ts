@@ -1,4 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
+import dotenv from 'dotenv';
+
+dotenv.config(); // Ensure env vars are loaded
 
 const config: CapacitorConfig = {
   appId: process.env.BUNDLE_ID,
