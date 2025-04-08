@@ -499,10 +499,6 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private handleSignInError = () => {
-    this.showNotification('Failed to sign in.', 'error');
-  };
-
   private handleSignOut = async () => {
     console.log('[App] Starting sign out process');
     try {

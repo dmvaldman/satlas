@@ -176,9 +176,8 @@ export class Markers {
       classes.push('want-to-go');
     }
 
-    // Add seen class only if the sit isn't already marked
-    // and isn't the user's own sit
-    if (seenSits.has(sit.id) && !isOwnSit && !hasMarks) {
+    // Add seen class only if the sit isn't the user's own sit
+    if (seenSits.has(sit.id) && !isOwnSit) {
       classes.push('seen');
     }
 

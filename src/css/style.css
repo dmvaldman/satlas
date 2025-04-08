@@ -5,10 +5,18 @@
   --safe-area-right: env(safe-area-inset-right, 0px);
 
   --primary-color: #0D47A1;
-  --cluster-color: #1976D2;
+  --cluster-color: #1565C0;
   --sit-color: #42A5F5;
   --sit-mine-color: #BBDEFB;
+  --location-marker-color: rgba(255, 255, 255, .2);
+  --sit-seen-color: #E3F2FD;
+
+  /* --primary-color: #4527A0;
+  --cluster-color: #1565C0;
+  --sit-color: #90CAF9;
+  --sit-mine-color: #80CBC4;
   --location-marker-color: #E3F2FD;
+  --sit-seen-color: #E0F2F1; */
 
   --action-green: #41b449;
   --action-red: #ff3b30;
@@ -171,7 +179,7 @@ body {
 }
 
 /* .satlas-marker.seen {
-  background-color: #63acc1;
+  background-color: var(--sit-seen-color);
 } */
 
 /* Add marker container styles */
@@ -214,7 +222,7 @@ body {
   position: relative;
   width: 24px;
   height: 24px;
-  z-index: 0;
+  z-index: 2;
   pointer-events: none;
 }
 
