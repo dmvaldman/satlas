@@ -25,7 +25,6 @@ interface ProfileModalState {
   city: string;
   cityCoordinates: Location | null;
   cityTopResult: string | null;
-  isSubmitting: boolean;
   usernameError: string | null;
   touchStartX: number | null;
   touchCurrentX: number | null;
@@ -49,7 +48,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityCoordinates: null,
       cityTopResult: null,
       pushNotifications: false,
-      isSubmitting: false,
       usernameError: null,
       touchStartX: null,
       touchCurrentX: null,
@@ -640,13 +638,13 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // First close the modal immediately
     this.props.onClose();
 
-    // Don't try to save if there are validation errors or we're submitting
-    if (this.state.usernameError || this.state.isSubmitting) {
-      return;
-    }
-
-    // Don't save if username is too short
-    if (!this.state.username || this.state.username.length < 3) {
+    // Don't try to save if there are validation errors
+    if (this.state.usernameError || !this.state.username) {
+      // Reset username to the previous value
+      this.setState({
+        username: this.props.preferences?.username || '',
+        usernameError: null
+      });
       return;
     }
 
