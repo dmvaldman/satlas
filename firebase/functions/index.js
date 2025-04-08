@@ -51,6 +51,7 @@ exports.processImage = storage.onObjectFinalized({
 
     // Create medium-sized compressed version
     const medBuffer = await sharp(imageBuffer)
+      .rotate()
       .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 80, progressive: true })
       .toBuffer();
@@ -59,6 +60,7 @@ exports.processImage = storage.onObjectFinalized({
 
     // Create thumbnail version
     const thumbnailBuffer = await sharp(imageBuffer)
+      .rotate()
       .resize(200, 200, { fit: 'cover', withoutEnlargement: true })
       .jpeg({ quality: 70 })
       .toBuffer();
