@@ -9,12 +9,12 @@
     "dev": "NODE_ENV=development vite",
     "build": "NODE_ENV=production vite build",
     "preview": "NODE_ENV=production vite preview",
-    "deploy": "node -r dotenv/config scripts/deploy.js",
+    "release:web": "node -r dotenv/config scripts/deploy.js",
     "gen-assets": "npx capacitor-assets generate",
     "logs": "adb logcat | grep -E 'Capacitor'",
     "build:android": "NODE_ENV=production npm run gen-assets && npm run build && npx cap sync android && npx cap run android",
     "clean:android": "cd android && ./gradlew clean && cd ..",
-    "release:android": "cd android && ./gradlew assembleRelease && cd .. && adb install android/app/build/outputs/apk/release/app-release.apk",
+    "release:android": "npm run build:android && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../build/satlas-android-release.apk && cd .. && adb install build/satlas-android-release.apk",
     "dev:android": "NODE_ENV=development npx cap sync android && npx cap run android --live-reload --port=5173",
     "dev:android-build": "NODE_ENV=development npx cap sync android && cd android && ./gradlew assembleDebug && cd ..",
     "dev:ios": "NODE_ENV=development npx cap sync && npx cap run ios --live-reload --port=5173",
@@ -22,7 +22,7 @@
     "clean:ios": "cd ios/App && xcodebuild clean && cd ../..",
     "setup:ios": "bash scripts/setup-ios.sh",
     "nuke:ios": "rm -rf ios && npx cap add ios && npm run setup:ios",
-    "archive:ios": "NODE_ENV=production npm run build && npx cap sync ios && cd ios/App && agvtool next-version -all && xcodebuild archive -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' && cd ../.."
+    "release:ios": "npm run build:ios && cd ios/App && agvtool next-version -all && xcodebuild archive -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' && cd ../.."
   },
   "main": "index.js",
   "dependencies": {
