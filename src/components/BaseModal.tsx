@@ -78,7 +78,8 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   }
 
   private handleKeyboardShow = (event: { keyboardHeight: number }) => {
-    if (Capacitor.getPlatform() !== 'ios') {
+    // Android and iOS have different keyboard behaviors. Detect for Android on both web/native.
+    if (Capacitor.getPlatform() !== 'ios' || /Android/i.test(navigator.userAgent)) {
       this.setState({
         isKeyboardVisible: true,
         keyboardHeight: event.keyboardHeight
@@ -87,7 +88,7 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   };
 
   private handleKeyboardHide = () => {
-    if (Capacitor.getPlatform() !== 'ios') {
+    if (Capacitor.getPlatform() !== 'ios' || /Android/i.test(navigator.userAgent)) {
       this.setState({
         isKeyboardVisible: false,
         keyboardHeight: 0

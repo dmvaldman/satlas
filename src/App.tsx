@@ -156,7 +156,7 @@ class App extends React.Component<{}, AppState> {
       CapacitorApp.addListener('resume', () => {
         console.log('[App] App resumed from background');
         this.locationService.startTracking();
-        if (this.state.map && this.state.currentLocation) {
+        if (this.state.map && this.state.currentLocation && !this.state.drawer.isOpen) {
           this.state.map.flyTo({
             center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],
             zoom: 13,

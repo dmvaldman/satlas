@@ -245,7 +245,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  z-index: 3;
   transition: transform 0.2s;
 }
 
@@ -273,7 +273,7 @@ body {
   background-color: rgba(0, 0, 0, 0);
   display: flex;
   justify-content: center;
-  z-index: 2000;
+  z-index: 10;
   cursor: pointer;
   align-items: flex-end;
   will-change: background-color;
@@ -296,7 +296,7 @@ body {
   transform: translateY(100%);
   transition: transform 0.3s ease-out, padding-bottom 0.2s ease-out;
   will-change: transform, padding-bottom;
-  z-index: 2001; /* Ensure it's above the overlay */
+  z-index: 11; /* Ensure it's above the overlay */
   max-width: 500px;
   border: 1px solid var(--medium-gray);
   box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
@@ -619,7 +619,7 @@ body {
   right: 0;
   bottom: 0;
   display: block;
-  z-index: 2;
+  z-index: 1;
   opacity: 1;
   transition: opacity 0.3s ease;
   text-align: center;
@@ -660,7 +660,7 @@ body {
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 10;
+  z-index: 2;
   display: flex;
   gap: 4px;
   opacity: .8;
@@ -701,7 +701,7 @@ body {
   overflow: hidden;
   white-space: nowrap;
   display: block;
-  z-index: 10;
+  z-index: 2;
   opacity: 0.7;
 }
 
@@ -901,7 +901,7 @@ body {
   top: calc(20px + var(--safe-area-top)); /* Place below the header */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 5000;
+  z-index: 100;
   display: flex;
   flex-direction: column-reverse; /* Reverse the order so new items appear at the top */
   gap: 10px;
@@ -999,7 +999,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000;
+  z-index: 200;
   cursor: pointer;
   padding-bottom: 0;
   bottom: 0;
@@ -1045,7 +1045,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 2001;
+  z-index: 201;
   transition: background-color 0.2s;
 }
 
