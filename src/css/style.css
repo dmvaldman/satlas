@@ -294,7 +294,7 @@ body {
   padding-bottom: calc(var(--safe-area-bottom) + 16px);
   max-height: 80vh;
   transform: translateY(100%);
-  transition: transform 0.3s ease-out, padding-bottom 0.2s ease-out;
+  transition: transform 0.3s ease-out;
   will-change: transform, padding-bottom;
   z-index: 11; /* Ensure it's above the overlay */
   max-width: 500px;
@@ -304,12 +304,13 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  overflow-y: auto;
 }
 
 /* Rule for keyboard adjustment, applied to the modal content */
 .modal-content.keyboard-visible {
-  padding-bottom: calc(var(--safe-area-bottom) + 16px + var(--keyboard-height-px, 0px));
-  max-height: calc(100vh - var(--keyboard-height-px, 0px) - 32px);
+  transform: translateY(calc(-1 * var(--keyboard-height-px, 0px))) !important;
+  max-height: calc(100vh - var(--keyboard-height-px, 0px)) !important;
 }
 
 .modal-content.active {
@@ -379,7 +380,7 @@ body {
 }
 
 .profile-section input[type="text"] {
-  width: calc(100% - 24px);
+  width: calc(100%);
   padding: 12px;
   background: var(--light-gray-opacity);
   border: 1px solid var(--dark-gray);
@@ -388,6 +389,7 @@ body {
   font-family: 'Helvetica Neue', sans-serif;
   line-height: 1.2;
   color: var(--black);
+  box-sizing: border-box;
 }
 
 .profile-section input[type="text"]:focus {
@@ -420,6 +422,7 @@ body {
   background: var(--light-gray-opacity);
   z-index: 2;
   color: var(--black);
+  box-sizing: border-box;
 }
 
 .profile-section #city:focus {
@@ -438,6 +441,7 @@ body {
   pointer-events: none;
   z-index: 1;
   color: var(--dark-gray);
+  box-sizing: border-box;
 }
 
 .profile-section .swipe-helper-text {
@@ -809,8 +813,8 @@ body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
 }
 
 /* Shared styles */

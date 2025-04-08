@@ -1,6 +1,6 @@
 import React from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Keyboard } from '@capacitor/keyboard';
+import { Keyboard, KeyboardInfo } from '@capacitor/keyboard';
 
 interface BaseModalProps {
   isOpen: boolean;
@@ -32,12 +32,9 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
 
   componentDidMount() {
     if (this.props.isOpen) {
-      this.setState({ isVisible: true }, () => {
-        requestAnimationFrame(() => {
-          this.setState({ isActive: true });
-        });
-      });
+      this.openModal();
     }
+
     if (Capacitor.isNativePlatform()) {
       Keyboard.addListener('keyboardWillShow', this.handleKeyboardShow);
       Keyboard.addListener('keyboardWillHide', this.handleKeyboardHide);
@@ -46,25 +43,9 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
 
   componentDidUpdate(prevProps: BaseModalProps) {
     if (!prevProps.isOpen && this.props.isOpen) {
-      // Modal is opening
-      this.setState({ isVisible: true }, () => {
-        requestAnimationFrame(() => {
-          this.setState({ isActive: true });
-        });
-      });
+      this.openModal();
     } else if (prevProps.isOpen && !this.props.isOpen) {
-      // Modal is closing
-      this.setState({ isActive: false });
-
-      // Clear any existing timeout
-      if (this.animationTimeout) {
-        window.clearTimeout(this.animationTimeout);
-      }
-
-      // Wait for animation to complete before removing from DOM
-      this.animationTimeout = window.setTimeout(() => {
-        this.setState({ isVisible: false });
-      }, 300); // Match the CSS transition duration
+      this.closeModal();
     }
   }
 
@@ -72,28 +53,46 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
     if (this.animationTimeout) {
       window.clearTimeout(this.animationTimeout);
     }
+
     if (Capacitor.isNativePlatform()) {
       Keyboard.removeAllListeners();
     }
   }
 
-  private handleKeyboardShow = (event: { keyboardHeight: number }) => {
-    // Android and iOS have different keyboard behaviors. Detect for Android on both web/native.
-    if (Capacitor.getPlatform() !== 'ios' || /Android/i.test(navigator.userAgent)) {
-      this.setState({
-        isKeyboardVisible: true,
-        keyboardHeight: event.keyboardHeight
+  private openModal() {
+    this.setState({ isVisible: true }, () => {
+      requestAnimationFrame(() => {
+        this.setState({ isActive: true });
       });
+    });
+  }
+
+  private closeModal() {
+    this.setState({ isActive: false });
+    if (this.animationTimeout) {
+      window.clearTimeout(this.animationTimeout);
     }
+    this.animationTimeout = window.setTimeout(() => {
+      this.setState({ isVisible: false });
+    }, 300); // Match the CSS transition duration
+  }
+
+  // --- Native Keyboard Handler ---
+  private handleKeyboardShow = (event: KeyboardInfo) => {
+    this.setState({
+      isKeyboardVisible: true,
+      // Use actual height on native iOS/Android (Android needs height, iOS viewport resizes)
+      keyboardHeight: Capacitor.getPlatform() === 'android' ? event.keyboardHeight : 0
+    });
   };
 
+  // --- Native Keyboard Handler ---
   private handleKeyboardHide = () => {
-    if (Capacitor.getPlatform() !== 'ios' || /Android/i.test(navigator.userAgent)) {
-      this.setState({
-        isKeyboardVisible: false,
-        keyboardHeight: 0
-      });
-    }
+    // Only applies on native
+    this.setState({
+      isKeyboardVisible: false,
+      keyboardHeight: 0
+    });
   };
 
   private handleClose = (e?: React.MouseEvent) => {
