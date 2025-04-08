@@ -381,12 +381,12 @@ body {
 }
 
 /* City input container and autocomplete styling */
-.city-input-container {
+.profile-section .city-input-container {
   position: relative;
   background: transparent;
 }
 
-#city {
+.profile-section #city {
   top: 0;
   left: 0;
   padding: 12px;
@@ -399,12 +399,12 @@ body {
   color: var(--black);
 }
 
-#city:focus {
+.profile-section #city:focus {
   border-color: var(--primary-color);
   outline: none;
 }
 
-.city-suggestion {
+.profile-section .city-suggestion {
   top: 0;
   padding: 12px;
   border: 1px solid var(--medium-gray);
@@ -417,22 +417,33 @@ body {
   color: var(--dark-gray);
 }
 
+.profile-section .swipe-helper-text {
+  color: var(--black);
+  font-size: var(--font-size-small);
+  height: 1em;
+  opacity: 0.6;
+}
+
+.profile-section .swipe-helper-text.hidden {
+  visibility: hidden;
+}
+
 .profile-section .error-message {
   color: var(--dark-gray);
   font-size: var(--font-size-small);
   margin-bottom: 8px;
 }
 
-.toggle-label {
+.profile-section .toggle-label {
   cursor: default;
 }
 
-.toggle-label span {
+.profile-section .toggle-label span {
   vertical-align: middle;
   font-size: var(--font-size-large);
 }
 
-.toggle-slider {
+.profile-section .toggle-slider {
   position: relative;
   display: inline-block;
   width: 54px;
@@ -444,7 +455,7 @@ body {
   cursor: pointer;
 }
 
-.toggle-slider:before {
+.profile-section .toggle-slider:before {
   position: absolute;
   content: "";
   height: 24px;
@@ -457,7 +468,7 @@ body {
 }
 
 /* NEW: Style the container for the toggle */
-.toggle-section {
+.profile-section .toggle-section {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -465,24 +476,24 @@ body {
 }
 
 /* Override general label styles ONLY for direct children of .toggle-section */
-.toggle-section > label {
+.profile-section .toggle-section > label {
   display: inline-block; /* Allow side-by-side placement */
 }
 
 /* Hidden but toggle slider affects it. Common pattern. */
-input[type="checkbox"] {
+.profile-section input[type="checkbox"] {
   display: none;
 }
 
-input[type="checkbox"]:checked + .toggle-slider {
+.profile-section input[type="checkbox"]:checked + .toggle-slider {
   background-color: var(--dark-green);
 }
 
-input[type="checkbox"]:checked + .toggle-slider:before {
+.profile-section input[type="checkbox"]:checked + .toggle-slider:before {
   transform: translateX(24px);
 }
 
-.profile-button {
+.profile-section .profile-button {
   padding: 0.85rem 1rem;
   border: none;
   border-radius: 4px;
@@ -490,19 +501,19 @@ input[type="checkbox"]:checked + .toggle-slider:before {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
 }
 
-.profile-button.primary {
+.profile-section .profile-button.primary {
   background-color: var(--action-green);
   color: var(--white);
 }
 
-.profile-actions {
+.profile-section .profile-actions {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
 }
 
-.logout-button {
+.profile-section .logout-button {
   background-color: var(--action-red);
   color: var(--white);
   width: 100%;

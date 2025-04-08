@@ -27,6 +27,9 @@ interface ProfileModalState {
   cityTopResult: string | null;
   isSubmitting: boolean;
   usernameError: string | null;
+  touchStartX: number | null;
+  touchCurrentX: number | null;
+  isSwiping: boolean;
 }
 
 class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState> {
@@ -47,7 +50,10 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       cityTopResult: null,
       pushNotifications: false,
       isSubmitting: false,
-      usernameError: null
+      usernameError: null,
+      touchStartX: null,
+      touchCurrentX: null,
+      isSwiping: false
     };
 
     // Create the permission change handler bound to this instance
@@ -314,6 +320,73 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
+  // Function to handle tapping the suggestion
+  private handleSuggestionTap = () => {
+    const { cityTopResult } = this.state;
+    if (cityTopResult) {
+      this.setState({
+        city: cityTopResult, // Update input field
+        cityTopResult: null    // Clear suggestion
+      }, () => {
+        // Get coordinates after state is updated
+        this.getCoordinatesFromCity(cityTopResult);
+        // Unfocus the input field
+        this.cityInputRef.current?.blur();
+      });
+    }
+  }
+
+  // --- Swipe Detection Logic ---
+  private handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Only track single touch
+    if (e.touches.length === 1) {
+      this.setState({
+        touchStartX: e.touches[0].clientX,
+        touchCurrentX: e.touches[0].clientX, // Initialize current X
+        isSwiping: true
+      });
+    }
+  };
+
+  private handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!this.state.isSwiping || e.touches.length !== 1) return;
+
+    this.setState({ touchCurrentX: e.touches[0].clientX });
+  };
+
+  private handleTouchEnd = () => {
+    if (!this.state.isSwiping || this.state.touchStartX === null || this.state.touchCurrentX === null) {
+      this.resetSwipeState();
+      return;
+    }
+
+    const diffX = this.state.touchCurrentX - this.state.touchStartX;
+    const swipeThreshold = 20; // Minimum pixels to count as a swipe
+
+    // Check for swipe right
+    if (diffX > swipeThreshold) {
+      console.log('Swipe right detected!');
+      this.handleSuggestionTap(); // Trigger autocomplete
+    }
+
+    this.resetSwipeState();
+  };
+
+  private resetSwipeState = () => {
+    this.setState({
+      touchStartX: null,
+      touchCurrentX: null,
+      isSwiping: false
+    });
+  }
+
+  private handleCityBlur = () => {
+    const { cityTopResult } = this.state;
+    if (cityTopResult) {
+      this.handleSuggestionTap();
+    }
+  }
+
   private saveInBackground = async (data: {
     username: string;
     pushNotifications: boolean;
@@ -560,6 +633,43 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
+  private handleClose = (e?: React.MouseEvent) => {
+    // Prevent event propagation
+    if (e) {
+      e.stopPropagation();
+    }
+
+    // First close the modal immediately
+    this.props.onClose();
+
+    // Don't try to save if there are validation errors or we're submitting
+    if (this.state.usernameError || this.state.isSubmitting) {
+      return;
+    }
+
+    // Don't save if username is too short
+    if (!this.state.username || this.state.username.length < 3) {
+      return;
+    }
+
+    // Check if anything changed
+    const { preferences } = this.props;
+    const usernameChanged = this.state.username !== (preferences?.username || '');
+    const notificationsChanged = this.state.pushNotifications !== (preferences?.pushNotificationsEnabled || false);
+    const cityChanged = JSON.stringify(this.state.cityCoordinates) !== JSON.stringify(preferences?.cityCoordinates);
+
+    // Only save if something changed
+    if (usernameChanged || notificationsChanged || cityChanged) {
+      // Save in the background - modal is already closed
+      this.saveInBackground({
+        username: this.state.username,
+        pushNotifications: this.state.pushNotifications,
+        cityCoordinates: this.state.cityCoordinates,
+        preferences
+      });
+    }
+  };
+
   render() {
     const { isOpen, onClose, onSignOut } = this.props;
     const {
@@ -567,50 +677,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       pushNotifications,
       city,
       cityTopResult,
-      cityCoordinates,
-      isSubmitting,
       usernameError
     } = this.state;
-
-    if (!isOpen) return null;
-
-    // Update the handleClose function to avoid event propagation issues
-    const handleClose = (e?: React.MouseEvent) => {
-      // Prevent event propagation
-      if (e) {
-        e.stopPropagation();
-      }
-
-      // First close the modal immediately
-      onClose();
-
-      // Don't try to save if there are validation errors or we're submitting
-      if (usernameError || isSubmitting) {
-        return;
-      }
-
-      // Don't save if username is too short
-      if (!username || username.length < 3) {
-        return;
-      }
-
-      // Check if anything changed
-      const { preferences } = this.props;
-      const usernameChanged = username !== (preferences?.username || '');
-      const notificationsChanged = pushNotifications !== (preferences?.pushNotificationsEnabled || false);
-      const cityChanged = JSON.stringify(cityCoordinates) !== JSON.stringify(preferences?.cityCoordinates);
-
-      // Only save if something changed
-      if (usernameChanged || notificationsChanged || cityChanged) {
-        // Save in the background - modal is already closed
-        this.saveInBackground({
-          username,
-          pushNotifications,
-          cityCoordinates,
-          preferences
-        });
-      }
-    };
 
     // Calculate suggestion - only if the top result starts with what the user typed
     let suggestion = '';
@@ -622,12 +690,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     return (
       <BaseModal
         isOpen={isOpen}
-        onClose={handleClose}
+        onClose={this.handleClose}
         contentClassName="profile-content"
       >
         <div>
           <h2>Profile Settings</h2>
-
           <div className="profile-section">
             <label htmlFor="username">Username</label>
             <input
@@ -646,13 +713,20 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
           <div className="profile-section">
             <label htmlFor="city">Home City</label>
-            <div className="city-input-container">
+            <div
+              className="city-input-container"
+              onTouchStart={this.handleTouchStart}
+              onTouchMove={this.handleTouchMove}
+              onTouchEnd={this.handleTouchEnd}
+              onTouchCancel={this.resetSwipeState}
+            >
               <input
                 type="text"
                 id="city"
                 ref={this.cityInputRef}
                 value={city}
                 onChange={(e) => this.handleCityChange(e.target.value)}
+                onBlur={this.handleCityBlur}
                 onKeyDown={this.handleCityKeyDown}
                 placeholder="Your city"
                 autoComplete="off"
@@ -662,6 +736,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   {suggestion}
                 </div>
               )}
+              <div className={`swipe-helper-text ${(suggestion && city.length > 0) ? 'visible' : 'hidden'}`}>
+                {Capacitor.isNativePlatform() ? 'Swipe to complete →' : 'Tap to complete'}
+              </div>
             </div>
           </div>
 
