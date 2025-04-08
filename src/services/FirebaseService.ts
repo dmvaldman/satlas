@@ -201,44 +201,42 @@ export class FirebaseService {
   static async signInWithGoogle(): Promise<void> {
     console.log('[Firebase] Starting Google sign-in process');
     try {
-      // First ensure we're signed out
       console.log('[Firebase] Ensuring user is signed out');
-      await FirebaseService.signOut();
-      console.log('[Firebase] User signed out successfully');
+      await FirebaseService.signOut().catch(err => console.warn('[Firebase] Non-critical sign out error:', err));
+      console.log('[Firebase] Sign out check complete');
 
       if (Capacitor.isNativePlatform()) {
-        console.log('[Firebase] Using native authentication');
+        console.log('[Firebase] Using native authentication for Google');
         try {
-          // Check if the plugin is available
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
-
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithGoogle');
           const result = await FirebaseAuthentication.signInWithGoogle();
           console.log('[Firebase] Native Google sign-in raw result:', result);
-
           if (!result?.credential) {
-            console.error('[Firebase] No credential received from native sign-in');
-            throw new Error('No credential received from native sign-in');
+            console.error('[Firebase] No credential received from native Google sign-in');
+            throw new Error('No credential received from native Google sign-in');
           }
-
-          console.log('[Firebase] Assuming native plugin handles web SDK sign-in implicitly.');
+          console.log('[Firebase] Native Google sign-in seems complete via plugin.');
 
         } catch (error) {
-          console.error('[Firebase] Native sign-in error:', error);
+          console.error('[Firebase] Native Google sign-in error:', error);
           throw error;
         }
+
       } else {
-        console.log('[Firebase] Using web authentication');
+        // --- WEB --- Revert to Popup Flow
+        console.log('[Firebase] Using web popup authentication for Google');
         const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        console.log('[Firebase] Web Google sign-in completed successfully');
-        return
+        await signInWithPopup(auth, provider); // Use popup
+        console.log('[Firebase] Web Google sign-in popup completed.');
+        return;
       }
     } catch (error) {
-      console.error('[Firebase] Error signing in with Google:', error);
+      console.error('[Firebase] Error during Google sign-in process:', error);
+      // Re-throw error to be caught by UI
       throw error;
     }
   }
@@ -266,45 +264,41 @@ export class FirebaseService {
   static async signInWithApple(): Promise<void> {
     console.log('[Firebase] Starting Apple sign-in process');
     try {
-      // First ensure we're signed out completely
-      console.log('[Firebase] Ensuring user is signed out from all sources');
-      await FirebaseService.signOut();
-      console.log('[Firebase] User signed out successfully');
+      console.log('[Firebase] Ensuring user is signed out');
+      await FirebaseService.signOut().catch(err => console.warn('[Firebase] Non-critical sign out error:', err));
+      console.log('[Firebase] Sign out check complete');
 
       if (Capacitor.isNativePlatform()) {
-        console.log('[Firebase] Using native authentication');
+        console.log('[Firebase] Using native authentication for Apple');
         try {
-          // Check if the plugin is available
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
-
-          // Call the plugin's signInWithApple method.
-          // The plugin might handle the nonce implicitly, or it might be part of the result.
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithApple');
           const result = await FirebaseAuthentication.signInWithApple();
-
           console.log('[Firebase] Native Apple sign-in raw result:', result);
-
-          if (!result?.credential?.idToken) { // Check specifically for idToken
-            console.error('[Firebase] No idToken received from native sign-in');
-            throw new Error('No idToken received from native sign-in');
+          if (!result?.credential?.idToken) {
+            console.error('[Firebase] No idToken received from native Apple sign-in');
+            throw new Error('No idToken received from native Apple sign-in');
           }
-
-          console.log('[Firebase] User successfully authenticated with Apple via native plugin.');
+          console.log('[Firebase] Native Apple sign-in seems complete via plugin.');
         } catch (error) {
-          console.error('[Firebase] Native sign-in or credential sign-in error:', error);
+          console.error('[Firebase] Native Apple sign-in error:', error);
           throw error;
         }
+
       } else {
-        console.log('[Firebase] Using web authentication');
+        // --- WEB --- Revert to Popup Flow
+        console.log('[Firebase] Using web popup authentication for Apple');
         const provider = new OAuthProvider('apple.com');
-        await signInWithPopup(auth, provider);
-        console.log('[Firebase] Web Apple sign-in completed successfully');
+        await signInWithPopup(auth, provider); // Use popup
+        console.log('[Firebase] Web Apple sign-in popup completed.');
+        return;
       }
     } catch (error) {
-      console.error('[Firebase] Error signing in with Apple:', error);
+      console.error('[Firebase] Error during Apple sign-in process:', error);
+      // Re-throw error to be caught by UI
       throw error;
     }
   }

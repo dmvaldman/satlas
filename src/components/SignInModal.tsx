@@ -1,8 +1,6 @@
 import React from 'react';
 import { FirebaseService } from '../services/FirebaseService';
-import { User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { auth } from '../services/FirebaseService';
 import BaseModal from './BaseModal';
 
 interface SignInModalProps {
@@ -13,7 +11,31 @@ interface SignInModalProps {
 }
 
 class SignInModal extends React.Component<SignInModalProps> {
+  private _isSafariWeb(): boolean {
+    if (Capacitor.getPlatform() !== 'web') {
+      return false;
+    }
+    // Check for Safari specifically, excluding Chrome, Edge, and Android variants
+    const ua = navigator.userAgent;
+    const isLikelySafari = /Safari/i.test(ua) &&         // Must contain Safari
+                          !/Chrome/i.test(ua) &&        // Must NOT contain Chrome
+                          !/Chromium/i.test(ua) &&      // Must NOT contain Chromium
+                          !/CriOS/i.test(ua) &&         // Must NOT contain CriOS (Chrome iOS)
+                          !/Edg/i.test(ua) &&           // Must NOT contain Edge
+                          !/Android/i.test(ua);         // Must NOT contain Android
+    return isLikelySafari;
+  }
+
   private handleSignIn = async (method: 'apple' | 'google') => {
+    // --- Safari Web Check ---
+    if (this._isSafariWeb()) {
+      this.props.showNotification(
+        'Sign-in is not supported in Safari. Please use another browser or the native app.',
+        'error'
+      );
+      return; // Prevent sign-in attempt
+    }
+
     // Close modal immediately for better UX
     this.props.onClose();
 
