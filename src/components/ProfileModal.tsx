@@ -696,7 +696,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
           <div className="profile-section">
             <label htmlFor="username">Username</label>
             <input
-              type="text"
+              type="search"
               id="username"
               ref={this.inputRef}
               value={username}
@@ -719,7 +719,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
               onTouchCancel={this.resetSwipeState}
             >
               <input
-                type="text"
+                type="search"
                 id="city"
                 ref={this.cityInputRef}
                 value={city}
