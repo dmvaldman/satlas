@@ -4,9 +4,11 @@
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
 
-  --primary-color: #3326c3;
-  --sit-color: #4cb4d4;
-  --sit-mine-color: #8bdf91;
+  --primary-color: #0D47A1;
+  --cluster-color: #1976D2;
+  --sit-color: #42A5F5;
+  --sit-mine-color: #BBDEFB;
+
   --action-green: #41b449;
   --action-red: #ff3b30;
   --white: #ffffff;

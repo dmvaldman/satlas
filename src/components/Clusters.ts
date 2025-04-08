@@ -3,30 +3,31 @@ import { Sit } from '../types';
 
 export class Clusters {
   private clusterSourceAdded: boolean = false;
-  private clusterColor: string = '#003f83';
+  private clusterColor!: string;
   private clusterRadius: number = 24;
 
   public setupClusterLayer(map: mapboxgl.Map, sits: Map<string, Sit>): void {
     if (map.loaded()) {
-      // Check if source already exists before initializing
-      if (!this.sourceExists(map, 'sits')) {
-        this.initializeClusterLayers(map, sits);
-      } else {
-        // Source already exists, just update it and mark as added
-        this.clusterSourceAdded = true;
-        this.updateClusterSource(map, sits);
-      }
+      this.onMapLoaded(map, sits);
     } else {
       map.on('load', () => {
-        // Check if source already exists before initializing
-        if (!this.sourceExists(map, 'sits')) {
-          this.initializeClusterLayers(map, sits);
-        } else {
-          // Source already exists, just update it and mark as added
-          this.clusterSourceAdded = true;
-          this.updateClusterSource(map, sits);
-        }
+        this.onMapLoaded(map, sits);
       });
+    }
+  }
+
+  private onMapLoaded(map: mapboxgl.Map, sits: Map<string, Sit>): void {
+    this.clusterColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--cluster-color')
+      .trim();
+
+    // Check if source already exists before initializing
+    if (!this.sourceExists(map, 'sits')) {
+      this.initializeClusterLayers(map, sits);
+    } else {
+      // Source already exists, just update it and mark as added
+      this.clusterSourceAdded = true;
+      this.updateClusterSource(map, sits);
     }
   }
 
