@@ -312,8 +312,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
       if (data.features && data.features.length > 0) {
         // Get the first place result
-        const city = data.features[0].place_name;
-        this.setState({ city });
+        const [city, state, ...rest] = data.features[0].place_name.split(', ');
+        this.setState({ city: `${city}, ${state}` });
       }
     } catch (error) {
       console.error('Error getting city from coordinates:', error);
@@ -330,8 +330,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       }, () => {
         // Get coordinates after state is updated
         this.getCoordinatesFromCity(cityTopResult);
-        // Unfocus the input field
-        this.cityInputRef.current?.blur();
       });
     }
   }
