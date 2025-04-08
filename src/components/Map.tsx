@@ -162,7 +162,9 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     map.flyTo({
       center: [currentLocation.longitude, currentLocation.latitude],
-      zoom: 15
+      zoom: 15,
+      duration: 1000,
+      essential: true
     });
   }
 

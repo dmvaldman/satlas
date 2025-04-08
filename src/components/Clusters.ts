@@ -148,7 +148,8 @@ export class Clusters {
       map.flyTo({
         center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number],
         zoom: zoom + 1,
-        duration: 500
+        duration: 300,
+        essential: true
       });
     });
   };
