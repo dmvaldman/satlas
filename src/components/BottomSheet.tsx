@@ -10,8 +10,10 @@ interface BottomSheetProps {
 
 interface BottomSheetState {
   translateY: number;
-  startDrag: number | null;
   startX: number | null;
+  startY: number | null;
+  lastX: number | null;
+  lastY: number | null;
   isDragging: boolean;
   sheetHeight: number;
   paddingBottom: number; // Needs to be in sync with the paddingBottom in the css
@@ -22,19 +24,20 @@ interface BottomSheetState {
 
 class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   private overlayRef = React.createRef<HTMLDivElement>();
-  private contentContainerRef = React.createRef<HTMLDivElement>();
   private sheetContainerRef = React.createRef<HTMLDivElement>();
   private resizeObserver: ResizeObserver | null = null;
+  private readonly DRAG_DIRECTION_THRESHOLD = 300; // pixels to determine direction
   private readonly VELOCITY_THRESHOLD = 0.5; // pixels per millisecond
-  private readonly DRAG_DIRECTION_THRESHOLD = 10; // pixels to determine direction
 
   constructor(props: BottomSheetProps) {
     super(props);
 
     this.state = {
       translateY: window.innerHeight, // Start fully offscreen (at the bottom)
-      startDrag: null,
       startX: null,
+      startY: null,
+      lastX: 0,
+      lastY: 0,
       isDragging: false,
       sheetHeight: window.innerHeight,
       paddingBottom: 100,
@@ -147,15 +150,17 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
 
     this.setState({
-      startDrag: clientY,
+      startY: clientY,
       startX: clientX,
+      lastX: clientX,
+      lastY: clientY,
       isDragging: true,
       dragDirection: null // Reset drag direction
     });
   };
 
   private handleDragMove = (e: TouchEvent | MouseEvent) => {
-    if (!this.state.isDragging || this.state.startDrag === null) return;
+    if (!this.state.isDragging || this.state.startY === null) return;
 
     e.preventDefault();
 
@@ -164,24 +169,25 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     const currentTranslate = this.state.translateY;
 
     // Calculate both X and Y deltas
-    const deltaY = clientY - this.state.startDrag;
-    const deltaX = clientX - (this.state.startX || 0);
+    const deltaY = clientY - this.state.lastY;
+    const deltaX = clientX - this.state.lastX;
 
     // Determine drag direction if not already set
-    if (this.state.dragDirection === null) {
-      const absDeltaX = Math.abs(deltaX);
-      const absDeltaY = Math.abs(deltaY);
+    let currentDragDirection = this.state.dragDirection;
 
-      // Only set direction if we've moved past the threshold
-      if (absDeltaX > this.DRAG_DIRECTION_THRESHOLD || absDeltaY > this.DRAG_DIRECTION_THRESHOLD) {
-        this.setState({
-          dragDirection: absDeltaX > absDeltaY ? 'horizontal' : 'vertical'
-        });
+    if (currentDragDirection === null) {
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        currentDragDirection = 'horizontal';
+      } else if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        currentDragDirection = 'vertical';
       }
+      this.setState({
+        dragDirection: currentDragDirection
+      });
     }
 
     // If we're dragging horizontally, don't update the sheet position
-    if (this.state.dragDirection === 'horizontal') {
+    if (currentDragDirection === 'horizontal') {
       return;
     }
 
@@ -197,14 +203,16 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     // Calculate velocity if we have previous timestamp
     let velocityY = 0;
     if (this.state.previousTimestamp !== null) {
-      const deltaY = newTranslate - currentTranslate;
       const deltaTime = now - this.state.previousTimestamp;
       velocityY = deltaTime > 0 ? deltaY / deltaTime : 0;
     }
 
     this.setState({
       translateY: newTranslate,
-      startDrag: clientY,
+      startX: clientX,
+      startY: clientY,
+      lastX: this.state.lastX + deltaX,
+      lastY: this.state.lastY + deltaY,
       previousTimestamp: now,
       velocityY
     });
@@ -219,12 +227,15 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
   private handleDragEnd = () => {
     if (!this.state.isDragging) return;
 
-    const isBelowSpatialThreshold = this.state.translateY > this.state.sheetHeight * 0.5;
+    const isBelowSpatialThreshold = Math.abs(this.state.translateY) > this.DRAG_DIRECTION_THRESHOLD;
     const isBelowVelocityThreshold = this.state.velocityY > this.VELOCITY_THRESHOLD && this.state.velocityY > 0;
 
     this.setState({
       isDragging: false,
-      startDrag: null,
+      startY: null,
+      startX: null,
+      lastX: null,
+      lastY: null,
       previousTimestamp: null,
       velocityY: 0,
       dragDirection: null // Reset drag direction
@@ -245,7 +256,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
 
   render() {
     const { open, header, children } = this.props;
-    const { translateY, isDragging, dragDirection } = this.state;
+    const { translateY, isDragging } = this.state;
 
     return (
       <div className={`satlas-bottom-sheet ${!open ? 'closed' : ''}`}>
@@ -266,7 +277,6 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
             {header}
           </div>
           <div
-            ref={this.contentContainerRef}
             className="content-container"
           >
             {children}

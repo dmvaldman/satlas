@@ -22,7 +22,8 @@ interface CarouselState {
   totalWidth: number;
   imageStatuses: ImageStatus[]; // Array instead of Map
   lastMoveTimestamp: number;
-  lastPosition: number;
+  lastPositionX: number;
+  lastPositionY: number;
   velocity: number;
   dragDirection: 'horizontal' | 'vertical' | null;
 }
@@ -33,7 +34,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private resizeObserver: ResizeObserver | null = null;
   private padding = 16;
   private momentumAnimationId: number | null = null;
-  private readonly DRAG_DIRECTION_THRESHOLD = 10; // pixels to determine direction
+  private readonly DRAG_DIRECTION_THRESHOLD = 100; // pixels to determine direction
 
   constructor(props: CarouselProps) {
     super(props);
@@ -50,7 +51,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       totalWidth: 0,
       imageStatuses: Array(this.props.images.length).fill('notLoaded'),
       lastMoveTimestamp: 0,
-      lastPosition: 0,
+      lastPositionX: 0,
+      lastPositionY: 0,
       velocity: 0,
       dragDirection: null,
     };
@@ -255,7 +257,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     this.setState({
       startX: clientX,
       startY: clientY,
-      lastPosition: clientX,
+      lastPositionX: clientX,
+      lastPositionY: clientY,
       isDragging: true,
       lastMoveTimestamp: performance.now(),
       velocity: 0,
@@ -278,20 +281,22 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const currentTime = performance.now();
     const timeElapsed = currentTime - this.state.lastMoveTimestamp;
-    const deltaX = clientX - this.state.lastPosition;
-    const deltaY = clientY - this.state.startY;
+    const deltaX = clientX - this.state.lastPositionX;
+    const deltaY = clientY - this.state.lastPositionY;
+    // const dispX = Math.abs(clientX - this.state.startX);
+    // const dispY = Math.abs(clientY - this.state.startY);
 
-    // Determine drag direction if not already set
-    if (this.state.dragDirection === null) {
-      const absDeltaX = Math.abs(deltaX);
-      const absDeltaY = Math.abs(deltaY);
+    let currentDragDirection = this.state.dragDirection;
 
-      // Only set direction if we've moved past the threshold
-      if (absDeltaX > this.DRAG_DIRECTION_THRESHOLD || absDeltaY > this.DRAG_DIRECTION_THRESHOLD) {
-        this.setState({
-          dragDirection: absDeltaX > absDeltaY ? 'horizontal' : 'vertical'
-        });
+    if (currentDragDirection === null) {
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        currentDragDirection = 'horizontal';
+      } else if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        currentDragDirection = 'vertical';
       }
+      this.setState({
+        dragDirection: currentDragDirection
+      });
     }
 
     // If we're dragging vertically, don't update the carousel position
@@ -319,7 +324,8 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     this.setState({
       translateX: newTranslateX,
-      lastPosition: clientX,
+      lastPositionX: clientX,
+      lastPositionY: clientY,
       lastMoveTimestamp: currentTime,
       velocity: velocity
     });
@@ -349,7 +355,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
 
     // Check if we should apply momentum scrolling
     // Only apply momentum if the velocity is significant
-    const shouldApplyMomentum = Math.abs(this.state.velocity) > 0.01 &&
+    const shouldApplyMomentum = this.state.dragDirection === 'horizontal' && Math.abs(this.state.velocity) > 0.01 &&
       this.state.totalWidth > this.state.containerWidth;
 
     this.setState({
