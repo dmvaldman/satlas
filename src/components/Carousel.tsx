@@ -358,9 +358,10 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const shouldApplyMomentum = this.state.dragDirection === 'horizontal' && Math.abs(this.state.velocity) > 0.01 &&
       this.state.totalWidth > this.state.containerWidth;
 
+
     this.setState({
       translateX: finalTranslateX,
-      isDragging: false,
+      isDragging: shouldApplyMomentum,
       dragDirection: null // Reset drag direction
     }, () => {
       // Start momentum animation if needed
@@ -402,6 +403,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
         (this.state.totalWidth > this.state.containerWidth &&
          newTranslateX === -(this.state.totalWidth - this.state.containerWidth))) {
       this.momentumAnimationId = null;
+      this.setState({
+        isDragging: false
+      });
       return;
     }
 
