@@ -82,6 +82,7 @@ body {
   cursor: pointer;
   font-size: var(--font-size-large);
   opacity: 0.9;
+  box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
 }
 
 .auth-button svg {
@@ -101,6 +102,7 @@ body {
   align-items: center;
   justify-content: center;
   position: relative;
+  box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
 }
 
 #profile-image {
@@ -216,7 +218,7 @@ body {
   height: 66px;
   border-radius: 50%;
   background: var(--primary-color);
-  box-shadow: 0px 0px 2px 0px rgba(0,0,0,.5);
+  box-shadow: 0px 5px 6px 0px rgba(0,0,0,.3);
   border: none;
   cursor: pointer;
   display: flex;
@@ -903,7 +905,7 @@ body {
   font-size: var(--font-size-medium);
   font-weight: 500;
   margin-right: 12px;
-  text-shadow: 0px 0px 2px var(--black);
+  text-shadow: 0px 0px 1px var(--black);
 }
 
 .notification-close {
@@ -921,6 +923,7 @@ body {
   align-items: center;
   justify-content: center;
   border: none;
+  text-shadow: 0px 0px 1px var(--black);
 }
 
 .notification.success {

@@ -73,8 +73,8 @@ export class Clusters {
       paint: {
         'circle-color': this.clusterColor,
         'circle-radius': this.clusterRadius,
-        'circle-stroke-width': 1,
-        'circle-stroke-color': '#000000'
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#000000',
       }
     });
 
@@ -92,7 +92,7 @@ export class Clusters {
       paint: {
         'text-color': '#fff',
         'text-halo-color': '#000',
-        'text-halo-width': 1
+        'text-halo-width': 0.5
       }
     });
 
@@ -143,9 +143,11 @@ export class Clusters {
       if (err || zoom === null || zoom === undefined) return;
 
       // Center the map on the cluster and zoom in
+      // Small hack to make the clusters not disappear
       map.flyTo({
         center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number],
-        zoom: zoom
+        zoom: zoom + 1,
+        duration: 500
       });
     });
   };
