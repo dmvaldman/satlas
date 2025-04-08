@@ -285,7 +285,7 @@ class App extends React.Component<{}, AppState> {
         if (this.state.userPreferences.cityCoordinates) {
           mapCoordinates = this.state.userPreferences.cityCoordinates;
           userCoordinates = mapCoordinates;
-          zoom = 4;
+          zoom = 11;
         } else {
           // Center map on geographic center of America
           mapCoordinates = { latitude: 39.8283, longitude: -98.5795 };
