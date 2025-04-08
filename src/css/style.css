@@ -456,10 +456,9 @@ body {
 }
 
 .profile-section .swipe-helper-text {
-  color: var(--black);
+  color: var(--dark-gray);
   font-size: var(--font-size-small);
-  height: 1em;
-  opacity: 0.6;
+  margin-top: 3px;
 }
 
 .profile-section .swipe-helper-text.hidden {
@@ -469,7 +468,7 @@ body {
 .profile-section .error-message {
   color: var(--dark-gray);
   font-size: var(--font-size-small);
-  margin-bottom: 8px;
+  margin-top: 3px;
 }
 
 .profile-section .toggle-label {

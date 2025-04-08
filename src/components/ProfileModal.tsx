@@ -735,7 +735,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                 </div>
               )}
               <div className={`swipe-helper-text ${(suggestion && city.length > 0) ? 'visible' : 'hidden'}`}>
-                {('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 'Swipe to complete →' : 'Tap to complete'}
+                {('ontouchstart' in window || navigator.maxTouchPoints > 0) ? 'Swipe to complete →' : 'Tab to complete →'}
               </div>
             </div>
           </div>
