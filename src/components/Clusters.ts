@@ -88,7 +88,7 @@ export class Clusters {
       layout: {
         'text-field': '{point_count_abbreviated}',
         'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 16,
+        'text-size': 18,
       },
       paint: {
         'text-color': '#fff',

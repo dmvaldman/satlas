@@ -115,7 +115,11 @@ class MapComponent extends React.Component<MapProps, MapState> {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 
-    path.setAttribute('fill', '#3326c3');
+    const markerColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--location-marker-color')
+      .trim();
+
+    path.setAttribute('fill', markerColor);
     path.setAttribute('stroke', 'black');
     path.setAttribute('stroke-width', '1');
     path.setAttribute('d', 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z');

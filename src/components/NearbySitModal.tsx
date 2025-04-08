@@ -25,7 +25,7 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
 
         {hasUserContributed ? (
           <>
-            <p>You're too close to an existing sit that you've already contributed to.</p>
+            <p>You're too close to an existing sit you've already contributed to. </p><p>Replace or delete your photo instead.</p>
           </>
         ) : (
           <>

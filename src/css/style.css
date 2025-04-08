@@ -8,11 +8,12 @@
   --cluster-color: #1976D2;
   --sit-color: #42A5F5;
   --sit-mine-color: #BBDEFB;
+  --location-marker-color: #E3F2FD;
 
   --action-green: #41b449;
   --action-red: #ff3b30;
   --white: #ffffff;
-  --light-gray: rgb(245, 245, 245);
+  --light-gray: #ddd;
   --medium-gray: #888;
   --dark-gray: #444;
   --black: #000000;
@@ -85,6 +86,11 @@ body {
   font-size: var(--font-size-large);
   opacity: 0.9;
   box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
+  transition: transform 0.2s;
+}
+
+.auth-button:active {
+  transform: scale(0.95);
 }
 
 .auth-button svg {
@@ -94,8 +100,8 @@ body {
 }
 
 #profile-container {
-  width: 62px;
-  height: 62px;
+  width: 66px;
+  height: 66px;
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
@@ -105,6 +111,11 @@ body {
   justify-content: center;
   position: relative;
   box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
+  transition: transform 0.2s;
+}
+
+#profile-container:active {
+  transform: scale(0.95);
 }
 
 #profile-image {
@@ -216,8 +227,8 @@ body {
   position: fixed;
   bottom: calc(2rem + var(--safe-area-bottom));
   right: calc(2rem + var(--safe-area-right));
-  width: 66px;
-  height: 66px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: var(--primary-color);
   box-shadow: 0px 5px 6px 0px rgba(0,0,0,.3);
@@ -303,9 +314,9 @@ body {
 }
 
 .modal-content p {
-  font-size: var(--font-size-medium);
+  font-size: var(--font-size-large);
   margin-bottom: 1rem;
-  line-height: 1.5em;
+  line-height: 1.75em;
 }
 
 .modal-option-button {
@@ -628,7 +639,7 @@ body {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--light-gray-opacity);
+  border: 4px solid var(--light-gray);
   border-radius: 50%;
   border-top-color: var(--black);
   animation: spin 1s ease-in-out infinite;
