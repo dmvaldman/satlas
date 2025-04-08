@@ -231,11 +231,7 @@ body {
   width: 24px;
   height: 24px;
   z-index: 2;
-  pointer-events: none;
-}
-
-.location-marker svg {
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 /* Add these styles for the FAB */
