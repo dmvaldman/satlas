@@ -185,9 +185,14 @@ class PopupComponent extends React.Component<PopupProps> {
     if (!sit) return null;
 
     let mapsUrl: string;
-    if (Capacitor.isNativePlatform()) {
-      mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}`;
+    const platform = Capacitor.getPlatform();
+
+    if (platform === 'ios') {
+      mapsUrl = `maps://?q=${sit.location.latitude},${sit.location.longitude}`;
+    } else if (platform === 'android') {
+      mapsUrl = `geo:${sit.location.latitude},${sit.location.longitude}?q=${sit.location.latitude},${sit.location.longitude}`;
     } else {
+      // Fallback for web and other platforms
       mapsUrl = `https://www.google.com/maps/search/?api=1&query=${sit.location.latitude},${sit.location.longitude}`;
     }
 
