@@ -29,7 +29,6 @@ interface AppState {
   // Auth state
   user: User | null;
   isAuthenticated: boolean;
-  authIsReady: boolean;
 
   // Map state
   map: mapboxgl.Map | null;
@@ -94,7 +93,6 @@ class App extends React.Component<{}, AppState> {
       // Auth state
       user: null,
       isAuthenticated: false,
-      authIsReady: false,
 
       // Map state
       map: null,
@@ -221,41 +219,20 @@ class App extends React.Component<{}, AppState> {
       console.log('[App] Auth state changed:', user ? user.displayName : 'null');
 
       if (user) {
-        console.log('[App] Setting authenticated state with user:', user.uid);
-        this.setState({
-          user,
-          isAuthenticated: true,
-          authIsReady: true
-        });
-
-        await this.loadUserData(user);
+        this.handleSignIn(user);
       } else {
         console.log('[App] Setting unauthenticated state');
         this.setState({
           user: null,
-          isAuthenticated: false,
-          authIsReady: true
+          isAuthenticated: false
         });
       }
     });
 
     // 2. Direct auth check
     const currentUser = auth.currentUser;
-    console.log('[App] Direct auth check on mount:', {
-      hasUser: !!currentUser,
-      userId: currentUser?.uid,
-      displayName: currentUser?.displayName
-    });
-
-    this.setState({
-      user: currentUser,
-      isAuthenticated: !!currentUser,
-      authIsReady: true  // Always make UI available
-    });
-
-    // 3. Load user data if authenticated
     if (currentUser) {
-      await this.loadUserData(currentUser);
+      this.handleSignIn(currentUser);
     }
   };
 
@@ -478,13 +455,12 @@ class App extends React.Component<{}, AppState> {
     });
   };
 
-  private handleSignInSuccess = async (user: User) => {
+  private handleSignIn = async (user: User) => {
     console.log('[App] Sign-in successful, updating state');
     // Update auth state
     this.setState({
       user: user,
-      isAuthenticated: true,
-      authIsReady: true
+      isAuthenticated: true
     }, async () => {
       console.log('[App] State manually updated after sign-in');
 
@@ -1327,7 +1303,6 @@ class App extends React.Component<{}, AppState> {
     const {
       user,
       isAuthenticated,
-      authIsReady,
       map,
       sits,
       marks,
@@ -1338,20 +1313,6 @@ class App extends React.Component<{}, AppState> {
       userPreferences,
       drawer,
     } = this.state;
-
-    // Still show loading, but include the map container
-    if (!authIsReady) {
-      return (
-        <div className="app">
-          <div className="loading">Loading...</div>
-          <div
-            id="map-container"
-            ref={this.mapContainer}
-            style={{ width: '100%' }}
-          />
-        </div>
-      );
-    }
 
     return (
       <div className="app">
