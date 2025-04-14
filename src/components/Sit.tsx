@@ -48,14 +48,15 @@ class PopupComponent extends React.Component<PopupProps> {
     super(props);
   }
 
-  componentDidUpdate(prevProps: PopupProps) {
-    const { sit, user, isOpen } = this.props;
+  // Implement MarkSit at later time
+  // componentDidUpdate(prevProps: PopupProps) {
+  //   const { sit, user, isOpen } = this.props;
 
-    // Mark the sit as seen when the popup is opened
-    if (isOpen && !prevProps.isOpen && user) {
-      FirebaseService.markSitAsSeen(user.uid, sit.id);
-    }
-  }
+  //   // Mark the sit as seen when the popup is opened
+  //   if (isOpen && !prevProps.isOpen && user) {
+  //     FirebaseService.markSitAsSeen(user.uid, sit.id);
+  //   }
+  // }
 
   private handleMarkClick = async (markType: 'favorite' | 'wantToGo' | 'visited') => {
     if (!this.props.user) {
