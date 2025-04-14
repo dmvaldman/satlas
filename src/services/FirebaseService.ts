@@ -12,7 +12,9 @@ import {
   OAuthProvider,
 } from 'firebase/auth';
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  memoryLocalCache,
   doc,
   setDoc,
   getDoc,
@@ -22,7 +24,8 @@ import {
   getDocs,
   deleteDoc,
   addDoc,
-  writeBatch
+  writeBatch,
+  Firestore
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -72,8 +75,22 @@ if (Capacitor.isNativePlatform()) {
   auth = getAuth(app);
 }
 
-// Initialize other services
-const db = getFirestore(app);
+// --- Initialize Firestore with Explicit Persistence ---
+let db: Firestore;
+const firestoreCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
+try {
+    console.log(`[Firebase] Initializing Firestore with persistentLocalCache (size: ${firestoreCacheSizeBytes} bytes)...`);
+    db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ cacheSizeBytes: firestoreCacheSizeBytes })
+    });
+    console.log("[Firebase] Firestore initialized with explicit persistence.");
+} catch (error) {
+    console.error("[Firebase] Error initializing Firestore with persistent cache:", error);
+    console.log("[Firebase] Falling back to in-memory Firestore cache.");
+    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+}
+// --- End Firestore Initialization ---
+
 const storage = getStorage(app);
 
 // Firebase Service class with static methods
@@ -756,8 +773,14 @@ export class FirebaseService {
         where('location.latitude', '<=', bounds.north)
       );
 
+      // Use getDocsFromServer or getDocsFromCache if specific source is needed
+      // Default getDocs will try cache first when offline
       const querySnapshot = await getDocs(q);
       const sits = new Map<string, Sit>();
+
+      // Log the source of the data
+      const source = querySnapshot.metadata.fromCache ? "local cache" : "server";
+      console.log(`[Firebase] loadSitsFromBounds: Data fetched from ${source}. Found ${querySnapshot.size} documents.`);
 
       querySnapshot.docs.forEach(doc => {
         const sitData = doc.data();
@@ -768,17 +791,21 @@ export class FirebaseService {
             longitude: sitData.location.longitude
           },
           imageCollectionId: sitData.imageCollectionId,
-          createdAt: sitData.createdAt,
+          createdAt: sitData.createdAt, // Consider converting Timestamps if needed
           uploadedBy: sitData.uploadedBy,
           uploadedByUsername: sitData.uploadedByUsername
         };
-
         sits.set(sit.id, sit);
       });
 
+      // If from cache and empty, log a specific message
+      if (querySnapshot.metadata.fromCache && querySnapshot.empty) {
+          console.log("[Firebase] loadSitsFromBounds: No documents found in cache for this query.");
+      }
+
       return sits;
     } catch (error) {
-      console.error('Error loading nearby sits:', error);
+      console.error('[Firebase] Error loading nearby sits:', error);
       throw error;
     }
   }
