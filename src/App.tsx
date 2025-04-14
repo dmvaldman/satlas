@@ -289,14 +289,7 @@ class App extends React.Component<{}, AppState> {
         console.log('Firing onReconnect GPS callback');
         this.locationService.onReconnect((coordinates) => {
           console.log('onReconnect GPS callback fired with coordinates:', coordinates);
-          if (this.state.map && coordinates) {
-            // animate to new location and zoom
-            this.state.map.flyTo({
-              center: [coordinates.longitude, coordinates.latitude],
-              zoom: 13,
-              duration: 1000,
-              essential: true
-            });
+          if (coordinates) {
             this.setState({ currentLocation: coordinates });
           }
         });

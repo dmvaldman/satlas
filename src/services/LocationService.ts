@@ -218,7 +218,7 @@ export class LocationService {
     this.locationCallbacks = this.locationCallbacks.filter(cb => cb !== callback);
   }
 
-  private handleLocationUpdate(location?: Location): void {
+  private handleLocationUpdate(location: Location): void {
     this.locationCallbacks.forEach(callback => {
       try {
         callback(location);
