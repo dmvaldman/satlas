@@ -37,6 +37,7 @@ export interface ImageCollection {
 
 export interface UserPreferences {
   username: string;
+  username_lowercase: string;
   pushNotificationsEnabled: boolean;
   lastVisit: number;
   cityCoordinates?: {

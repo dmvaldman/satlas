@@ -116,7 +116,8 @@ class App extends React.Component<{}, AppState> {
       userPreferences: {
         username: '',
         pushNotificationsEnabled: false,
-        lastVisit: 0
+        lastVisit: 0,
+        username_lowercase: ''
       },
 
       // Initialize drawer state
@@ -141,14 +142,21 @@ class App extends React.Component<{}, AppState> {
       this.initializeAuth(),
       this.initializeMap()
     ]).catch(error => {
-      console.error('[App] Initialization error:', error);
+      console.error('[App] Initialization error during Promise.all:', error);
       this.showNotification('Failed to initialize app', 'error');
     });
 
     // Configure status bar first since it's fast
     if (Capacitor.isNativePlatform()) {
-      this.configureStatusBar();
-      SplashScreen.hide();
+      console.log('[App] Configuring status bar...'); // Log before
+      try {
+          this.configureStatusBar();
+          console.log('[App] Status bar configured. Attempting to hide splash screen...'); // Log after config, before hide
+          SplashScreen.hide();
+          console.log('[App] SplashScreen.hide() command executed.'); // Log after hide
+      } catch(e) {
+          console.error('[App] Error during status bar config or splash screen hide:', e);
+      }
 
       // Add resume listener for native platforms
       CapacitorApp.addListener('resume', () => {
@@ -1303,6 +1311,7 @@ class App extends React.Component<{}, AppState> {
     const {
       user,
       isAuthenticated,
+
       map,
       sits,
       marks,
