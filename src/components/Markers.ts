@@ -51,9 +51,22 @@ export class Markers {
       el.appendChild(this.createIconElement(marks));
     }
 
-    // Add click handler to container for larger hit area
+    // Add click handler to container
     container.addEventListener('click', (e) => {
       e.stopPropagation();
+
+      // --- Add Click Effect ---
+      // Find the inner satlas-marker element (el)
+      const markerElement = container.querySelector('.satlas-marker');
+      if (markerElement) {
+          markerElement.classList.add('clicked');
+          setTimeout(() => {
+              markerElement.classList.remove('clicked');
+          }, 150); // Duration matches CSS transition
+      }
+      // --- End Click Effect ---
+
+      // Call the original handler
       this.onMarkerClick(sit);
     });
 
