@@ -30,7 +30,7 @@ import {
   uploadString,
   deleteObject
 } from 'firebase/storage';
-import { Sit, Image, Location, UserPreferences, MarkType, PhotoResult, PushToken } from '../types';
+import { Sit, Image, Location, UserPreferences, MarkType, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
@@ -463,25 +463,34 @@ export class FirebaseService {
     try {
       const userDoc = await getDoc(doc(db, 'users', userId));
       if (userDoc.exists()) {
-        const userData = userDoc.data() as UserPreferences;
+        const userPreferences = userDoc.data() as UserPreferences;
 
         // Validate username
-        if (!userData.username) {
+        if (!userPreferences.username) {
           // If no username exists and we have a user, generate one
           const username = await this.generateUniqueUsername(
             userId,
             displayName || ''
           );
-          userData.username = username;
+          userPreferences.username = username;
           // Save the updated preferences
-          await this.saveUserPreferences(userId, userData);
+          await this.saveUserPreferences(userId, userPreferences);
         }
 
-        return userData;
+        return userPreferences;
       } else {
-        // This should never happen since we create the document on auth
-        console.error('User document not found for authenticated user');
-        throw new Error('User document not found');
+        // Create the document if it doesn't exist
+        const username = await this.generateUniqueUsername(
+          userId,
+          displayName || ''
+        );
+        const userPreferences = {
+          username: username,
+          pushNotificationsEnabled: false
+        } as UserPreferences;
+
+        await this.saveUserPreferences(userId, userPreferences);
+        return userPreferences;
       }
     } catch (error) {
       console.error('Error loading user preferences:', error);
