@@ -52,34 +52,44 @@ class AuthComponent extends React.Component<AuthProps> {
     const { user, onToggleProfile } = this.props;
     if (!user) return null;
 
+    const hasPhoto = !!user.photoURL;
+    const containerClass = hasPhoto ? '' : ' no-image';
+
     return (
       <div
         id="profile-container"
+        className={containerClass}
         onClick={onToggleProfile}
       >
-        {user.photoURL ? (
+        {hasPhoto ? (
           <img
             id="profile-image"
-            src={user.photoURL}
+            src={user.photoURL || undefined}
             alt="Profile"
             referrerPolicy="no-referrer"
             crossOrigin="anonymous"
           />
         ) : (
-          <svg className="profile-placeholder-icon" viewBox="0 0 24 24">
-            {/* Gear Icon Path
-            <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12-.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
-            */}
-            {/* Hamburger Menu Icon Paths - Filled Rectangles (Commented out) */}
-            {/* <path d="M3 18.5 H21 V15.5 H3 Z M3 13.5 H21 V10.5 H3 Z M3 8.5 H21 V5.5 H3 Z"></path> */}
-            {/* Hamburger Menu using <line> elements (Current) */}
+          <svg
+            className="profile-placeholder-icon"
+            viewBox="0 0 24 24"
+            style={{ filter: 'url(#svg-shadow)' }}
+          >
+            <defs>
+              <filter id="svg-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow
+                  dx="0"
+                  dy="2"
+                  stdDeviation="1.5"
+                  floodColor="#000000"
+                  floodOpacity="0.3"
+                />
+              </filter>
+            </defs>
+
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="18" x2="21" y2="18" />
-            {/* Option: Person Silhouette Icon (Commented out) */}
-            {/* <circle cx="12" cy="7" r="4" fill="none" />
-            <path d="M5.5 21 V19 c0-2.5 3-4 6.5-4 s 6.5 1.5 6.5 4 v2" fill="none" /> */}
-            {/* Option: Sliders/Controls Icon */}
           </svg>
         )}
       </div>

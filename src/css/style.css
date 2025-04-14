@@ -130,6 +130,12 @@ body {
   transition: transform 0.2s;
 }
 
+/* Add this rule for when there's no profile image */
+#profile-container.no-image {
+  border: none;
+  box-shadow: none;
+}
+
 #profile-container:active {
   transform: scale(0.95);
 }
@@ -141,7 +147,7 @@ body {
 }
 
 .profile-placeholder-icon {
-  width: 60%;
+  width: 57%;
   height: 100%;
   fill: var(--black);
   stroke: var(--black);
