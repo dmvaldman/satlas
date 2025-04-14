@@ -961,22 +961,44 @@ class App extends React.Component<{}, AppState> {
 
     // If the same sit is already open, just return without doing anything
     if (this.state.drawer.isOpen && this.state.drawer.sit?.id === sit.id) {
-      // Do nothing when clicking the same marker that's already open
       return;
     }
 
-    // Fetch images for the sit
-    const images = sit.imageCollectionId
-      ? await this.getImagesForSit(sit.imageCollectionId)
-      : [];
-
+    // 1. Immediately open the drawer with the sit and an empty images array
     this.setState({
       drawer: {
         isOpen: true,
         sit,
-        images
+        images: [] // Start with empty images
       }
     });
+
+    // 2. Asynchronously fetch the actual images
+    try {
+        const fetchedImages = sit.imageCollectionId
+            ? await this.getImagesForSit(sit.imageCollectionId)
+            : [];
+
+        // 3. Update the state *only if* the drawer is still open for the same sit
+        this.setState(prevState => {
+            if (prevState.drawer.isOpen && prevState.drawer.sit?.id === sit.id) {
+                console.log(`[App] Fetched ${fetchedImages.length} images for sit ${sit.id}, updating drawer.`);
+                return {
+                    drawer: {
+                        ...prevState.drawer,
+                        images: fetchedImages // Update with fetched images
+                    }
+                };
+            } else {
+                // Drawer closed or changed sit before images loaded, do nothing
+                console.log(`[App] Drawer closed or changed sit before images loaded for ${sit.id}.`);
+                return null;
+            }
+        });
+
+    } catch (error) {
+        console.error(`[App] Error fetching images for sit ${sit.id} in background:`, error);
+    }
   };
 
   private closeDrawer = () => {

@@ -21,6 +21,7 @@
   --action-green: #41b449;
   --action-red: #ff3b30;
   --white: #ffffff;
+  --light-gray-opacity: rgba(245, 245, 245, 0.6);
   --light-gray: #ddd;
   --medium-gray: #888;
   --dark-gray: #444;
@@ -31,7 +32,6 @@
   --dark-green: #21863a;
   --light-red: #fab7b3;
   --dark-red: #b52a23;
-  --light-gray-opacity: rgba(245, 245, 245, 0.6);
   --font-size-small: 14px;
   --font-size-medium: 16px;
   --font-size-large: 18px;
@@ -576,7 +576,6 @@ body {
   position: relative;
   height: 300px; /* Set a reasonable fixed height */
   width: 100%;
-  height: 100%;
   overflow: hidden;
   margin-bottom: 8px;
 }
@@ -638,7 +637,7 @@ body {
   transition: opacity 0.3s ease;
   text-align: center;
   pointer-events: none;
-  background-color: var(--white);
+  background-color: var(--light-gray-opacity);
   border: 1px solid var(--medium-gray);
   border-radius: 10px;
 }

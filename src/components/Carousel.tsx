@@ -497,12 +497,11 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       totalWidth
     } = this.state;
 
-    if (images.length === 0) {
-      return <div className="no-images">No images available</div>;
-    }
+    // Check if images are still loading initially (passed as empty array)
+    const isLoadingInitially = images.length === 0;
 
-    const isScrollDisabled = totalWidth <= containerWidth;
-    const carouselHeight = this.containerRef.current?.clientHeight || 300; // Default to 300px if not available
+    const isScrollDisabled = totalWidth <= containerWidth || isLoadingInitially || images.length <= 1;
+    const carouselHeight = this.containerRef.current?.clientHeight || 300;
     const hasMultipleImages = images.length > 1;
 
     return (
@@ -514,107 +513,114 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
               transform: `translateX(${translateX}px)`
             }}
           >
-            {images.map((image, index) => {
-              const status = imageStatuses[index] || 'notLoaded';
-              const isVisible = status === 'loading' || status === 'loaded';
-              const isLoaded = status === 'loaded';
-              const canShowControls = currentUserId && (image.userId === currentUserId || currentUserId === 'bEorC36iZYZGWKydUqFo6VZ7RSn2');
+            {isLoadingInitially ? (
+              // Show a single placeholder/spinner when loading initially
+              <div
+                className="carousel-item placeholder-loader"
+                style={{
+                   width: '100%', // Take full width
+                   height: `${carouselHeight}px`
+                }}
+              >
+                <div className="spinner"></div>
+              </div>
+            ) : (
+              // Render actual images when available
+              images.map((image, index) => {
+                const status = imageStatuses[index] || 'notLoaded';
+                const isVisible = status === 'loading' || status === 'loaded';
+                const isLoaded = status === 'loaded';
+                const canShowControls = currentUserId && (image.userId === currentUserId || currentUserId === 'bEorC36iZYZGWKydUqFo6VZ7RSn2');
 
-              // Calculate dimensions using the helper method
-              const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
-                image,
-                containerWidth,
-                carouselHeight,
-                hasMultipleImages
-              );
+                const { width: imageWidth, height: imageHeight } = this.calculateImageDimensions(
+                  image,
+                  containerWidth,
+                  carouselHeight,
+                  hasMultipleImages
+                );
 
-              return (
-                <div
-                  key={image.id}
-                  className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
-                  style={{
-                    width: `${Math.floor(imageWidth)}px`,
-                    height: `${carouselHeight}px` // Keep carousel item height consistent
-                  }}
-                >
-                  {/* Only render image if it should be visible */}
-                  {isVisible ? (
-                    <img
-                      ref={this.imageRefs[index]}
-                      src={image.base64Data ?
-                        `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
-                        `${image.photoURL}?size=med`
-                      }
-                      alt={`Photo by ${image.userName}`}
-                      className="carousel-image"
-                      style={{
-                        opacity: isLoaded ? 1 : 0,
-                        width: `${Math.floor(imageWidth)}px`,
-                        height: `${imageHeight}px`
-                      }}
-                      onLoad={() => this.handleImageLoad(index)}
-                      onError={(e) => {
-                        console.error(`Error loading image: ${image.photoURL}, ${image.id}, ${e}`);
-                      }}
-                      onClick={(e) => this.handleImageClick(image, e)}
-                    />
-                  ) : null}
-
-                  {/* Placeholder with explicit dimensions */}
+                return (
                   <div
-                    className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
+                    key={image.id}
+                    className={`carousel-item ${index === images.length - 1 ? 'last-item' : ''}`}
                     style={{
-                      width: `${imageWidth}px`,
-                      height: `${imageHeight}px`
+                      width: `${Math.floor(imageWidth)}px`,
+                      height: `${carouselHeight}px`
                     }}
                   >
-                    <div className="spinner"></div>
+                    {isVisible ? (
+                      <img
+                        ref={this.imageRefs[index]}
+                        src={image.base64Data ?
+                          `data:image/jpeg;base64,${image.base64Data.replace(/^data:image\/\w+;base64,/, '')}` :
+                          `${image.photoURL}?size=med`
+                        }
+                        alt={`Photo by ${image.userName}`}
+                        className="carousel-image"
+                        style={{
+                          opacity: isLoaded ? 1 : 0,
+                          width: `${Math.floor(imageWidth)}px`,
+                          height: `${imageHeight}px`
+                        }}
+                        onLoad={() => this.handleImageLoad(index)}
+                        onError={(e) => {
+                          console.error(`Error loading image: ${image.photoURL}, ${image.id}, ${e}`);
+                        }}
+                        onClick={(e) => this.handleImageClick(image, e)}
+                      />
+                    ) : null}
+                    <div
+                      className={`placeholder-loader ${isLoaded ? 'hidden' : ''}`}
+                      style={{
+                        width: `${imageWidth}px`,
+                        height: `${imageHeight}px`
+                      }}
+                    >
+                      <div className="spinner"></div>
+                    </div>
+                    {isVisible && (
+                      <div className="image-uploader">
+                        {image.userName}
+                      </div>
+                    )}
+                    {canShowControls && (
+                      <div className="image-controls">
+                        {this.isImageUploading(image) ? (
+                          <div className="image-upload-loading active">
+                            <div className="spinner"></div>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              className="image-control-button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onImageReplace(image.id);
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                              </svg>
+                            </button>
+                            <button
+                              className="image-control-button delete"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onImageDelete(image.id);
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {/* Only show the uploader info once image is visible */}
-                  {isVisible && (
-                    <div className="image-uploader">
-                      {image.userName}
-                    </div>
-                  )}
-
-                  {canShowControls && (
-                    <div className="image-controls">
-                      {this.isImageUploading(image) ? (
-                        <div className="image-upload-loading active">
-                          <div className="spinner"></div>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            className="image-control-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onImageReplace(image.id);
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                            </svg>
-                          </button>
-                          <button
-                            className="image-control-button delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onImageDelete(image.id);
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                            </svg>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </>
