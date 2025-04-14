@@ -403,6 +403,18 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       const originalUsername = preferences?.username || '';
       const usernameChanged = username !== originalUsername;
 
+      const originalCityCoordinates = preferences?.cityCoordinates || undefined;
+      const cityCoordinatesChanged = JSON.stringify(cityCoordinates) !== JSON.stringify(originalCityCoordinates);
+
+      const originalPushNotifications = preferences?.pushNotificationsEnabled || false;
+      const pushNotificationsChanged = pushNotifications !== originalPushNotifications;
+
+      const hasChanged = usernameChanged || cityCoordinatesChanged || pushNotificationsChanged;
+
+      if (!hasChanged) {
+        return;
+      }
+
       // Update images with new username if needed
       if (usernameChanged && user) {
         await FirebaseService.updateUserWithNewUsername(user.uid, username);
@@ -411,6 +423,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       // Create the updated preferences object
       const updatedPreferences: UserPreferences = {
         username,
+        username_lowercase: username.toLowerCase(),
         pushNotificationsEnabled: pushNotifications,
         lastVisit: Date.now(),
         cityCoordinates: cityCoordinates || undefined
