@@ -222,7 +222,7 @@ class PopupComponent extends React.Component<PopupProps> {
     // 4. User has NOT already uploaded an image to this sit
 
     // Don't show if user is not logged in or no location available or if sit is undefined
-    if (!user || !currentLocation || !sit || !images) return null;
+    if (!user || !currentLocation || !sit || !images || images.length === 0) return null;
 
     // Don't show if user is too far away (more than 300 feet)
     const distance = getDistanceInFeet(currentLocation, sit.location);
