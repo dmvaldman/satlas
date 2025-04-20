@@ -686,8 +686,8 @@ body {
 
 .spinner.small {
   border-width: 4px;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
 }
 
 .spinner.medium {
@@ -760,7 +760,7 @@ body {
   right: 8px;
   z-index: 2;
   display: flex;
-  gap: 4px;
+  gap: 6px;
   opacity: .8;
 }
 
@@ -768,8 +768,8 @@ body {
   background-color: rgba(0, 0, 0, 0.3);
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -948,15 +948,6 @@ body {
   margin-bottom: 15px;
   text-align: center;
   font-size: var(--font-size-medium);
-}
-
-.spinner.small {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  border-top-color: var(--white);
-  animation: spin 1s ease-in-out infinite;
 }
 
 .fullscreen-image-overlay {
