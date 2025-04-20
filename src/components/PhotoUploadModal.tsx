@@ -1,12 +1,14 @@
 import React from 'react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { FilePicker } from '@capawesome/capacitor-file-picker';
+import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
+import { FilePicker, PickedFile } from '@capawesome/capacitor-file-picker';
 import { Location, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { OfflineService } from '../services/OfflineService';
 import { LocationService } from '../services/LocationService';
 import { convertDMSToDD } from '../utils/geo';
 import BaseModal from './BaseModal';
+import { ImageManipulator, ResizeOptions } from '@capacitor-community/image-manipulator';
 
 interface PhotoUploadProps {
   isOpen: boolean;
@@ -20,6 +22,33 @@ interface PhotoUploadProps {
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   private imageWidth = 1600;
   private quality = 90;
+
+  private async resizeNativeImage(filePath: string): Promise<string> {
+    console.log('[PhotoUpload] Resizing native image:', filePath);
+    try {
+      const options: ResizeOptions = {
+        imagePath: filePath,
+        quality: this.quality,
+        maxWidth: this.imageWidth,
+      };
+      const result = await ImageManipulator.resize(options);
+      console.log('[PhotoUpload] Native resize successful. Native path:', result.imagePath, 'Web path:', result.webPath);
+
+      const fileContent = await Filesystem.readFile({
+        path: result.imagePath,
+      });
+
+      if (typeof fileContent.data === 'string') {
+        return fileContent.data;
+      } else {
+        throw new Error('Filesystem.readFile did not return string data for resized image.');
+      }
+
+    } catch (error) {
+      console.error('[PhotoUpload] Error resizing native image:', error);
+      throw new Error('Failed to resize image natively.');
+    }
+  }
 
   private async resizeAndCompressImage(
     base64Data: string,
@@ -178,155 +207,117 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   };
 
-  private handleTakePhoto = async () => {
-    let originalBase64Data: string | null = null;
+  private async getLocation(sourceType: 'camera' | 'gallery', originalPathOrBase64?: string): Promise<Location | null> {
+    if (sourceType === 'camera') {
+      console.log('[PhotoUpload] Getting device location for camera photo...');
+      return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
+    }
+    if (Capacitor.getPlatform() === 'web' && originalPathOrBase64 && !originalPathOrBase64.startsWith('file:')) {
+      try {
+        console.log('[PhotoUpload] Attempting to get EXIF location from gallery image (web)...');
+        return await this.getImageLocation(originalPathOrBase64);
+      } catch (exifError) {
+        console.warn('[PhotoUpload] Could not get EXIF location from web gallery image:', exifError);
+      }
+    } else {
+      console.warn('[PhotoUpload] Skipping EXIF location for native gallery image (likely stripped by optimizer).');
+    }
+
+    console.log('[PhotoUpload] Falling back to device location for gallery photo...');
+    return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
+  }
+
+  private async processImage(pathOrBase64: string, sourceType: 'camera' | 'gallery') {
+    console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
+    let finalBase64Data: string;
+    let location: Location | null;
+    let dimensions: { width: number; height: number };
+
     try {
-      console.log('[PhotoUpload] Starting camera capture');
-      // 1. Acquire Original Image
-      const image = await Camera.getPhoto({
-        width: this.imageWidth,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera
-      });
-      console.log('[PhotoUpload] Photo captured.');
-
-      if (!image.base64String) {
-        throw new Error('No image data received from camera');
+      if (Capacitor.getPlatform() === 'web') {
+        console.log('[PhotoUpload] Using canvas resize for web...');
+        finalBase64Data = await this.resizeAndCompressImage(pathOrBase64, this.imageWidth, this.quality);
+      } else {
+        console.log('[PhotoUpload] Using native manipulator...');
+        finalBase64Data = await this.resizeNativeImage(pathOrBase64);
       }
-      originalBase64Data = image.base64String;
+      console.log('[PhotoUpload] Image processed successfully.');
 
-      // 2. Get Location (Use device location for camera photos)
-      let location: Location | null = null;
-      try {
-        location = await this.getLocation();
-        if (!location) throw new Error('Could not get device location');
-        console.log('[PhotoUpload] Device location obtained.');
-      } catch (locationError) {
-        console.error('[PhotoUpload] Error getting device location:', locationError);
-        this.props.showNotification('Error getting location', 'error');
-        return;
-      }
+      location = await this.getLocation(sourceType, pathOrBase64);
+      if (!location) throw new Error('Could not determine location.');
+      console.log('[PhotoUpload] Location determined:', location);
 
-      // 3. Get Dimensions from Original Data
-      let dimensions: {width: number, height: number};
-      try {
-        dimensions = await this.getImageDimensions(originalBase64Data);
-        console.log('[PhotoUpload] Original dimensions obtained:', dimensions);
-      } catch (dimensionError) {
-        console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-        this.props.showNotification('Invalid image dimensions', 'error');
-        return;
-      }
+      dimensions = await this.getImageDimensions(finalBase64Data);
+      console.log('[PhotoUpload] Final dimensions obtained:', dimensions);
 
-      // 4. Resize/Compress Original Data using Canvas
-      let finalBase64Data: string;
-      try {
-        finalBase64Data = await this.resizeAndCompressImage(
-          originalBase64Data,
-          this.imageWidth,
-          this.quality
-        );
-        console.log('[PhotoUpload] Image resized/compressed.');
-      } catch (resizeError) {
-        console.error('[PhotoUpload] Error resizing/compressing image:', resizeError);
-        this.props.showNotification('Error processing image', 'error');
-        return;
-      }
-
-      // 5. Prepare and Upload Result
       const photoResult: PhotoResult = {
-        base64Data: finalBase64Data, // Use processed data
-        location,                   // Use device location
-        dimensions                 // Use original dimensions
+        base64Data: finalBase64Data,
+        location,
+        dimensions
       };
       this.props.onPhotoUpload(photoResult);
 
     } catch (error) {
-      // Handle potential cancellations or other errors from Camera.getPhoto
+      console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
+      const message = error instanceof Error ? error.message : 'Error processing image';
+      this.props.showNotification(message, 'error');
+    }
+  }
+
+  private handleTakePhoto = async () => {
+    let originalPath: string | null = null;
+    try {
+      console.log('[PhotoUpload] Starting camera capture (requesting URI)');
+      const image: Photo = await Camera.getPhoto({
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera
+      });
+      console.log('[PhotoUpload] Photo captured (URI): ', image.webPath, '|| Native Path:', image.path);
+      // Use the native path if available, otherwise fallback to webPath (though path is expected for native)
+      const nativePath = image.path || image.webPath;
+      if (!nativePath) throw new Error('No image path received from camera');
+      originalPath = nativePath;
+
+      await this.processImage(originalPath, 'camera');
+
+    } catch (error) {
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
         if (errorMessage.includes('cancel') || errorMessage.includes('denied') || errorMessage.includes('permission')) {
           console.log('[PhotoUpload] Camera operation cancelled or denied.');
-          return; // Don't show generic error
+          return;
         }
       }
-      console.error('[PhotoUpload] Error taking photo:', error);
+      console.error('[PhotoUpload] Error acquiring camera image:', error);
       this.props.showNotification('Error accessing camera', 'error');
     }
   };
 
   private handleChooseFromGallery = async () => {
-    let originalBase64Data: string | null = null;
+    let originalPathOrBase64: string | null = null;
     try {
       console.log('[PhotoUpload] Starting gallery selection');
-
-      // 1. Acquire Original Image (Platform specific)
       if (Capacitor.getPlatform() === 'web') {
-        originalBase64Data = await this.getImageFromWebFileInput();
+        originalPathOrBase64 = await this.getImageFromWebFileInput();
       } else {
-        originalBase64Data = await this.getImageFromNativeGallery();
+        originalPathOrBase64 = await this.getImagePathFromNativeGallery();
       }
-      if (!originalBase64Data) return; // Exit if cancelled
-      console.log('[PhotoUpload] Original image data acquired from gallery.');
+      if (!originalPathOrBase64) return;
+      console.log('[PhotoUpload] Original image acquired from gallery.');
 
-      // 2. Get Location from Original EXIF Data
-      let location: Location;
-      try {
-        location = await this.getImageLocation(originalBase64Data);
-        console.log('[PhotoUpload] EXIF location obtained.');
-      } catch (locationError) {
-        console.error('[PhotoUpload] Error getting image EXIF location:', locationError);
-        this.props.showNotification('Could not read location data from image.', 'error');
-        return; // Stop if EXIF fails
-      }
-
-      // 3. Get Dimensions from Original Data
-      let dimensions: {width: number, height: number};
-      try {
-        dimensions = await this.getImageDimensions(originalBase64Data);
-        console.log('[PhotoUpload] Original dimensions obtained:', dimensions);
-      } catch (dimensionError) {
-        console.error('[PhotoUpload] Error getting image dimensions:', dimensionError);
-        this.props.showNotification('Invalid image dimensions', 'error');
-        return;
-      }
-
-      // 4. Resize/Compress Original Data using Canvas
-      let finalBase64Data: string;
-      try {
-        finalBase64Data = await this.resizeAndCompressImage(
-          originalBase64Data,
-          this.imageWidth,
-          this.quality
-        );
-        console.log('[PhotoUpload] Image resized/compressed.');
-      } catch (resizeError) {
-        console.error('[PhotoUpload] Error resizing/compressing image:', resizeError);
-        this.props.showNotification('Error processing image', 'error');
-        return;
-      }
-
-      // 5. Prepare and Upload Result
-      const photoResult: PhotoResult = {
-        base64Data: finalBase64Data, // Use processed data
-        location,                   // Use EXIF location
-        dimensions                 // Use original dimensions
-      };
-      this.props.onPhotoUpload(photoResult);
+      await this.processImage(originalPathOrBase64, 'gallery');
 
     } catch (error) {
-       // General catch block for gallery errors
-       if (error instanceof Error && (error.message.includes('cancel') || error.message.includes('No image selected'))) {
-         console.log('[PhotoUpload] Gallery selection cancelled.');
-         return; // Don't show generic error
-       }
-       console.error('[PhotoUpload] Error choosing photo from gallery:', error);
-       this.props.showNotification('Error accessing photos', 'error');
+      if (error instanceof Error && (error.message.includes('cancel') || error.message.includes('No image selected'))) {
+        console.log('[PhotoUpload] Gallery selection cancelled.');
+        return;
+      }
+      console.error('[PhotoUpload] Error acquiring gallery image:', error);
+      this.props.showNotification('Error accessing photos', 'error');
     }
   };
 
-  // Get image from web file input
   private getImageFromWebFileInput = (): Promise<string> => {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
@@ -338,11 +329,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           const file = (e.target as HTMLInputElement).files?.[0];
           if (!file) {
             console.log('Photo selection cancelled');
-            resolve(''); // User cancelled, return empty string
+            resolve('');
             return;
           }
 
-          // Convert to base64
           const reader = new FileReader();
           reader.onload = async (e) => {
             try {
@@ -352,7 +342,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
               }
               const initialBase64 = initialBase64WithPrefix.split(',')[1];
 
-              // Return the ORIGINAL base64 data
               resolve(initialBase64);
 
             } catch (error) {
@@ -374,90 +363,43 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   };
 
-  private getImageFromNativeGallery = async (): Promise<string> => {
-    if (Capacitor.getPlatform() === 'android') {
-      return this.getImageFromAndroidGallery();
-    } else if (Capacitor.getPlatform() === 'ios') {
-      return this.getImageFromIOSGallery();
-    } else {
-      throw new Error('Unsupported platform');
-    }
-  };
-
-  // Get image from Android gallery
-  private getImageFromAndroidGallery = async (): Promise<string> => {
+  private getImagePathFromNativeGallery = async (): Promise<string | null> => {
     try {
-      console.log('[PhotoUpload] Starting Android gallery selection (expecting Base64)');
+      if (Capacitor.getPlatform() === 'android') {
+        const result = await FilePicker.pickImages({
+          limit: 1,
+          readData: false
+        });
+        if (!result.files || result.files.length === 0 || !result.files[0].path) {
+          console.log('[PhotoUpload] No image path selected from Android gallery.');
+          return null;
+        }
+        return result.files[0].path;
 
-      const result = await FilePicker.pickImages({
-        limit: 1,
-        readData: true // Request Base64 data directly
-      });
-
-      if (!result.files || result.files.length === 0) {
-        console.log('[PhotoUpload] No image selected from Android gallery.');
-        return ''; // User cancelled
+      } else if (Capacitor.getPlatform() === 'ios') {
+        const image = await Camera.getPhoto({
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: CameraSource.Photos
+        });
+        const nativePath = image.path || image.webPath;
+        if (!nativePath) {
+            console.log('[PhotoUpload] No image path selected from iOS gallery.');
+            return null;
+        }
+        return nativePath;
+      } else {
+        throw new Error('Unsupported native platform');
       }
-
-      const file = result.files[0];
-
-      // Check if we got the Base64 data
-      if (!file.data) {
-        throw new Error('No image data or path received from FilePicker');
-      }
-
-      // --- Resize and Compress using Canvas ---
-      console.log('[PhotoUpload] Resizing image from Android gallery via canvas...');
-      const finalBase64 = await this.resizeAndCompressImage(
-        file.data, // Pass the Base64 data (potentially read from path)
-        this.imageWidth,
-        this.quality
-      );
-      console.log('[PhotoUpload] Image resized successfully.');
-      return finalBase64;
-      // --- End Resize ---
-
     } catch (error) {
-      console.error('[PhotoUpload] Error getting/resizing image from Android gallery:', error);
-      // Check if it's a user cancellation
-      if (error instanceof Error &&
-          (error.message.includes('cancel') || error.message.includes('No image selected'))) {
-           console.log('[PhotoUpload] Android gallery selection cancelled.');
-        return ''; // Return empty string for cancellation
-      }
-      throw error;
+        console.error('[PhotoUpload] Error getting image path from native gallery:', error);
+        if (error instanceof Error && (error.message.includes('cancel') || error.message.includes('No image selected'))) {
+            console.log('[PhotoUpload] Native gallery selection cancelled.');
+            return null;
+        }
+        throw error;
     }
   };
-
-  // Get image from iOS gallery
-  private getImageFromIOSGallery = async (): Promise<string> => {
-    const image = await Camera.getPhoto({
-      width: this.imageWidth,
-      allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Photos
-    });
-
-    if (!image.base64String) {
-      console.error('[PhotoUpload] No image data received');
-      this.props.showNotification('No image data received', 'error');
-      throw new Error('No image data received');
-    }
-
-    return image.base64String;
-  };
-
-  private async getLocation(): Promise<Location | null> {
-    // Try cached location first
-    const cachedLocation = LocationService.getLastKnownLocation();
-    if (cachedLocation) {
-      return cachedLocation;
-    }
-
-    // Fall back to getting fresh location
-    const locationService = new LocationService();
-    return locationService.getCurrentLocation();
-  }
 
   render() {
     const { isOpen, onClose } = this.props;

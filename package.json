@@ -26,6 +26,7 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@capacitor-community/image-manipulator": "^7.0.0",
     "@capacitor-firebase/authentication": "^7.1.0",
     "@capacitor/android": "^7.0.1",
     "@capacitor/app": "^7.0.0",

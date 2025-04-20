@@ -301,9 +301,9 @@ class PopupComponent extends React.Component<PopupProps> {
             <p>Uploading new sit...</p>
           )}
 
-          {this.renderUploadButton()}
-
           {this.renderMarkButtons()}
+
+          {this.renderUploadButton()}
 
           {/* Group metadata elements in a single div */}
           <div className="sit-metadata-container">
