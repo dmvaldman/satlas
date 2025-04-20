@@ -8,7 +8,9 @@ import { OfflineService } from '../services/OfflineService';
 import { LocationService } from '../services/LocationService';
 import { convertDMSToDD } from '../utils/geo';
 import BaseModal from './BaseModal';
-import { ImageManipulator, ResizeOptions } from '@capacitor-community/image-manipulator';
+
+// Import the worker script using Vite's ?worker syntax from its new location
+import ResizeWorker from '../workers/resize.worker.js?worker';
 
 interface PhotoUploadProps {
   isOpen: boolean;
@@ -22,93 +24,76 @@ interface PhotoUploadProps {
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   private imageWidth = 1600;
   private quality = 90;
+  // Initialize worker directly if supported, otherwise null
+  private resizeWorker: Worker | null = window.Worker ? new ResizeWorker() : null;
+  private resizePromises = new Map<string, { resolve: (value: string) => void, reject: (reason?: any) => void }>();
 
-  private async resizeNativeImage(filePath: string): Promise<string> {
-    console.log('[PhotoUpload] Resizing native image:', filePath);
-    try {
-      const options: ResizeOptions = {
-        imagePath: filePath,
-        quality: this.quality,
-        maxWidth: this.imageWidth,
+  constructor(props: PhotoUploadProps) {
+    super(props);
+    // Setup listeners if worker was initialized successfully
+    if (this.resizeWorker) {
+      console.log('[PhotoUpload] Initializing Resize Worker listeners...');
+      this.resizeWorker.onmessage = (event) => {
+        const { success, base64Result, error, id } = event.data;
+        console.log('[PhotoUpload] Received message from worker for job:', id);
+        const promiseCallbacks = this.resizePromises.get(id);
+        if (promiseCallbacks) {
+            if (success) {
+                promiseCallbacks.resolve(base64Result);
+            } else {
+                promiseCallbacks.reject(new Error(error || 'Worker resizing failed'));
+            }
+            this.resizePromises.delete(id); // Clean up
+        } else {
+            console.warn('[PhotoUpload] Received worker message for unknown job ID:', id);
+        }
       };
-      const result = await ImageManipulator.resize(options);
-      console.log('[PhotoUpload] Native resize successful. Native path:', result.imagePath, 'Web path:', result.webPath);
-
-      const fileContent = await Filesystem.readFile({
-        path: result.imagePath,
-      });
-
-      if (typeof fileContent.data === 'string') {
-        return fileContent.data;
-      } else {
-        throw new Error('Filesystem.readFile did not return string data for resized image.');
-      }
-
-    } catch (error) {
-      console.error('[PhotoUpload] Error resizing native image:', error);
-      throw new Error('Failed to resize image natively.');
+      this.resizeWorker.onerror = (error) => {
+        console.error('[PhotoUpload] Error in Resize Worker:', error);
+        // Reject any pending promises on worker error
+        this.resizePromises.forEach((callbacks, id) => {
+            callbacks.reject(new Error('Worker encountered an error'));
+            this.resizePromises.delete(id);
+        });
+      };
+    } else {
+        console.warn('[PhotoUpload] Web Workers not supported or failed to initialize.');
+        // Consider adding a fallback to the canvas method here if needed
     }
   }
 
-  private async resizeAndCompressImage(
-    base64Data: string,
-    maxWidth: number,
-    quality: number // 0-100
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
+  componentWillUnmount() {
+    if (this.resizeWorker) {
+      console.log('[PhotoUpload] Terminating Resize Worker.');
+      this.resizeWorker.terminate();
+      // Reject any pending promises on unmount
+      this.resizePromises.forEach((callbacks, id) => {
+           callbacks.reject(new Error('Component unmounting'));
+           this.resizePromises.delete(id);
+      });
+    }
+  }
 
-        // Calculate new dimensions while maintaining aspect ratio
-        let targetWidth = originalWidth;
-        let targetHeight = originalHeight;
-        if (targetWidth > maxWidth) {
-          targetWidth = maxWidth;
-          targetHeight = Math.round((targetWidth / originalWidth) * originalHeight);
-        }
-
-        // Ensure dimensions are valid
-        if (targetWidth <= 0 || targetHeight <= 0) {
-            reject(new Error(`Invalid calculated dimensions: ${targetWidth}x${targetHeight}`));
-            return;
-        }
-
-        console.log(`[PhotoUpload] Resizing image from ${originalWidth}x${originalHeight} to ${targetWidth}x${targetHeight}`);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-
-        // Draw the image onto the canvas
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-
-        // Export the canvas content as JPEG with specified quality
-        // toDataURL quality is 0.0 to 1.0
-        const resizedBase64 = canvas.toDataURL('image/jpeg', quality / 100);
-
-        // Remove the data URI prefix (data:image/jpeg;base64,)
-        resolve(resizedBase64.split(',')[1]);
-      };
-      img.onerror = (error) => {
-        console.error('[PhotoUpload] Image load error during resizing:', error);
-        reject(new Error('Failed to load image for resizing'));
-      };
-
-      // Ensure base64 data has the correct prefix for image src
-      if (!base64Data.startsWith('data:')) {
-        img.src = `data:image/jpeg;base64,${base64Data}`;
-      } else {
-        img.src = base64Data;
+  private async getLocation(sourceType: 'camera' | 'gallery', originalBase64?: string): Promise<Location | null> {
+      if (sourceType === 'camera') {
+          console.log('[PhotoUpload] Getting device location for camera photo...');
+          return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
       }
-    });
+      // For gallery, attempt EXIF first (Only possible with Base64)
+      if (originalBase64) {
+          try {
+              console.log('[PhotoUpload] Attempting to get EXIF location from original gallery image data...');
+              return await this.getImageLocation(originalBase64);
+          } catch (exifError) {
+              console.warn('[PhotoUpload] Could not get EXIF location:', exifError);
+          }
+      } else {
+           console.warn('[PhotoUpload] No original Base64 provided to getLocation for gallery image.');
+      }
+
+      // Fallback to device location for gallery if EXIF fails or Base64 wasn't available
+      console.log('[PhotoUpload] Falling back to device location for gallery photo...');
+      return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
   }
 
   private async getImageLocation(base64Image: string): Promise<Location> {
@@ -207,61 +192,98 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   };
 
-  private async getLocation(sourceType: 'camera' | 'gallery', originalPathOrBase64?: string): Promise<Location | null> {
-    if (sourceType === 'camera') {
-      console.log('[PhotoUpload] Getting device location for camera photo...');
-      return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
+  private resizeImageUnified(originalBase64: string): Promise<string> {
+    if (!this.resizeWorker) {
+        console.error('[PhotoUpload] Resize worker not available!');
+        return Promise.reject(new Error("Resize worker not available."));
     }
-    if (Capacitor.getPlatform() === 'web' && originalPathOrBase64 && !originalPathOrBase64.startsWith('file:')) {
+
+    return new Promise((resolve, reject) => {
+        const jobId = `job_${Date.now()}_${Math.random()}`;
+        this.resizePromises.set(jobId, { resolve, reject });
+        this.resizeWorker?.postMessage({
+            base64Data: originalBase64,
+            maxWidth: this.imageWidth,
+            quality: this.quality,
+            id: jobId
+        });
+
+        // Optional: Add a timeout for the promise
+        const timeoutId = setTimeout(() => {
+            if (this.resizePromises.has(jobId)) {
+                console.error(`[PhotoUpload] Worker job ${jobId} timed out.`);
+                this.resizePromises.get(jobId)?.reject(new Error('Resize operation timed out'));
+                this.resizePromises.delete(jobId);
+            }
+        }, 30000); // 30 second timeout
+
+        // Ensure timeout is cleared when promise settles
+        const promiseCallbacks = this.resizePromises.get(jobId);
+        if (promiseCallbacks) {
+            promiseCallbacks.resolve = (value: string) => {
+                clearTimeout(timeoutId);
+                resolve(value);
+            };
+            promiseCallbacks.reject = (reason?: any) => {
+                clearTimeout(timeoutId);
+                reject(reason);
+            };
+        } else {
+            // This case should ideally not happen if the promise was just added
+            console.error(`[PhotoUpload] Could not find promise callbacks for job ${jobId} immediately after creation.`);
+            clearTimeout(timeoutId); // Clear timeout anyway
+            reject(new Error(`Internal error processing job ${jobId}`));
+        }
+    });
+}
+
+  private async processImage(imageSource: string, sourceType: 'camera' | 'gallery') {
+      console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
+      if (!this.resizeWorker) {
+          this.props.showNotification('Image processing service unavailable.', 'error');
+          return;
+      }
+      let originalBase64Data: string;
+      let finalBase64Data: string;
+      let location: Location | null;
+      let dimensions: { width: number; height: number };
+
       try {
-        console.log('[PhotoUpload] Attempting to get EXIF location from gallery image (web)...');
-        return await this.getImageLocation(originalPathOrBase64);
-      } catch (exifError) {
-        console.warn('[PhotoUpload] Could not get EXIF location from web gallery image:', exifError);
+          // 1. Ensure we have ORIGINAL Base64 for metadata processing
+          if (Capacitor.getPlatform() !== 'web' && imageSource.startsWith('file:')) {
+              const fileContent = await Filesystem.readFile({ path: imageSource });
+              if (typeof fileContent.data !== 'string') {
+                  throw new Error('Filesystem did not return Base64 string.');
+              }
+              originalBase64Data = fileContent.data;
+          } else {
+              originalBase64Data = imageSource;
+          }
+
+          // 2. Resize/Optimize Image using the Worker (pass ORIGINAL Base64)
+          finalBase64Data = await this.resizeImageUnified(originalBase64Data);
+
+          // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
+          location = await this.getLocation(sourceType, originalBase64Data);
+          if (!location) throw new Error('Could not determine location.');
+
+          // 4. Get Dimensions (from the FINAL processed Base64)
+          dimensions = await this.getImageDimensions(finalBase64Data);
+
+          // 5. Prepare and Upload Result
+          const photoResult: PhotoResult = {
+              base64Data: finalBase64Data,
+              location,
+              dimensions
+          };
+          console.log('[PhotoUpload] Processing complete, calling onPhotoUpload.');
+          this.props.onPhotoUpload(photoResult);
+
+      } catch (error) {
+          console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
+          const message = error instanceof Error ? error.message : 'Error processing image';
+          this.props.showNotification(message, 'error');
       }
-    } else {
-      console.warn('[PhotoUpload] Skipping EXIF location for native gallery image (likely stripped by optimizer).');
-    }
-
-    console.log('[PhotoUpload] Falling back to device location for gallery photo...');
-    return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
-  }
-
-  private async processImage(pathOrBase64: string, sourceType: 'camera' | 'gallery') {
-    console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
-    let finalBase64Data: string;
-    let location: Location | null;
-    let dimensions: { width: number; height: number };
-
-    try {
-      if (Capacitor.getPlatform() === 'web') {
-        console.log('[PhotoUpload] Using canvas resize for web...');
-        finalBase64Data = await this.resizeAndCompressImage(pathOrBase64, this.imageWidth, this.quality);
-      } else {
-        console.log('[PhotoUpload] Using native manipulator...');
-        finalBase64Data = await this.resizeNativeImage(pathOrBase64);
-      }
-      console.log('[PhotoUpload] Image processed successfully.');
-
-      location = await this.getLocation(sourceType, pathOrBase64);
-      if (!location) throw new Error('Could not determine location.');
-      console.log('[PhotoUpload] Location determined:', location);
-
-      dimensions = await this.getImageDimensions(finalBase64Data);
-      console.log('[PhotoUpload] Final dimensions obtained:', dimensions);
-
-      const photoResult: PhotoResult = {
-        base64Data: finalBase64Data,
-        location,
-        dimensions
-      };
-      this.props.onPhotoUpload(photoResult);
-
-    } catch (error) {
-      console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
-      const message = error instanceof Error ? error.message : 'Error processing image';
-      this.props.showNotification(message, 'error');
-    }
   }
 
   private handleTakePhoto = async () => {
