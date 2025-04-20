@@ -32,9 +32,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private containerRef = React.createRef<HTMLDivElement>();
   private imageRefs: React.RefObject<HTMLImageElement>[] = [];
   private resizeObserver: ResizeObserver | null = null;
-  private padding = 16;
   private momentumAnimationId: number | null = null;
-  private readonly DRAG_DIRECTION_THRESHOLD = 100; // pixels to determine direction
+  private padding = 16; // Match CSS
+  private defaultHeight = 340; // Match CSS
 
   constructor(props: CarouselProps) {
     super(props);
@@ -501,7 +501,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     const isLoadingInitially = images.length === 0;
 
     const isScrollDisabled = totalWidth <= containerWidth || isLoadingInitially || images.length <= 1;
-    const carouselHeight = this.containerRef.current?.clientHeight || 300;
+    const carouselHeight = this.containerRef.current?.clientHeight || this.defaultHeight;
     const hasMultipleImages = images.length > 1;
 
     return (
@@ -522,7 +522,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                    height: `${carouselHeight}px`
                 }}
               >
-                <div className="spinner"></div>
+                <div className="spinner medium"></div>
               </div>
             ) : (
               // Render actual images when available
@@ -576,7 +576,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                         height: `${imageHeight}px`
                       }}
                     >
-                      <div className="spinner"></div>
+                      <div className="spinner medium"></div>
                     </div>
                     {isVisible && (
                       <div className="image-uploader">
@@ -587,7 +587,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                       <div className="image-controls">
                         {this.isImageUploading(image) ? (
                           <div className="image-upload-loading active">
-                            <div className="spinner"></div>
+                            <div className="spinner small"></div>
                           </div>
                         ) : (
                           <>

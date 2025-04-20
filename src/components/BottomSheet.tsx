@@ -259,7 +259,7 @@ class BottomSheet extends React.Component<BottomSheetProps, BottomSheetState> {
     const { translateY, isDragging } = this.state;
 
     return (
-      <div className={`satlas-bottom-sheet ${!open ? 'closed' : ''}`}>
+      <div className={`bottom-sheet ${!open ? 'closed' : ''}`}>
         <div
           ref={this.overlayRef}
           className="overlay"

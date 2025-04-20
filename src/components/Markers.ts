@@ -56,8 +56,7 @@ export class Markers {
       e.stopPropagation();
 
       // --- Add Click Effect ---
-      // Find the inner satlas-marker element (el)
-      const markerElement = container.querySelector('.satlas-marker');
+      const markerElement = container.querySelector('.marker');
       if (markerElement) {
           markerElement.classList.add('clicked');
           setTimeout(() => {
@@ -167,7 +166,7 @@ export class Markers {
     marks: Set<MarkType>,
     seenSits: Set<string> = new Set()
   ): string[] {
-    const classes = ['satlas-marker'];
+    const classes = ['marker'];
 
     // Check if this is the user's own sit
     const isOwnSit = user && sit.uploadedBy && sit.uploadedBy === user.uid;

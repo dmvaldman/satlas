@@ -19,7 +19,6 @@ class NearbyExistingSitModal extends React.Component<NearbyExistingSitModalProps
       <BaseModal
         isOpen={isOpen}
         onClose={() => onClose(sitId)}
-        contentClassName="photo-options"
       >
         <h2>Sit Nearby</h2>
 

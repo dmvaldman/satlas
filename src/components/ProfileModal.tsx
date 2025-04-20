@@ -700,7 +700,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
       <BaseModal
         isOpen={isOpen}
         onClose={this.handleClose}
-        contentClassName="profile-content"
       >
         <div>
           <h2>Profile Settings</h2>

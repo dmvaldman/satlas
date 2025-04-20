@@ -67,6 +67,19 @@ body {
   touch-action: none;
 }
 
+/* React app styles */
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
 #app-header {
   position: fixed;
   top: 2rem;
@@ -81,7 +94,6 @@ body {
   justify-content: space-between;
 }
 
-/* Update auth styles */
 .auth-container {
   margin-left: auto;
   display: flex;
@@ -172,13 +184,28 @@ body {
   height: 100%;
 }
 
-/* .mapboxgl-ctrl { */
-  /* position: relative; */
-  /* left: calc(var(--safe-area-left) + 2em) !important; */
-/* } */
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
 
+.mapboxgl-ctrl {
+  display: none !important;
+}
 
-.satlas-marker {
+.marker-container {
+  width: 60px;  /* Larger hit area */
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  border-radius: 50%;
+}
+
+.marker {
   width: 26px;
   height: 26px;
   background-color: var(--sit-color);  /* Default green color */
@@ -194,28 +221,17 @@ body {
 }
 
 /* Add this class for the momentary clicked state */
-.satlas-marker.clicked {
+.marker.clicked {
   filter: brightness(0.7); /* Darken the marker */
   transform: scale(1.1); /* Scale up slightly */
 }
 
-/* .satlas-marker.seen {
+/* .marker.seen {
   background-color: var(--sit-seen-color);
 } */
 
-/* Add marker container styles */
-.marker-container {
-  width: 60px;  /* Larger hit area */
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: absolute;
-  border-radius: 50%;
-}
 
-
-.satlas-marker.own-sit {
+.marker.own-sit {
   background-color: var(--sit-mine-color);  /* Blue for own sits */
 }
 
@@ -247,7 +263,6 @@ body {
   pointer-events: none !important;
 }
 
-/* Add these styles for the FAB */
 .fab {
   position: fixed;
   bottom: calc(2rem + var(--safe-area-bottom));
@@ -280,7 +295,6 @@ body {
   transform: scale(0.95);
 }
 
-/* Base modal styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -301,7 +315,6 @@ body {
   background-color: rgba(0, 0, 0, 0.4);
 }
 
-/* Base modal content styles */
 .modal-content {
   background: var(--light-gray-opacity);
   width: 100%;
@@ -322,6 +335,7 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   overflow-y: auto;
+  pointer-events: auto;
 }
 
 /* Rule for keyboard adjustment, applied to the modal content */
@@ -408,6 +422,7 @@ body {
   line-height: 1.2;
   color: var(--black);
   box-sizing: border-box;
+  outline: none;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -415,9 +430,6 @@ body {
 .profile-section input[type="text"]:focus,
 .profile-section input[type="search"]:focus {
   border-color: var(--black);
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
   box-shadow: 0px 0px 2px 0px var(--medium-gray);
 }
 
@@ -517,7 +529,6 @@ body {
   transition: 0.4s;
 }
 
-/* NEW: Style the container for the toggle */
 .profile-section .toggle-section {
   display: flex;
   align-items: center;
@@ -525,7 +536,6 @@ body {
   padding-top: 1rem;
 }
 
-/* Override general label styles ONLY for direct children of .toggle-section */
 .profile-section .toggle-section > label {
   display: inline-block; /* Allow side-by-side placement */
 }
@@ -584,22 +594,20 @@ body {
   align-items: center;
 }
 
-/* Carousel content - the visible viewport */
 .carousel-content {
   position: relative;
-  height: 300px; /* Set a reasonable fixed height */
+  height: 340px;  /* Match Carousel.tsx */
   width: 100%;
   overflow: hidden;
   margin-bottom: 8px;
 }
 
-/* Carousel track - the sliding container for all items */
 .carousel-track {
   position: relative;
   height: 100%;
   touch-action: pan-y;
-  will-change: transform; /* Optimize for animations */
-  width: max-content; /* Allow track to be as wide as needed for all content */
+  will-change: transform;
+  width: max-content;
 }
 
 .carousel-track.scroll-disabled {
@@ -655,7 +663,6 @@ body {
   border-radius: 10px;
 }
 
-/* Center spinner within placeholder */
 .placeholder-loader::after {
   content: '';
   display: inline-block;
@@ -663,26 +670,91 @@ body {
   vertical-align: middle;
 }
 
-/* Hide the loader when the image is loaded */
 .placeholder-loader.hidden {
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
-/* Spinner animation for loading states */
 .spinner {
-  width: 40px;
-  height: 40px;
   border: 4px solid var(--light-gray);
-  border-radius: 50%;
   border-top-color: var(--black);
+  border-radius: 50%;
   animation: spin 1s ease-in-out infinite;
   display: inline-block;
   vertical-align: middle;
 }
 
-/* Position controls absolutely */
-.image-controls {
+.spinner.small {
+  border-width: 4px;
+  width: 32px;
+  height: 32px;
+}
+
+.spinner.medium {
+  border-width: 5px;
+  width: 50px;
+  height: 50px;
+}
+
+.spinner.large {
+  border-width: 6px;
+  width: 60px;
+  height: 60px;
+}
+
+.satlas-popup-header .popup-icon {
+  width: 54px;
+  fill: var(--dark-gray);
+}
+
+.satlas-popup-header .share-button {
+  position: absolute;
+  right: 16px;
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--light-gray-opacity);
+  border: 1px solid var(--medium-gray);
+  cursor: pointer;
+  fill: var(--dark-gray);
+}
+
+.satlas-popup .sit-metadata-container {
+  color: var(--dark-gray);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.satlas-popup .favorite-count {
+  font-size: var(--font-size-large);
+  margin: 8px 0;
+}
+
+.satlas-popup .sit-uploader-info {
+  margin: 8px 0;
+  text-align: left;
+  border-radius: 4px;
+  font-size: var(--font-size-large);
+}
+
+.satlas-popup .uploader-name {
+  font-weight: 500;
+}
+
+.satlas-popup .maps-link {
+  display: block;
+  color: var(--dark-blue);
+  text-decoration: none;
+  margin: 8px 0;
+  transition: background-color 0.2s;
+  font-size: var(--font-size-large);
+}
+
+.satlas-popup .image-controls {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -692,8 +764,7 @@ body {
   opacity: .8;
 }
 
-/* Image controls */
-.image-control-button {
+.satlas-popup .image-controls .image-control-button {
   background-color: rgba(0, 0, 0, 0.3);
   border: none;
   border-radius: 50%;
@@ -706,14 +777,13 @@ body {
   padding: 0;
 }
 
-.image-control-button svg {
+.satlas-popup .image-controls .image-control-button svg {
   width: 20px;
   height: 20px;
   fill: white;
 }
 
-/* Image uploader info */
-.image-uploader {
+.satlas-popup .image-uploader {
   position: absolute;
   bottom: 0;
   right: 0;
@@ -732,13 +802,7 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.6);
 }
 
-/* Prevent clicks on modal content from closing the modal */
-.photo-options *,
-.profile-options * {
-  pointer-events: auto;
-}
-
-.mark-buttons {
+.satlas-popup .mark-buttons {
   display: flex;
   gap: 8px;
   padding-top: 8px;
@@ -747,7 +811,7 @@ body {
   width: 100%; /* Ensure container takes full width */
 }
 
-.mark-button {
+.satlas-popup .mark-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -763,174 +827,66 @@ body {
   height: 40px;
   flex: 1; /* Make all buttons take equal width */
   min-width: 0; /* Allow buttons to shrink if needed */
-  max-width: none; /* Remove max-width constraint */
+  max-width: none;
 }
 
-.mark-button .mark-icon {
+.satlas-popup .mark-button .mark-icon {
   width: 16px;
   height: 16px;
   fill: var(--dark-gray);
   transition: fill 0.2s;
 }
 
-.mark-button.visited .mark-icon {
+.satlas-popup .mark-button.visited .mark-icon {
   stroke-width: 2;
   stroke: var(--dark-gray);
 }
 
-.mark-button.wantToGo .mark-icon {
+.satlas-popup .mark-button.wantToGo .mark-icon {
   stroke-width: 2;
   stroke: var(--dark-gray);
 }
 
-.mark-button.favorite.active {
+.satlas-popup .mark-button.favorite.active {
   border-color: var(--dark-red);
   color: var(--dark-red);
   background: var(--light-red);
 }
 
-.mark-button.favorite.active .mark-icon {
+.satlas-popup .mark-button.favorite.active .mark-icon {
   fill: var(--dark-red);
 }
 
-.mark-button.visited.active {
+.satlas-popup .mark-button.visited.active {
   border-color: var(--dark-green);
   color: var(--dark-green);
   background: var(--light-green);
 }
 
-.mark-button.visited.active .mark-icon {
+.satlas-popup .mark-button.visited.active .mark-icon {
   fill: var(--dark-green);
   stroke: var(--dark-green);
 }
 
-.mark-button.wantToGo.active {
+.satlas-popup .mark-button.wantToGo.active {
   border-color: var(--dark-blue);
   color: var(--dark-blue);
   background: var(--light-blue);
 }
 
-.mark-button.wantToGo.active .mark-icon {
+.satlas-popup .mark-button.wantToGo.active .mark-icon {
   fill: var(--dark-blue);
   stroke: var(--dark-blue);
 }
 
-.map-loading {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.mapboxgl-ctrl {
-  display: none !important;
-}
-
-
-/* React app styles */
-#root {
-  height: 100%;
-  width: 100%;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-}
-
-/* Shared styles */
-.loading {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-}
-
-/* New wrapper for the carousel image and its overlay controls */
-.carousel-img-wrapper {
-  position: relative;
-  height: 300px;  /* Set the desired height for the image+controls container */
-}
-
-.image-info {
-  position: absolute;
-  bottom: -30px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  color: var(--white);
-  padding: 8px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.popup-icon {
-  width: 54px;
-  fill: var(--dark-gray);
-}
-
-.sit-metadata-container {
-  color: var(--dark-gray);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-
-.favorite-count {
-  font-size: var(--font-size-large);
-  margin: 8px 0;
-}
-
-/* Add styling for the sit uploader info */
-.sit-uploader-info {
-  margin: 8px 0;
-  text-align: left;
-  border-radius: 4px;
-  font-size: var(--font-size-large);
-}
-
-.uploader-name {
-  font-weight: 500;
-}
-
-.maps-link {
-  display: block;
-  color: var(--dark-blue);
-  text-decoration: none;
-  margin: 8px 0;
-  transition: background-color 0.2s;
-  font-size: var(--font-size-large);
-}
-
-.share-button {
-  position: absolute;
-  right: 16px;
-  padding: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 4px;
-  background: var(--light-gray-opacity);
-  border: 1px solid var(--medium-gray);
-  cursor: pointer;
-  fill: var(--dark-gray);
-}
-
-/* Update notification styles - move from bottom to top */
 .notifications-container {
   position: fixed;
-  top: calc(20px + var(--safe-area-top)); /* Place below the header */
+  top: calc(20px + var(--safe-area-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
   display: flex;
-  flex-direction: column-reverse; /* Reverse the order so new items appear at the top */
+  flex-direction: column-reverse;
   gap: 10px;
   width: 90%;
   max-width: 400px;
@@ -984,18 +940,6 @@ body {
   border: 1px solid var(--dark-red);
 }
 
-/* Update animation for top notifications */
-@keyframes slideDown {
-  from {
-    transform: translateY(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
 .offline-notice {
   background-color: var(--medium-gray);
   color: var(--white);
@@ -1015,7 +959,6 @@ body {
   animation: spin 1s ease-in-out infinite;
 }
 
-/* Fullscreen Image Component */
 .fullscreen-image-overlay {
   position: fixed;
   top: 0;
@@ -1083,4 +1026,21 @@ body {
   width: 24px;
   height: 24px;
   fill: var(--white);
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Update animation for top notifications */
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }

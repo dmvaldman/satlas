@@ -376,7 +376,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       <BaseModal
         isOpen={isOpen}
         onClose={onClose}
-        contentClassName="photo-options"
       >
         {isOffline && (
           <div className="offline-notice">You're offline. Photos will upload when you're back online.</div>

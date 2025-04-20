@@ -1339,7 +1339,7 @@ class App extends React.Component<{}, AppState> {
     } = this.state;
 
     return (
-      <div className="app">
+      <div id="app">
         <header id="app-header">
           <AuthComponent
             user={user}
@@ -1360,7 +1360,7 @@ class App extends React.Component<{}, AppState> {
 
         {!map && (
           <div className="map-loading">
-            <div className="spinner"></div>
+            <div className="spinner large"></div>
           </div>
         )}
 
