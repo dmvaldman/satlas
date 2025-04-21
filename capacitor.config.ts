@@ -46,6 +46,9 @@ const config: CapacitorConfig = {
     },
     EdgeToEdge: {
       backgroundColor: "#000000"
+    },
+    Sentry: {
+      dsn: process.env.SENTRY_DSN,
     }
   }
 };

@@ -1419,8 +1419,6 @@ class App extends React.Component<{}, AppState> {
           onUploadToExisting={this.handleAddPhotoToSit}
         />
 
-        <Notifications />
-
         {drawer.sit && (
           <SitComponent
             isOpen={drawer.isOpen}
