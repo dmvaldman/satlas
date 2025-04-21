@@ -31,6 +31,7 @@ import {
   getStorage,
   ref,
   uploadString,
+  uploadBytes,
   deleteObject
 } from 'firebase/storage';
 import { Sit, Image, Location, UserPreferences, MarkType, PushToken } from '../types';
@@ -92,6 +93,19 @@ try {
 // --- End Firestore Initialization ---
 
 const storage = getStorage(app);
+
+// Helper function (can be moved to utils if used elsewhere)
+function base64ToBlob(base64: string, contentType: string = 'image/jpeg'): Blob {
+    // Remove potential Data URI prefix before decoding
+    const base64WithoutPrefix = base64.replace(/^data:image\/\w+;base64,/, '');
+    const byteCharacters = atob(base64WithoutPrefix);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType });
+}
 
 // Firebase Service class with static methods
 export class FirebaseService {
@@ -990,8 +1004,8 @@ export class FirebaseService {
 
   /**
    * Create an image in Firestore
-   * @param tempImage The temporary image
-   * @returns Promise resolving to the created image
+   * @param tempImage The temporary image (contains base64Data initially)
+   * @returns Promise resolving to the created image (without base64Data)
    */
   static async _createImage(tempImage: Image): Promise<Image> {
     const filename = `sit_${Date.now()}.jpg`;
@@ -1010,22 +1024,24 @@ export class FirebaseService {
       }
     }
 
-    const base64WithoutPrefix = tempImage.base64Data.replace(/^data:image\/\w+;base64,/, '');
+    // Convert Base64 to Blob for upload
+    const imageBlob = base64ToBlob(tempImage.base64Data, contentType);
 
     // Add metadata with detected content type
     const metadata = {
       contentType: contentType
     };
 
-    // Upload with metadata
-    await uploadString(storageRef, base64WithoutPrefix, 'base64', metadata);
+    // Upload Blob using uploadBytes
+    console.log(`[Firebase] Uploading Blob (${(imageBlob.size / 1024).toFixed(2)} KB) with content type ${contentType}...`);
+    await uploadBytes(storageRef, imageBlob, metadata);
+    console.log(`[Firebase] Blob upload successful for ${filename}`);
 
     // Use CDN URL
-    const photoURL = `https://satlas-world.web.app/images/sits/${filename}`;
+    const photoURL = `https://satlas-world.web.app/images/sits/${filename}`; // Make sure this CDN URL is correct
 
-    // Create image collection
-    // Remove base64Data from upload. Rely on photoURL to get the image
-    const imageDoc = await addDoc(collection(db, 'images'), {
+    // Create image document in Firestore
+    const imageDocData = {
       photoURL: photoURL,
       userId: tempImage.userId,
       userName: tempImage.userName,
@@ -1034,22 +1050,24 @@ export class FirebaseService {
       width: tempImage.width,
       height: tempImage.height,
       location: tempImage.location
-    });
+    };
+    const imageDoc = await addDoc(collection(db, 'images'), imageDocData);
 
-    // Add base64Data back in in memory
+    // Construct the final Image object to return (WITHOUT base64Data)
     const image: Image = {
       id: imageDoc.id,
+      createdAt: imageDocData.createdAt,
       photoURL: photoURL,
       userId: tempImage.userId,
       userName: tempImage.userName,
       collectionId: tempImage.collectionId,
-      createdAt: new Date(),
       width: tempImage.width,
       height: tempImage.height,
       base64Data: tempImage.base64Data,
       location: tempImage.location
     };
 
+    // Update mappings and remove temp data
     this.addTempImageMapping(tempImage.id, image.id);
     this.removeTempImage(tempImage.id);
 
