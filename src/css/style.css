@@ -8,7 +8,7 @@
   --cluster-color: #1565C0;
   --sit-color: #42A5F5;
   --sit-mine-color: #BBDEFB;
-  --location-marker-color: rgba(255, 255, 255, .2);
+  --location-marker-color: #311B92;
   --sit-seen-color: #E3F2FD;
 
   /* --primary-color: #4527A0;
@@ -92,6 +92,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  z-index: 3;
 }
 
 .auth-container {
