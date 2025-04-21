@@ -1,6 +1,7 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
+import * as Sentry from "@sentry/react";
 import AuthComponent from './components/AuthButton';
 import MapComponent from './components/Map';
 import { Image, Sit, Location, MarkType, PhotoResult } from './types';
@@ -458,6 +459,14 @@ class App extends React.Component<{}, AppState> {
 
   private handleSignIn = async (user: User) => {
     console.log('[App] Sign-in successful, updating state');
+
+    // Identify user for Sentry immediately after getting the user object
+    Sentry.setUser({
+      id: user.uid,
+      email: user.email || undefined,
+      username: user.displayName || undefined
+    });
+
     // Update auth state
     this.setState({
       user: user,
@@ -481,6 +490,9 @@ class App extends React.Component<{}, AppState> {
     try {
       await FirebaseService.signOut();
       console.log('[App] Firebase sign out completed');
+
+      // Clear user context in Sentry
+      Sentry.setUser(null);
 
       // Explicitly update the auth state in React
       this.setState({
