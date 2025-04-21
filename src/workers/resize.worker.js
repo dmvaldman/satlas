@@ -44,11 +44,9 @@ self.onmessage = async (event) => {
         throw new Error('Invalid imageBuffer received in worker.');
     }
     const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' }); // Create Blob from buffer
-    console.log('[Worker] Created initial Blob from ArrayBuffer, size:', imageBlob.size);
 
     // 1. Create an ImageBitmap from the Blob
     const imageBitmap = await createImageBitmap(imageBlob);
-    console.log('[Worker] Created ImageBitmap, dimensions:', imageBitmap.width, 'x', imageBitmap.height);
 
     // 2. Calculate new dimensions
     const originalWidth = imageBitmap.width;
@@ -78,7 +76,6 @@ self.onmessage = async (event) => {
 
     // 5. Create ImageBitmap from the canvas (Transferable)
     const finalImageBitmap = canvas.transferToImageBitmap();
-    console.log('[Worker] Resizing complete, transferring ImageBitmap for job:', id);
 
     // 6. Post transferable ImageBitmap result back to main thread
     self.postMessage({
