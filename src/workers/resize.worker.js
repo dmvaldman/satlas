@@ -1,5 +1,3 @@
-// public/resize.worker.js
-
 // Helper function to convert Base64 to Blob
 function base64ToBlob(base64, mimeType) {
   try {
@@ -35,16 +33,22 @@ function blobToBase64(blob) {
   });
 }
 
-
 self.onmessage = async (event) => {
-  const { base64Data, maxWidth, quality, id } = event.data;
+  // CORRECT: Receive ArrayBuffer
+  const { imageBuffer, maxWidth, quality, id } = event.data;
   console.log('[Worker] Received job:', id);
 
   try {
-    // 1. Create an ImageBitmap from Base64
-    const imageBlob = base64ToBlob(base64Data, 'image/jpeg');
-    if (!imageBlob) throw new Error('Failed to convert base64 to blob.');
+    // CORRECT: Create Blob directly from ArrayBuffer
+    if (!imageBuffer || !(imageBuffer instanceof ArrayBuffer)) {
+        throw new Error('Invalid imageBuffer received in worker.');
+    }
+    const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' }); // Create Blob from buffer
+    console.log('[Worker] Created initial Blob from ArrayBuffer, size:', imageBlob.size);
+
+    // 1. Create an ImageBitmap from the Blob
     const imageBitmap = await createImageBitmap(imageBlob);
+    console.log('[Worker] Created ImageBitmap, dimensions:', imageBitmap.width, 'x', imageBitmap.height);
 
     // 2. Calculate new dimensions
     const originalWidth = imageBitmap.width;
@@ -72,20 +76,18 @@ self.onmessage = async (event) => {
     // 4. Draw resized image
     ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
 
-    // 5. Convert canvas back to Blob
-    const blob = await canvas.convertToBlob({
-      type: 'image/jpeg',
-      quality: quality / 100
-    });
+    // 5. Create ImageBitmap from the canvas (Transferable)
+    const finalImageBitmap = canvas.transferToImageBitmap();
+    console.log('[Worker] Resizing complete, transferring ImageBitmap for job:', id);
 
-    // 6. Convert Blob to Base64 for sending back
-     const finalBase64 = await blobToBase64(blob);
+    // 6. Post transferable ImageBitmap result back to main thread
+    self.postMessage({
+        success: true,
+        imageBitmapResult: finalImageBitmap,
+        id: id
+    }, [finalImageBitmap]);
 
-    console.log('[Worker] Resizing complete for job:', id);
-    // 7. Post result back to main thread
-    self.postMessage({ success: true, base64Result: finalBase64, id });
-
-    // Close the bitmap to free memory
+    // Close the original bitmap
     imageBitmap.close();
 
   } catch (error) {

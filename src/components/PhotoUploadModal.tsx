@@ -26,22 +26,24 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
   private quality = 90;
   // Initialize worker directly if supported, otherwise null
   private resizeWorker: Worker | null = window.Worker ? new ResizeWorker() : null;
-  private resizePromises = new Map<string, { resolve: (value: string) => void, reject: (reason?: any) => void }>();
+  // Update Map type to expect ImageBitmap back from worker
+  private resizePromises = new Map<string, { resolve: (value: ImageBitmap) => void, reject: (reason?: any) => void }>();
 
   constructor(props: PhotoUploadProps) {
     super(props);
     // Setup listeners if worker was initialized successfully
     if (this.resizeWorker) {
       console.log('[PhotoUpload] Initializing Resize Worker listeners...');
+      // UPDATED: Expect imageBitmapResult back
       this.resizeWorker.onmessage = (event) => {
-        const { success, base64Result, error, id } = event.data;
+        const { success, imageBitmapResult, error, id } = event.data;
         console.log('[PhotoUpload] Received message from worker for job:', id);
         const promiseCallbacks = this.resizePromises.get(id);
         if (promiseCallbacks) {
-            if (success) {
-                promiseCallbacks.resolve(base64Result);
+            if (success && imageBitmapResult instanceof ImageBitmap) {
+                promiseCallbacks.resolve(imageBitmapResult);
             } else {
-                promiseCallbacks.reject(new Error(error || 'Worker resizing failed'));
+                promiseCallbacks.reject(new Error(error || 'Worker resizing failed or returned invalid data'));
             }
             this.resizePromises.delete(id); // Clean up
         } else {
@@ -58,7 +60,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       };
     } else {
         console.warn('[PhotoUpload] Web Workers not supported or failed to initialize.');
-        // Consider adding a fallback to the canvas method here if needed
     }
   }
 
@@ -162,51 +163,43 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   }
 
-  private getImageDimensions = (base64Data: string): Promise<{width: number, height: number}> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-
-      img.onload = () => {
-        // Ensure dimensions are valid (greater than zero)
-        if (img.width > 0 && img.height > 0) {
-          resolve({
-            width: img.width,
-            height: img.height
-          });
-        } else {
-          // Reject with error if dimensions are invalid
-          reject(new Error('Invalid image dimensions: width or height is zero'));
-        }
-      };
-
-      img.onerror = () => {
-        reject(new Error('Failed to load image for dimension calculation'));
-      };
-
-      // Ensure base64 data has the correct prefix
-      if (!base64Data.startsWith('data:')) {
-        img.src = `data:image/jpeg;base64,${base64Data}`;
-      } else {
-        img.src = base64Data;
-      }
-    });
+  // UPDATED: getImageDimensions to use ImageBitmap
+  private getImageDimensions = (imageBitmap: ImageBitmap): {width: number, height: number} => {
+    if (imageBitmap.width > 0 && imageBitmap.height > 0) {
+      return { width: imageBitmap.width, height: imageBitmap.height };
+    } else {
+      throw new Error('Invalid image dimensions from ImageBitmap: width or height is zero');
+    }
   };
 
-  private resizeImageUnified(originalBase64: string): Promise<string> {
+  // ADDED: Helper to convert Base64 string to ArrayBuffer
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binaryString = atob(base64.replace(/^data:image\/\w+;base64,/, '')); // Ensure prefix is removed
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  // UPDATED: resizeImageUnified to accept ArrayBuffer and return Promise<ImageBitmap>
+  private resizeImageUnified(imageBuffer: ArrayBuffer): Promise<ImageBitmap> {
     if (!this.resizeWorker) {
         console.error('[PhotoUpload] Resize worker not available!');
         return Promise.reject(new Error("Resize worker not available."));
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<ImageBitmap>((resolve, reject) => {
         const jobId = `job_${Date.now()}_${Math.random()}`;
         this.resizePromises.set(jobId, { resolve, reject });
+        // UPDATED: Post ArrayBuffer and mark it as transferable
         this.resizeWorker?.postMessage({
-            base64Data: originalBase64,
+            imageBuffer: imageBuffer, // Pass buffer
             maxWidth: this.imageWidth,
             quality: this.quality,
             id: jobId
-        });
+        }, [imageBuffer]); // <-- Transfer ownership
 
         // Optional: Add a timeout for the promise
         const timeoutId = setTimeout(() => {
@@ -215,12 +208,13 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
                 this.resizePromises.get(jobId)?.reject(new Error('Resize operation timed out'));
                 this.resizePromises.delete(jobId);
             }
-        }, 30000); // 30 second timeout
+        }, 30000);
 
         // Ensure timeout is cleared when promise settles
         const promiseCallbacks = this.resizePromises.get(jobId);
         if (promiseCallbacks) {
-            promiseCallbacks.resolve = (value: string) => {
+            // Update resolve/reject types here too for clarity
+            promiseCallbacks.resolve = (value: ImageBitmap) => {
                 clearTimeout(timeoutId);
                 resolve(value);
             };
@@ -229,48 +223,114 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
                 reject(reason);
             };
         } else {
-            // This case should ideally not happen if the promise was just added
             console.error(`[PhotoUpload] Could not find promise callbacks for job ${jobId} immediately after creation.`);
             clearTimeout(timeoutId); // Clear timeout anyway
             reject(new Error(`Internal error processing job ${jobId}`));
         }
     });
-}
+  }
 
+  // ADDED: Helper to convert Blob back to Base64 (for PhotoResult)
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+            resolve(reader.result.toString().split(',')[1]); // Remove prefix
+        } else {
+            reject(new Error('FileReader did not return result for final conversion.'));
+        }
+      };
+      reader.onerror = (error) => {
+          console.error('[PhotoUpload] Final blobToBase64 conversion error:', error);
+          reject(error);
+      }
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // ADDED: Helper to convert ImageBitmap to Blob
+  private async imageBitmapToBlob(bitmap: ImageBitmap, quality: number): Promise<Blob> {
+    let canvas: OffscreenCanvas | HTMLCanvasElement;
+    if (typeof OffscreenCanvas === 'undefined') {
+        console.warn('[PhotoUpload] OffscreenCanvas not available in main thread for Blob conversion, using regular canvas.');
+        canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+    } else {
+        canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get canvas context for Blob conversion');
+
+    // Explicitly check type for HTMLCanvasElement fallback
+    if (canvas instanceof HTMLCanvasElement) {
+        const htmlCtx = ctx as CanvasRenderingContext2D; // Cast here
+        htmlCtx.drawImage(bitmap, 0, 0);
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) { resolve(blob); } else { reject(new Error('canvas.toBlob failed')); }
+            }, 'image/jpeg', quality / 100);
+        });
+    } else {
+        // Assumed OffscreenCanvas path
+        const offscreenCtx = ctx as OffscreenCanvasRenderingContext2D; // Cast here
+        offscreenCtx.drawImage(bitmap, 0, 0);
+        return await canvas.convertToBlob({ type: 'image/jpeg', quality: quality / 100 });
+    }
+  }
+
+  // UPDATED: processImage to use ArrayBuffer and ImageBitmap flow
   private async processImage(imageSource: string, sourceType: 'camera' | 'gallery') {
       console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
       if (!this.resizeWorker) {
           this.props.showNotification('Image processing service unavailable.', 'error');
           return;
       }
-      let originalBase64Data: string;
-      let finalBase64Data: string;
+      let originalImageBuffer: ArrayBuffer;
+      let finalResizedBitmap: ImageBitmap;
+      let finalBase64Data: string; // Still need this for PhotoResult temporarily
       let location: Location | null;
       let dimensions: { width: number; height: number };
+      let originalBase64ForExif: string | undefined;
 
       try {
-          // 1. Ensure we have ORIGINAL Base64 for metadata processing
+          // 1. Get ORIGINAL data as ArrayBuffer AND Base64 (for EXIF)
           if (Capacitor.getPlatform() !== 'web' && imageSource.startsWith('file:')) {
               const fileContent = await Filesystem.readFile({ path: imageSource });
               if (typeof fileContent.data !== 'string') {
                   throw new Error('Filesystem did not return Base64 string.');
               }
-              originalBase64Data = fileContent.data;
+              originalBase64ForExif = fileContent.data;
+              originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
           } else {
-              originalBase64Data = imageSource;
+              originalBase64ForExif = imageSource;
+              originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
           }
 
-          // 2. Resize/Optimize Image using the Worker (pass ORIGINAL Base64)
-          finalBase64Data = await this.resizeImageUnified(originalBase64Data);
+          // 2. Resize/Optimize Image using the Worker (pass TRANSFERABLE ArrayBuffer, get ImageBitmap)
+          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer);
 
           // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
-          location = await this.getLocation(sourceType, originalBase64Data);
+          location = await this.getLocation(sourceType, originalBase64ForExif);
           if (!location) throw new Error('Could not determine location.');
 
-          // 4. Get Dimensions (from the FINAL processed Base64)
-          dimensions = await this.getImageDimensions(finalBase64Data);
+          // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
+          dimensions = this.getImageDimensions(finalResizedBitmap);
 
-          // 5. Prepare and Upload Result
+          // 5. Convert final ImageBitmap to Blob
+          const finalResizedBlob = await this.imageBitmapToBlob(finalResizedBitmap, this.quality);
+
+          // Close the bitmap now that we have the Blob
+          finalResizedBitmap.close();
+
+          // !! TEMPORARY STEP for Phase 1: Convert Blob back to Base64 for downstream PhotoResult !!
+          console.log('[PhotoUpload] Converting final Blob back to Base64 for PhotoResult...');
+          finalBase64Data = await this.blobToBase64(finalResizedBlob);
+          console.log('[PhotoUpload] Final Base64 conversion complete.');
+          // !! END TEMPORARY STEP !!
+
+          // 6. Prepare and Upload Result (using the temporary Base64)
           const photoResult: PhotoResult = {
               base64Data: finalBase64Data,
               location,
