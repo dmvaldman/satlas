@@ -57,6 +57,7 @@ interface AppState {
       isOpen: boolean;
       sitId: string | null;
       hasUserContributed: boolean;
+      imageId?: string;
     };
     fullscreenImage: {
       isOpen: boolean;
@@ -110,7 +111,7 @@ class App extends React.Component<{}, AppState> {
       modals: {
         photo: { isOpen: false, state: 'none' },
         profile: { isOpen: false },
-        nearbySit: { isOpen: false, sitId: null, hasUserContributed: false },
+        nearbySit: { isOpen: false, sitId: null, hasUserContributed: false, imageId: undefined },
         fullscreenImage: { isOpen: false, image: null },
         signIn: { isOpen: false }
       },
@@ -555,13 +556,22 @@ class App extends React.Component<{}, AppState> {
     const images = await FirebaseService.getImages(sit.imageCollectionId);
     const hasUserContributed = images.some(image => image.userId === this.state.user?.uid);
 
+    let imageId = undefined;
+    if (hasUserContributed) {
+      imageId = images.find(image => image.userId === this.state.user?.uid)?.id;
+      if (!imageId) {
+        console.error('[App] User has contributed but no image found', this.state.user?.uid);
+      }
+    }
+
     this.setState(prevState => ({
       modals: {
         ...prevState.modals,
         nearbySit: {
           isOpen: true,
           sitId: sitId,
-          hasUserContributed: hasUserContributed
+          hasUserContributed: hasUserContributed,
+          imageId: imageId
         }
       }
     }));
@@ -574,7 +584,8 @@ class App extends React.Component<{}, AppState> {
         nearbySit: {
           isOpen: false,
           sitId: null,
-          hasUserContributed: false
+          hasUserContributed: false,
+          imageId: undefined
         }
       }
     }));
@@ -779,6 +790,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleReplaceImage = (sitId: string, imageId: string) => {
+    this.closeNearbySitModal();
     this.openPhotoUploadModal('replace_image', sitId, imageId);
   };
 
@@ -1429,8 +1441,10 @@ class App extends React.Component<{}, AppState> {
           isOpen={modals.nearbySit.isOpen}
           sitId={modals.nearbySit.sitId}
           hasUserContributed={modals.nearbySit.hasUserContributed}
+          imageId={modals.nearbySit.imageId}
           onClose={this.closeNearbySitModal}
           onUploadToExisting={this.handleAddPhotoToSit}
+          onReplaceImage={this.handleReplaceImage}
         />
 
         {drawer.sit && (
