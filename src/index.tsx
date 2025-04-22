@@ -45,7 +45,7 @@ const root = createRoot(container);
 
 // Hide the native splash screen once the app is ready
 root.render(
-  <React.StrictMode>
+  <>
     <Notifications />
     <Sentry.ErrorBoundary
       fallback={<></>}
@@ -53,7 +53,7 @@ root.render(
     >
       <App />
     </Sentry.ErrorBoundary>
-  </React.StrictMode>
+  </>
 );
 
 // Lock the screen orientation to portrait
