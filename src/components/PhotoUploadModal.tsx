@@ -75,7 +75,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     }
   }
 
-  private async getLocation(sourceType: 'camera' | 'gallery', originalBase64?: string): Promise<Location | null> {
+  private async getLocation(sourceType: 'camera' | 'gallery', originalBase64?: string): Promise<Location> {
       if (sourceType === 'camera') {
           console.log('[PhotoUpload] Getting device location for camera photo...');
           return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
@@ -87,14 +87,12 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
               return await this.getImageLocation(originalBase64);
           } catch (exifError) {
               console.warn('[PhotoUpload] Could not get EXIF location:', exifError);
+              throw new Error('Could not get location from photo');
           }
       } else {
            console.warn('[PhotoUpload] No original Base64 provided to getLocation for gallery image.');
+           throw new Error('Could not get location from photo');
       }
-
-      // Fallback to device location for gallery if EXIF fails or Base64 wasn't available
-      console.log('[PhotoUpload] Falling back to device location for gallery photo...');
-      return LocationService.getLastKnownLocation() || new LocationService().getCurrentLocation();
   }
 
   private async getImageLocation(base64Image: string): Promise<Location> {
@@ -312,11 +310,20 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer);
 
           // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
-          location = await this.getLocation(sourceType, originalBase64ForExif);
-          if (!location) throw new Error('Could not determine location.');
+          try {
+            location = await this.getLocation(sourceType, originalBase64ForExif);
+          } catch (error) {
+            console.error('[PhotoUpload] Error getting location:', error);
+            this.props.showNotification('Error getting location from photo', 'error');
+          }
 
           // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
-          dimensions = this.getImageDimensions(finalResizedBitmap);
+          try {
+            dimensions = this.getImageDimensions(finalResizedBitmap);
+          } catch (error) {
+            console.error('[PhotoUpload] Error getting image dimensions:', error);
+            this.props.showNotification('Error getting image dimensions', 'error');
+          }
 
           // 5. Convert final ImageBitmap to Blob
           const finalResizedBlob = await this.imageBitmapToBlob(finalResizedBitmap, this.quality);
