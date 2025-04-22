@@ -12,6 +12,8 @@ import AddSitButton from './components/AddSitButton';
 import NearbySitModal from './components/NearbySitModal';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './services/LocationService';
+import { NotificationService } from './services/NotificationService';
+import Notifications from './components/Notifications';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
@@ -19,7 +21,6 @@ import { Capacitor } from '@capacitor/core';
 import SitComponent from './components/Sit';
 import { OfflineService, OfflineSuccess } from './services/OfflineService';
 import { ValidationUtils, SitTooCloseError } from './utils/ValidationUtils';
-import Notifications from './components/Notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
@@ -902,13 +903,7 @@ class App extends React.Component<{}, AppState> {
     message: string,
     type: 'success' | 'error'
   ) => {
-    const notification = Notifications.getInstance();
-    // Check if the instance exists (it might be null during HMR)
-    if (notification) {
-      notification.showNotification({ message, type });
-    } else {
-      console.warn('[App] showNotification called, but Notifications instance was not ready.');
-    }
+    NotificationService.getInstance().showNotification({ message, type });
   };
 
   private configureStatusBar = async () => {
@@ -1357,6 +1352,8 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div id="app">
+        <Notifications />
+
         <header id="app-header">
           <AuthComponent
             user={user}

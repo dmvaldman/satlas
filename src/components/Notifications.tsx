@@ -1,114 +1,122 @@
 import React from 'react';
-
-export type NotificationType = 'success' | 'error';
-
-export interface NotificationItem {
-  message: string;
-  type: NotificationType;
-}
+// Import service and types
+import { NotificationService, NotificationItem, NotificationType } from '../services/NotificationService';
 
 // Define the type for the custom event detail from index.tsx
+// Keep this if still used, otherwise remove
 interface AppErrorEventDetail {
   message: string;
   type: NotificationType;
   eventId?: string;
 }
 
-class Notification extends React.Component<{}, { notifications: NotificationItem[] }> {
-  private static instance: Notification | null = null;
+// Use a unique ID for React keys, managed by the service or component
+interface NotificationItemWithId extends NotificationItem {
+    id: number; // Unique ID for React key prop
+}
+
+class Notifications extends React.Component<{}, { notifications: NotificationItemWithId[] }> {
   private timeout: number = 5000;
+  private notificationService: NotificationService | null = null;
+  private unsubscribe: (() => void) | null = null;
+  private nextId: number = 0; // Simple counter for unique keys
 
   constructor(props: {}) {
     super(props);
     this.state = {
-      notifications: []
+      notifications: [] // Initialize empty
     };
-
-    // Set up singleton instance
-    Notification.instance = this;
   }
 
-  // Add event listener when the component mounts
   componentDidMount() {
+    this.notificationService = NotificationService.getInstance();
+    this.handleNotificationsChange = this.handleNotificationsChange.bind(this);
+    this.unsubscribe = this.notificationService.subscribe(this.handleNotificationsChange);
+
+    // Process initial notifications from service to add unique IDs
+    const initialNotifications = this.notificationService.getAllNotifications();
+    this.handleNotificationsChange(initialNotifications);
+
+    // Optional: Keep app-error listener if needed
     window.addEventListener('app-error', this.handleAppError);
   }
 
   componentWillUnmount() {
-    Notification.instance = null;
-    // Remove event listener when the component unmounts
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this.notificationService = null;
     window.removeEventListener('app-error', this.handleAppError);
   }
 
-  // Handler for the custom 'app-error' event
+  // Handler for service updates - add unique IDs for React keys
+  private handleNotificationsChange = (serviceNotifications: NotificationItem[]) => {
+    const notificationsWithIds = serviceNotifications.map(n => ({
+      ...n,
+      id: this.nextId++ // Assign a unique ID for the key prop
+    }));
+    this.setState({ notifications: notificationsWithIds });
+  };
+
+  // Handler for the custom 'app-error' event (keep if needed)
   private handleAppError = (event: Event) => {
-    // Type assertion to access the detail property
     const customEvent = event as CustomEvent<AppErrorEventDetail>;
-    if (customEvent.detail) {
-      this.showNotification({
+    if (customEvent.detail && this.notificationService) {
+      this.notificationService.showNotification({
         message: customEvent.detail.message,
         type: customEvent.detail.type
       });
     }
   };
 
-  /**
-   * Show a notification
-   */
-  public showNotification = (notification: { message: string, type: NotificationType }) => {
-    // Add the new notification to the list
-    this.setState(prevState => ({
-      notifications: [...prevState.notifications, notification]
-    }));
-
-    // Set a timeout to automatically remove this notification
-    setTimeout(() => {
-      this.setState(prevState => ({
-        notifications: prevState.notifications.filter(n => n !== notification)
-      }));
-    }, this.timeout);
+  // Remove notification needs to map back to the service's object
+  private removeNotification = (idToRemove: number) => {
+    if (!this.notificationService) return;
+    // Find the original notification object in the service based on matching message/type/etc.
+    // This relies on the service returning the *actual* objects it stores via getAllNotifications
+    // or finding a robust way to map the ID back.
+    // For simplicity now, we'll find the corresponding item in current state and ask service to remove it.
+    // NOTE: This might be fragile if multiple identical notifications exist.
+    // A better approach might involve the service managing IDs.
+    const notificationInState = this.state.notifications.find(n => n.id === idToRemove);
+    if (notificationInState) {
+      // Reconstruct the object shape the service expects (without ID)
+      const serviceNotification: NotificationItem = {
+          message: notificationInState.message,
+          type: notificationInState.type
+      };
+      // Ask the service to remove the *original* object it holds
+      // This relies on the service using object identity for removal
+      // We need to find the original object in the service that matches
+      const allServiceNotifications = this.notificationService.getAllNotifications();
+      const originalNotification = allServiceNotifications.find(n =>
+          n.message === serviceNotification.message && n.type === serviceNotification.type
+      );
+      if (originalNotification) {
+          this.notificationService.removeNotification(originalNotification);
+      } else {
+          console.warn("Could not find original notification in service to remove.");
+      }
+    }
   };
-
-  /**
-   * Remove a specific notification
-   */
-  private removeNotification = (index: number) => {
-    this.setState(prevState => ({
-      notifications: prevState.notifications.filter((_, i) => i !== index)
-    }));
-  };
-
-  /**
-   * Clear all notifications
-   */
-  public clearAllNotifications = () => {
-    this.setState({ notifications: [] });
-  };
-
-  /**
-   * Static method to get the instance
-   */
-  public static getInstance(): Notification | null {
-    return Notification.instance;
-  }
 
   render() {
-    const { notifications } = this.state;
+    const { notifications } = this.state; // Use local state notifications with IDs
 
-    // Always render the container even when there are no notifications
-    // This keeps the component mounted and the singleton instance available
     return (
       <div className="notifications-container">
-        {notifications.map((notification, index) => (
+        {notifications.map((notification) => (
           <div
-            key={index}
+            key={notification.id} // Use unique ID as key
             className={`notification ${notification.type}`}
           >
             <span className="notification-message">{notification.message}</span>
             <button
               className="notification-close"
               onClick={(e) => {
-                e.stopPropagation(); // Prevent event from bubbling
-                this.removeNotification(index);
+                e.stopPropagation();
+                this.removeNotification(notification.id); // Remove by ID
               }}
               aria-label="Close notification"
             >
@@ -121,4 +129,4 @@ class Notification extends React.Component<{}, { notifications: NotificationItem
   }
 }
 
-export default Notification;
+export default Notifications;

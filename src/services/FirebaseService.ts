@@ -1,4 +1,4 @@
-import { initializeApp, FirebaseApp } from 'firebase/app';
+import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import {
   User,
   getAuth,
@@ -12,7 +12,7 @@ import {
   OAuthProvider,
 } from 'firebase/auth';
 import {
-  initializeFirestore,
+  getFirestore,
   persistentLocalCache,
   memoryLocalCache,
   doc,
@@ -25,7 +25,8 @@ import {
   deleteDoc,
   addDoc,
   writeBatch,
-  Firestore
+  Firestore,
+  initializeFirestore
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -56,39 +57,61 @@ const firebaseConfig = {
     databaseURL: process.env.FIREBASE_DATABASE_URL,
 };
 
-// Initialize Firebase App
-const app: FirebaseApp = initializeApp(firebaseConfig);
-
-// See
-// - https://github.com/capawesome-team/capacitor-firebase/issues/221
-// - https://stackoverflow.com/questions/71630326/firebase-authentication-sticks-capacitor-ionic-on-ios
-// Conditionally initialize Auth based on platform
-let auth: Auth;
-if (Capacitor.isNativePlatform()) {
-  console.log("[Firebase] Initializing Auth for NATIVE platform with indexedDBLocalPersistence.");
-  // Use initializeAuth for native platforms with specific persistence
-  auth = initializeAuth(app, {
-    persistence: indexedDBLocalPersistence
-  });
+// Initialize Firebase App only if it hasn't been initialized yet
+let app: FirebaseApp;
+if (getApps().length === 0) {
+  console.log("[Firebase] Initializing Firebase App...");
+  app = initializeApp(firebaseConfig);
 } else {
-  console.log("[Firebase] Initializing Auth for WEB platform.");
-  // Use getAuth for web platform (uses browserLocalPersistence by default)
-  auth = getAuth(app);
+  console.log("[Firebase] Getting existing Firebase App...");
+  app = getApp(); // Get the already initialized app
 }
 
-// --- Initialize Firestore with Explicit Persistence ---
+// Use getAuth - it should handle retrieving the existing instance correctly
+// Persistence is tricky with HMR. getAuth might respect previously set persistence.
+// If not, we might need to explicitly call setPersistence again, but that can also cause issues.
+// Let's rely on getAuth first.
+let auth: Auth = getAuth(app);
+console.log(`[Firebase] Using ${Capacitor.isNativePlatform() ? 'Native' : 'Web'} Auth instance.`);
+
+// Explicit persistence setting attempt (might be needed if getAuth doesn't retain it)
+// Might cause issues if called repeatedly by HMR - use with caution or conditional logic
+/*
+if (Capacitor.isNativePlatform()) {
+  try {
+    await setPersistence(auth, indexedDBLocalPersistence);
+    console.log("[Firebase] Explicitly set indexedDBLocalPersistence.");
+  } catch (error) {
+    console.error("[Firebase] Error setting indexedDBLocalPersistence:", error);
+  }
+}
+*/
+
+// --- Initialize Firestore with Persistence Check ---
 let db: Firestore;
 const firestoreCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
+
+// Attempt to get existing Firestore instance first
 try {
-    console.log(`[Firebase] Initializing Firestore with persistentLocalCache (size: ${firestoreCacheSizeBytes} bytes)...`);
-    db = initializeFirestore(app, {
-        localCache: persistentLocalCache({ cacheSizeBytes: firestoreCacheSizeBytes })
-    });
-    console.log("[Firebase] Firestore initialized with explicit persistence.");
-} catch (error) {
-    console.error("[Firebase] Error initializing Firestore with persistent cache:", error);
-    console.log("[Firebase] Falling back to in-memory Firestore cache.");
-    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+  console.log("[Firebase] Attempting to get existing Firestore instance...");
+  db = getFirestore(app);
+  console.log("[Firebase] Got existing Firestore instance.");
+} catch (e) {
+  // If getFirestore throws without settings, it likely means it needs initialization
+  console.log("[Firebase] Firestore instance not found or needs settings, initializing...");
+  try {
+      console.log(`[Firebase] Initializing Firestore with persistentLocalCache (size: ${firestoreCacheSizeBytes} bytes)...`);
+      // Initialize with settings
+      db = initializeFirestore(app, {
+          localCache: persistentLocalCache({cacheSizeBytes: firestoreCacheSizeBytes})
+      });
+      console.log("[Firebase] Firestore initialized with explicit persistence.");
+  } catch (error) {
+      console.error("[Firebase] Error initializing Firestore with persistent cache:", error);
+      console.log("[Firebase] Falling back to in-memory Firestore cache.");
+      // Initialize with fallback settings
+      db = initializeFirestore(app, {localCache: memoryLocalCache()});
+  }
 }
 // --- End Firestore Initialization ---
 

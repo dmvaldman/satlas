@@ -2,7 +2,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import * as Sentry from "@sentry/react";
 import App from './App';
-import Notifications from './components/Notifications';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { Capacitor } from '@capacitor/core';
 
@@ -43,17 +42,14 @@ const container = document.getElementById('root');
 if (!container) throw new Error('Failed to find the root element');
 const root = createRoot(container);
 
-// Hide the native splash screen once the app is ready
+// Render App wrapped in ErrorBoundary
 root.render(
-  <>
-    <Notifications />
-    <Sentry.ErrorBoundary
-      fallback={<></>}
-      onError={handleBoundaryError}
-    >
-      <App />
-    </Sentry.ErrorBoundary>
-  </>
+  <Sentry.ErrorBoundary
+    fallback={<></>}
+    onError={handleBoundaryError}
+  >
+    <App />
+  </Sentry.ErrorBoundary>
 );
 
 // Lock the screen orientation to portrait
