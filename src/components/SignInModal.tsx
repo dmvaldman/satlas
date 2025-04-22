@@ -15,14 +15,7 @@ class SignInModal extends React.Component<SignInModalProps> {
     if (Capacitor.getPlatform() !== 'web') {
       return false;
     }
-    // Check for Safari specifically, excluding Chrome, Edge, and Android variants
-    const ua = navigator.userAgent;
-    const isLikelySafari = /Safari/i.test(ua) &&         // Must contain Safari
-                          !/Chrome/i.test(ua) &&        // Must NOT contain Chrome
-                          !/Chromium/i.test(ua) &&      // Must NOT contain Chromium
-                          !/CriOS/i.test(ua) &&         // Must NOT contain CriOS (Chrome iOS)
-                          !/Edg/i.test(ua) &&           // Must NOT contain Edge
-                          !/Android/i.test(ua);         // Must NOT contain Android
+    const isLikelySafari = navigator.vendor.includes('Apple');
     return isLikelySafari;
   }
 
@@ -30,7 +23,7 @@ class SignInModal extends React.Component<SignInModalProps> {
     // --- Safari Web Check ---
     if (this._isSafariWeb()) {
       this.props.showNotification(
-        'Sign-in is not supported in Safari. Please use another browser or the native app.',
+        'Sign-in is not supported in Safari. Please use another browser or the iOS app.',
         'error'
       );
       return; // Prevent sign-in attempt
