@@ -10,6 +10,7 @@ import {
   indexedDBLocalPersistence,
   Auth,
   OAuthProvider,
+  setPersistence
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -68,24 +69,23 @@ if (getApps().length === 0) {
 }
 
 // Use getAuth - it should handle retrieving the existing instance correctly
-// Persistence is tricky with HMR. getAuth might respect previously set persistence.
-// If not, we might need to explicitly call setPersistence again, but that can also cause issues.
-// Let's rely on getAuth first.
 let auth: Auth = getAuth(app);
 console.log(`[Firebase] Using ${Capacitor.isNativePlatform() ? 'Native' : 'Web'} Auth instance.`);
 
-// Explicit persistence setting attempt (might be needed if getAuth doesn't retain it)
-// Might cause issues if called repeatedly by HMR - use with caution or conditional logic
-/*
-if (Capacitor.isNativePlatform()) {
-  try {
-    await setPersistence(auth, indexedDBLocalPersistence);
-    console.log("[Firebase] Explicitly set indexedDBLocalPersistence.");
-  } catch (error) {
-    console.error("[Firebase] Error setting indexedDBLocalPersistence:", error);
+// Set persistence explicitly AFTER getting the auth instance, only for native
+// Use an IIAFE for the async call at the top level
+(async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      console.log("[Firebase] Attempting to set indexedDBLocalPersistence...");
+      await setPersistence(auth, indexedDBLocalPersistence);
+      console.log("[Firebase] Successfully set indexedDBLocalPersistence.");
+    } catch (error) {
+      // Errors might occur if persistence was already set or other issues
+      console.error("[Firebase] Error setting indexedDBLocalPersistence (may be expected if already set):", error);
+    }
   }
-}
-*/
+})();
 
 // --- Initialize Firestore with Persistence Check ---
 let db: Firestore;
