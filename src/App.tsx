@@ -903,8 +903,11 @@ class App extends React.Component<{}, AppState> {
     type: 'success' | 'error'
   ) => {
     const notification = Notifications.getInstance();
+    // Check if the instance exists (it might be null during HMR)
     if (notification) {
       notification.showNotification({ message, type });
+    } else {
+      console.warn('[App] showNotification called, but Notifications instance was not ready.');
     }
   };
 
