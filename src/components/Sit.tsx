@@ -175,7 +175,7 @@ class PopupComponent extends React.Component<PopupProps> {
     if (favoriteCount === 0) return null;
 
     return (
-      <div className="favorite-count">
+      <div className="sit-metadata-item favorite-count">
         {favoriteCount} {favoriteCount === 1 ? 'person' : 'people'} favorited this
       </div>
     );
@@ -202,7 +202,7 @@ class PopupComponent extends React.Component<PopupProps> {
         href={mapsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="maps-link"
+        className="sit-metadata-item maps-link"
       >
         open in maps
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '4px', verticalAlign: 'middle' }}>
@@ -243,7 +243,7 @@ class PopupComponent extends React.Component<PopupProps> {
 
     return (
       <button
-        className="modal-option-button"
+        className="sit-metadata-item modal-option-button"
         onClick={handleClick}
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -309,7 +309,7 @@ class PopupComponent extends React.Component<PopupProps> {
           <div className="sit-metadata-container">
             {/* Display uploader information */}
             {sit.uploadedBy && sit.createdAt && (
-              <div className="sit-uploader-info">
+              <div className="sit-metadata-item sit-uploader-info">
                 {this.props.user && sit.uploadedBy === this.props.user.uid ? (
                   `You found this sit ${formatRelativeTime(sit.createdAt)}`
                 ) : (

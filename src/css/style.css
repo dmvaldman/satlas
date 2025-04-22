@@ -733,17 +733,13 @@ body {
   padding-bottom: 8px;
 }
 
-.satlas-popup .favorite-count {
-  font-size: var(--font-size-large);
+.satlas-popup .sit-metadata-item {
   margin: 8px 0;
+  font-size: var(--font-size-large);
 }
 
-.satlas-popup .sit-uploader-info {
-  margin: 8px 0;
-  text-align: left;
-  border-radius: 4px;
-  font-size: var(--font-size-large);
-}
+/* .satlas-popup .favorite-count {} */
+/* .satlas-popup .sit-uploader-info {} */
 
 .satlas-popup .uploader-name {
   font-weight: 500;
@@ -753,9 +749,7 @@ body {
   display: block;
   color: var(--dark-blue);
   text-decoration: none;
-  margin: 8px 0;
   transition: background-color 0.2s;
-  font-size: var(--font-size-large);
 }
 
 .satlas-popup .image-controls {
