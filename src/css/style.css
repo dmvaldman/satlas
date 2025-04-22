@@ -320,9 +320,9 @@ body {
   background: var(--light-gray-opacity);
   width: 100%;
   border-radius: 14px 14px 0 0;
-  padding: 16px;
+  padding: 18px;
   cursor: default;
-  padding-bottom: calc(var(--safe-area-bottom) + 16px);
+  padding-bottom: calc(var(--safe-area-bottom) + 18px);
   max-height: 80vh;
   transform: translateY(100%);
   transition: transform 0.3s ease-out;
@@ -396,7 +396,7 @@ body {
 }
 
 .profile-section {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .profile-section:last-child {
@@ -494,6 +494,11 @@ body {
   color: var(--dark-gray);
   font-size: var(--font-size-small);
   margin-top: 3px;
+  height: 0px;
+}
+
+.profile-section .error-message.hidden {
+  visibility: hidden;
 }
 
 .profile-section .toggle-label {
@@ -533,7 +538,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 1rem;
 }
 
 .profile-section .toggle-section > label {
