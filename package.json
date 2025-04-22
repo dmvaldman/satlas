@@ -1,6 +1,6 @@
 {
   "name": "Satlas",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "An atlas of sits",
   "type": "module",
   "keywords": [],
@@ -8,9 +8,7 @@
     "lint": "eslint",
     "dev": "NODE_ENV=development vite",
     "preview": "NODE_ENV=production vite preview",
-    "version:patch": "npm version patch",
-    "version:minor": "npm version minor",
-    "version:major": "npm version major",
+    "bump": "npm version patch",
     "sentry": "export SENTRY_RELEASE=satlas@$npm_package_version && npx sentry-cli releases new \"$SENTRY_RELEASE\" && npx sentry-cli releases files \"$SENTRY_RELEASE\" upload-sourcemaps dist --rewrite --url-prefix '~/assets' && npx sentry-cli releases finalize \"$SENTRY_RELEASE\" || echo 'Sentry release steps failed, continuing...'",
     "build": "NODE_ENV=production vite build",
     "release": "npm run build && npm run sentry",
