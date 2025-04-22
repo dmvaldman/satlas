@@ -299,7 +299,7 @@ class App extends React.Component<{}, AppState> {
     map.once('idle', () => {
       console.log('[App] Map loaded.');
       // Set map state *after* it's loaded
-      this.setState({ map: map }, () => {
+      this.setState({ map: map }, async () => {
         // Actions after map is set in state and loaded
         console.log('[App] Starting location tracking after map load.');
         // Always attempt to start tracking. LocationService handles retries/state.
@@ -308,7 +308,13 @@ class App extends React.Component<{}, AppState> {
         const bounds = map.getBounds();
         console.log('Initial Map Bounds:', bounds);
         if (bounds) {
-          this.handleLoadSits({ north: bounds.getNorth(), south: bounds.getSouth() });
+          // Get the count of sits loaded in the initial view
+          const loadedSitsCount = await this.handleLoadSits({ north: bounds.getNorth(), south: bounds.getSouth() });
+
+          // Check if sits map is empty after initial load
+          if (loadedSitsCount === 0) {
+            this.showNotification("No sits in this area — create the first!", 'success');
+          }
         }
       });
     });
@@ -612,33 +618,31 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private handleLoadSits = async (bounds: { north: number; south: number }) => {
+  private handleLoadSits = async (bounds: { north: number; south: number }): Promise<number> => {
     try {
       const newSits = await FirebaseService.loadSitsFromBounds(bounds);
-
-      // Only update state if there are actual changes
-      let hasNewSits = false;
       const currentSits = this.state.sits;
 
-      newSits.forEach((sit) => {
-        if (!currentSits.has(sit.id)) {
-          hasNewSits = true;
+      // Create a new map with the freshly loaded sits
+      const updatedSits = new Map(newSits);
+
+      // Preserve any temporary sits from the current state
+      currentSits.forEach((sit, sitId) => {
+        if (sitId.startsWith('temp_') && !updatedSits.has(sitId)) {
+          updatedSits.set(sitId, sit);
         }
       });
 
-      if (hasNewSits) {
-        // add temp sits to new sits
-        const combinedSits = new Map(newSits);
-        this.state.sits.forEach((sit) => {
-          if (sit.id.startsWith('temp_')) {
-            combinedSits.set(sit.id, sit);
-          }
-        });
-        console.log(`Loaded ${newSits.size} sits`);
-        this.setState({ sits: combinedSits });
-      }
+      // Always update the state with the new combined map
+      console.log(`Loaded ${newSits.size} sits from bounds. Total sits (incl. temp): ${updatedSits.size}`);
+      this.setState({ sits: updatedSits });
+
+      // Return the size of the final sits map (including temporary ones)
+      return updatedSits.size;
+
     } catch (error) {
       console.error('Error loading nearby sits:', error);
+      return this.state.sits.size; // Return current size on error to avoid incorrect notification
     }
   };
 
