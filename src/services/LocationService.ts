@@ -16,7 +16,6 @@ export class LocationService {
   private readonly LOCATION_MAX_AGE = 10000; // 10 seconds
   private readonly MIN_UPDATE_INTERVAL_MS = 5000; // Only process updates every 5 seconds
   private lastUpdateTime: number = 0; // Timestamp of the last processed update
-  private isConnected: boolean = false;
 
   constructor() {
     this.onLocationUpdate(LocationService.setLastKnownLocation);
@@ -24,8 +23,6 @@ export class LocationService {
 
   // Start watching location changes
   public async startTracking(): Promise<void> {
-    await this.stopTracking();
-
     try {
       await this._startTracking();
     } catch (error) {
@@ -34,9 +31,6 @@ export class LocationService {
   }
 
   private async _startTracking(): Promise<void> {
-    // Stop any existing poll immediately if we're attempting to start tracking
-    this._stopTrackingPoll();
-
     if (Capacitor.getPlatform() !== 'web') {
       const permissionStatus = await Geolocation.requestPermissions();
       this.hasLocationPermission = permissionStatus.location === 'granted';
@@ -59,7 +53,7 @@ export class LocationService {
     this.trackingPollId = window.setInterval(async () => {
       try {
         await this._startTracking();
-        this._stopTrackingPoll();
+        // Poll is stopped inside the watch callbacks now on first success
       } catch (error) {
         console.warn('Location tracking poll failed:', error);
       }
@@ -68,6 +62,7 @@ export class LocationService {
 
   private _stopTrackingPoll(): void {
     if (this.trackingPollId) {
+      console.log('Stopping location tracking poll...');
       window.clearInterval(this.trackingPollId);
       this.trackingPollId = null;
     }
@@ -82,7 +77,6 @@ export class LocationService {
         await Geolocation.clearWatch({ id: this.locationWatchId });
       }
       this.locationWatchId = null;
-      this.handleConnectionStateChange(false);
     }
     this._stopTrackingPoll();
   }
@@ -237,10 +231,9 @@ export class LocationService {
   private handleLocationError(error: any): void {
     console.error('LocationService error:', error?.code, error?.message, error);
 
-    // Assume disconnected on error
-    this.handleConnectionStateChange(false);
-
     // Use optional chaining and nullish coalescing for safer access
+    // Reset watch ID in case the error came from a failed watch setup
+    this.locationWatchId = null;
     const errorCode = error?.code;
     const errorMessage = error?.message?.toLowerCase() ?? '';
     const isPermissionDenied = errorCode === 1 || errorMessage.includes('permission denied');
@@ -257,32 +250,29 @@ export class LocationService {
     }
   }
 
-  private handleConnectionStateChange(isConnected: boolean, coordinates?: Location): void {
-    if (this.isConnected === isConnected) return;
-
-    this.isConnected = isConnected;
-    console.log(`[LocationService] Connection state changed: ${isConnected ? 'Connected' : 'Disconnected'}`);
-    // No longer need to invoke callbacks here
-  }
-
   private async setupNativeWatch(): Promise<void> {
-    this.locationWatchId = await Geolocation.watchPosition(
+    // Initiate watch, store ID locally first
+    const localWatchId = await Geolocation.watchPosition(
       { enableHighAccuracy: true, maximumAge: 0, timeout: this.LOCATION_TIMEOUT }, // Use maximumAge: 0 for watch
       (position, error) => {
         if (error) {
           this.handleLocationError(error);
-          // Don't reset lastUpdateTime here, allow immediate processing after error recovery
-          this.handleConnectionStateChange(false);
           return;
         }
         if (position) {
           // --- Throttling Logic ---
           const now = Date.now();
           if (now - this.lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
-            // console.log('[LocationService] Throttled native update'); // Optional debug log
             return; // Not enough time passed, ignore this update
           }
           this.lastUpdateTime = now; // Update timestamp for the processed update
+
+          // Assign instance watchId and stop poll ONLY on the first successful update
+          if (this.locationWatchId === null) {
+            console.log(`[LocationService] First success for native watch. Assigning ID: ${localWatchId}`);
+            this.locationWatchId = localWatchId;
+            this._stopTrackingPoll();
+          }
           // --- End Throttling ---
 
           const coordinates = {
@@ -291,7 +281,6 @@ export class LocationService {
           };
           this._stopTrackingPoll();
           console.log('[LocationService] Native watch processed position update.');
-          this.handleConnectionStateChange(true, coordinates);
           this.handleLocationUpdate(coordinates);
         }
       }
@@ -303,7 +292,8 @@ export class LocationService {
       throw new Error('Geolocation not supported in this browser');
     }
 
-    this.locationWatchId = navigator.geolocation.watchPosition(
+    // Initiate watch, store ID locally first
+    const localWatchId = navigator.geolocation.watchPosition(
       position => {
         // --- Throttling Logic ---
         const now = Date.now();
@@ -311,6 +301,14 @@ export class LocationService {
           // console.log('[LocationService] Throttled web update'); // Optional debug log
           return; // Not enough time passed
         }
+
+        // Assign instance watchId and stop poll ONLY on the first successful update
+        if (this.locationWatchId === null) {
+          console.log(`[LocationService] First success for web watch. Assigning ID: ${localWatchId}`);
+          this.locationWatchId = localWatchId as unknown as string; // Assign and cast
+          this._stopTrackingPoll();
+        }
+
         this.lastUpdateTime = now;
         // --- End Throttling ---
 
@@ -320,13 +318,11 @@ export class LocationService {
         };
         this._stopTrackingPoll();
         console.log('[LocationService] Web watch processed position update.');
-        this.handleConnectionStateChange(true, coordinates);
         this.handleLocationUpdate(coordinates);
       },
       error => {
         this.handleLocationError(error);
         // Don't reset lastUpdateTime here
-        this.handleConnectionStateChange(false);
         console.error('Web geolocation error:', error);
       },
       { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT }
