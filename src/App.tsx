@@ -138,10 +138,14 @@ class App extends React.Component<{}, AppState> {
   componentDidMount() {
     console.log('[App] Component mounted');
 
+    // Add location listener before initializations
+    this.locationService.onLocationUpdate(this.handleLocationUpdate);
+
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),
-      this.initializeMap()
+      this.initializeMap(), // initializeMap now handles its own async logic
+      this.initializeOfflineService() // Initialize offline service earlier
     ]).catch(error => {
       console.error('[App] Initialization error during Promise.all:', error);
       this.showNotification('Failed to initialize app', 'error');
@@ -149,24 +153,20 @@ class App extends React.Component<{}, AppState> {
 
     // Configure status bar first since it's fast
     if (Capacitor.isNativePlatform()) {
-      console.log('[App] Configuring status bar...'); // Log before
-      try {
-          this.configureStatusBar();
-          console.log('[App] Status bar configured. Attempting to hide splash screen...'); // Log after config, before hide
-          SplashScreen.hide();
-          console.log('[App] SplashScreen.hide() command executed.'); // Log after hide
-      } catch(e) {
-          console.error('[App] Error during status bar config or splash screen hide:', e);
-      }
+      // Configure status bar
+      this.configureStatusBar();
 
       // Add resume listener for native platforms
       CapacitorApp.addListener('resume', () => {
         console.log('[App] App resumed from background');
+        // Always try to start tracking on resume. LocationService handles if already tracking.
         this.locationService.startTracking();
+
+        // Fly map ONLY if we have a map, a location AND the drawer is closed
         if (this.state.map && this.state.currentLocation && !this.state.drawer.isOpen) {
           this.state.map.flyTo({
             center: [this.state.currentLocation.longitude, this.state.currentLocation.latitude],
-            zoom: 13,
+            zoom: 13, // Or maintain current zoom? Let's stick to 13.
             duration: 1000,
             essential: true
           });
@@ -184,14 +184,17 @@ class App extends React.Component<{}, AppState> {
       });
     }
 
-    // Add location listener before initializations
-    this.locationService.onLocationUpdate(this.handleLocationUpdate);
-
     // Setup deep links for web/mobile
     this.setupDeepLinks();
 
-    // Initialize offline service
-    this.initializeOfflineService();
+    // Attempt to hide splash screen only after primary initializations and listener setups
+    if (Capacitor.isNativePlatform()) {
+      try {
+        SplashScreen.hide(); // Fire and forget
+      } catch (e) {
+        console.error('[App] Error hiding splash screen:', e);
+      }
+    }
   }
 
   componentWillUnmount() {
@@ -246,101 +249,80 @@ class App extends React.Component<{}, AppState> {
   };
 
   private initializeMap = async () => {
-    console.log('Getting location');
+    console.log('[App] Initializing Map...');
 
-    // Get location in background
-    this.locationService.getCurrentLocation()
-      .then(coordinates => {
-        if (!this.mapContainer.current) return;
+    let initialCoordinates: Location | null = null;
+    let mapCenter: Location;
+    let mapZoom: number;
 
-        const zoom = 13;
-        const map = this.createMap(coordinates, zoom);
+    try {
+      console.log('[App] Attempting to get initial location...');
+      // Give slightly more time for initial location? Sticking to service default for now.
+      initialCoordinates = await this.locationService.getCurrentLocation();
+      console.log('[App] Initial location obtained:', initialCoordinates);
+      mapCenter = initialCoordinates;
+      mapZoom = 13;
+      // Set currentLocation immediately if successful
+      this.setState({ currentLocation: initialCoordinates });
+    } catch (error) {
+      console.warn('[App] Initial location failed:', error);
+      const lastKnown = LocationService.getLastKnownLocation();
+      if (lastKnown) {
+        console.log('[App] Using last known location for initial map center:', lastKnown);
+        mapCenter = lastKnown;
+        mapZoom = 13;
+        // Set currentLocation if using last known
+        this.setState({ currentLocation: lastKnown });
+      } else if (this.state.userPreferences.cityCoordinates) {
+        console.log('[App] Using user preference city for initial map center');
+        mapCenter = this.state.userPreferences.cityCoordinates;
+        mapZoom = 11;
+      } else {
+        console.log('[App] Using default US center for initial map');
+        mapCenter = { latitude: 39.8283, longitude: -98.5795 }; // US Center
+        mapZoom = 3;
+      }
+    }
 
-        this.setState({
-          currentLocation: coordinates,
-          map: map
-        });
-      })
-      .catch(error => {
-        console.error('Location error:', error);
-
-        let mapCoordinates: Location;
-        let userCoordinates: Location | null;
-        let zoom: number;
-
-        if (this.state.userPreferences.cityCoordinates) {
-          mapCoordinates = this.state.userPreferences.cityCoordinates;
-          userCoordinates = mapCoordinates;
-          zoom = 11;
-        } else {
-          // Center map on geographic center of America
-          mapCoordinates = { latitude: 39.8283, longitude: -98.5795 };
-          userCoordinates = null;
-          zoom = 3;
-        }
-
-        const map = this.createMap(mapCoordinates, zoom);
-
-        this.setState({
-          currentLocation: userCoordinates,
-          map: map
-        });
-
-        // Fire onReconnect GPS callback
-        console.log('Firing onReconnect GPS callback');
-        this.locationService.onReconnect((coordinates) => {
-          console.log('onReconnect GPS callback fired with coordinates:', coordinates);
-          if (coordinates) {
-            this.setState({ currentLocation: coordinates });
-          }
-        });
-      });
-  };
-
-  private createMap = (coordinates: Location, zoom: number) => {
-    if (!this.mapContainer.current) return null;
+    if (!this.mapContainer.current) {
+      console.error('[App] Map container not found!');
+      return;
+    }
 
     const map: mapboxgl.Map = new mapboxgl.Map({
       container: this.mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: [coordinates.longitude, coordinates.latitude],
-      zoom: zoom
+      center: [mapCenter.longitude, mapCenter.latitude],
+      zoom: mapZoom
     });
 
-    map.on('load', () => {
-        console.log('Map fully loaded');
+    map.once('idle', () => {
+      console.log('[App] Map loaded.');
+      // Set map state *after* it's loaded
+      this.setState({ map: map }, () => {
+        // Actions after map is set in state and loaded
+        console.log('[App] Starting location tracking after map load.');
+        // Always attempt to start tracking. LocationService handles retries/state.
         this.locationService.startTracking();
 
         const bounds = map.getBounds();
-        console.log('Map Bounds:', bounds);
+        console.log('Initial Map Bounds:', bounds);
         if (bounds) {
-          this.handleLoadSits({
-            north: bounds.getNorth(),
-            south: bounds.getSouth()
-          });
+          this.handleLoadSits({ north: bounds.getNorth(), south: bounds.getSouth() });
         }
       });
+    });
 
-      // Add moveend handler
-      map.on('moveend', () => {
-        const bounds = map.getBounds();
-        console.log('Map Bounds:', bounds);
-        if (bounds) {
-          this.handleLoadSits({
-            north: bounds.getNorth(),
-            south: bounds.getSouth()
-          });
+    map.on('moveend', () => {
+        // Ensure map exists in state before using it
+        if (this.state.map) {
+            const bounds = this.state.map.getBounds();
+            console.log('Map Moved Bounds:', bounds);
+            if (bounds) {
+                this.handleLoadSits({ north: bounds.getNorth(), south: bounds.getSouth() });
+            }
         }
-      });
-
-      // map.addControl(new mapboxgl.GeolocateControl({
-      //   positionOptions: {
-      //     enableHighAccuracy: false
-      //   },
-      //   trackUserLocation: true
-      // }), 'bottom-left');
-
-    return map;
+    });
   };
 
   private initializeOfflineService = async () => {
@@ -943,8 +925,24 @@ class App extends React.Component<{}, AppState> {
   private handleLocationUpdate = (location?: Location) => {
     if (!location) return;
 
+    // Check if we already had a location *before* this update
+    const hadLocationBefore = !!this.state.currentLocation;
+
     // Update state with new location
-    this.setState({ currentLocation: location });
+    this.setState({ currentLocation: location }, () => {
+        // Fly to location *only if* this is the FIRST valid location we've received
+        // *and* the map exists *and* the drawer is closed.
+        if (!hadLocationBefore && this.state.map && !this.state.drawer.isOpen) {
+          this.state.map.flyTo({
+            center: [location.longitude, location.latitude],
+            zoom: 13, // Keep zoom consistent
+            duration: 1000,
+            essential: true
+          });
+        } else {
+          console.log('[App] Location update received, not flying map.', { hadLocationBefore, hasMap: !!this.state.map, drawerOpen: this.state.drawer.isOpen });
+        }
+    });
 
     // Also update LocationService's cache
     LocationService.setLastKnownLocation(location);

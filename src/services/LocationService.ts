@@ -8,13 +8,11 @@ type LocationCallback = (location?: Location) => void;
 export class LocationService {
   private locationWatchId: string | null = null;
   private locationCallbacks: LocationCallback[] = [];
-  private onReconnectCallbacks: LocationCallback[] = [];
-  private onDisconnectCallbacks: (() => void)[] = [];
   private hasLocationPermission: boolean = false;
   private static lastKnownLocation: Location | null = null;
   private trackingPollId: number | null = null;
   private readonly TRACKING_POLL_INTERVAL = 1000; // 1 second
-  private readonly LOCATION_TIMEOUT = 3000; // 3 seconds
+  private readonly LOCATION_TIMEOUT = 5000; // 5 seconds
   private readonly LOCATION_MAX_AGE = 10000; // 10 seconds
   private readonly MIN_UPDATE_INTERVAL_MS = 5000; // Only process updates every 5 seconds
   private lastUpdateTime: number = 0; // Timestamp of the last processed update
@@ -163,32 +161,40 @@ export class LocationService {
     });
 
     try {
-      // First try with high accuracy
+      // --- Try Low Accuracy First ---
+      console.log('[LocationService] Attempting low accuracy first...');
       try {
         const position = await Promise.race([
           Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
+            enableHighAccuracy: false, // Low accuracy
             timeout: this.LOCATION_TIMEOUT
           }),
           timeoutPromise
         ]);
-
+        console.log('[LocationService] Low accuracy succeeded.');
         return {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
-      } catch (highAccuracyError) {
-        console.log('High accuracy location failed, falling back to low accuracy:', highAccuracyError);
+      } catch (lowAccuracyError) {
+        console.warn('[LocationService] Low accuracy failed, trying high accuracy:', lowAccuracyError);
+        // Clear the first timeout promise and create a new one for the high accuracy attempt
+        // Note: The original timeoutPromise might have already rejected, but creating a new one is cleaner.
+        const highAccuracyTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('High accuracy location request timed out'));
+          }, this.LOCATION_TIMEOUT);
+        });
 
-        // Fallback to low accuracy with timeout
+        // --- Fallback to High Accuracy ---
         const position = await Promise.race([
           Geolocation.getCurrentPosition({
-            enableHighAccuracy: false,
+            enableHighAccuracy: true, // High accuracy
             timeout: this.LOCATION_TIMEOUT
           }),
-          timeoutPromise
+          highAccuracyTimeoutPromise
         ]);
-
+        console.log('[LocationService] High accuracy fallback succeeded.');
         return {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
@@ -234,8 +240,10 @@ export class LocationService {
     // Assume disconnected on error
     this.handleConnectionStateChange(false);
 
-    // Check for explicit permission denial (code 1 or specific message)
-    const isPermissionDenied = error?.code === 1 || error?.message?.toLowerCase().includes('permission denied');
+    // Use optional chaining and nullish coalescing for safer access
+    const errorCode = error?.code;
+    const errorMessage = error?.message?.toLowerCase() ?? '';
+    const isPermissionDenied = errorCode === 1 || errorMessage.includes('permission denied');
 
     if (isPermissionDenied) {
       this.hasLocationPermission = false;
@@ -249,49 +257,17 @@ export class LocationService {
     }
   }
 
-  // Add handlers for GPS connection state changes
-  public onReconnect(callback: LocationCallback) {
-    this.onReconnectCallbacks.push(callback);
-  }
-
-  public offReconnect(callback: LocationCallback): void {
-    this.onReconnectCallbacks = this.onReconnectCallbacks.filter(cb => cb !== callback);
-  }
-
-  public onDisconnect(callback: () => void): void {
-    this.onDisconnectCallbacks.push(callback);
-  }
-
-  public offDisconnect(callback: () => void): void {
-    this.onDisconnectCallbacks = this.onDisconnectCallbacks.filter(cb => cb !== callback);
-  }
-
   private handleConnectionStateChange(isConnected: boolean, coordinates?: Location): void {
     if (this.isConnected === isConnected) return;
 
     this.isConnected = isConnected;
-    if (isConnected) {
-      this.onReconnectCallbacks.forEach(callback => {
-        try {
-          callback(coordinates);
-        } catch (error) {
-          console.error('Error in reconnect listener:', error);
-        }
-      });
-    } else {
-      this.onDisconnectCallbacks.forEach(callback => {
-        try {
-          callback();
-        } catch (error) {
-          console.error('Error in disconnect listener:', error);
-        }
-      });
-    }
+    console.log(`[LocationService] Connection state changed: ${isConnected ? 'Connected' : 'Disconnected'}`);
+    // No longer need to invoke callbacks here
   }
 
   private async setupNativeWatch(): Promise<void> {
     this.locationWatchId = await Geolocation.watchPosition(
-      { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: this.LOCATION_TIMEOUT }, // Use maximumAge: 0 for watch
       (position, error) => {
         if (error) {
           this.handleLocationError(error);
