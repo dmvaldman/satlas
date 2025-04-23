@@ -161,7 +161,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     });
   }
 
-  // UPDATED: getImageDimensions to use ImageBitmap
   private getImageDimensions = (imageBitmap: ImageBitmap): {width: number, height: number} => {
     if (imageBitmap.width > 0 && imageBitmap.height > 0) {
       return { width: imageBitmap.width, height: imageBitmap.height };
@@ -170,19 +169,40 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     }
   };
 
-  // ADDED: Helper to convert Base64 string to ArrayBuffer
-  private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binaryString = atob(base64.replace(/^data:image\/\w+;base64,/, '')); // Ensure prefix is removed
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+  private base64ToArrayBuffer(base64Input: string): ArrayBuffer {
+    // 1. Check if the input starts with the data URL prefix
+    let base64 = base64Input;
+    const prefixRegex = /^data:image\/[a-zA-Z]+;base64,/;
+    if (prefixRegex.test(base64Input)) {
+        base64 = base64Input.replace(prefixRegex, '');
     }
-    return bytes.buffer;
+
+    // 2. Clean the base64 string (remove potential whitespace/newlines)
+    const cleanedBase64 = base64.replace(/\s/g, '');
+
+    // 3. Decode using atob
+    try {
+        const binaryString = atob(cleanedBase64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    } catch (e) {
+        console.error("[PhotoUpload] Failed to decode base64 string:", e);
+        // Re-throw a more informative error
+        if (e instanceof DOMException && e.name === 'InvalidCharacterError') {
+             throw new Error(`Failed to execute 'atob': The string contains characters outside of the Latin1 range or is not correctly encoded. Cleaned Base64 Length: ${cleanedBase64.length}`);
+        } else if (e instanceof Error) {
+             throw new Error(`Failed to execute 'atob': ${e.message}`);
+        } else {
+             throw new Error(`Failed to execute 'atob': Unknown error occurred.`);
+        }
+    }
   }
 
-  // UPDATED: resizeImageUnified to accept ArrayBuffer and return Promise<ImageBitmap>
-  private resizeImageUnified(imageBuffer: ArrayBuffer): Promise<ImageBitmap> {
+  private resizeImage(imageBuffer: ArrayBuffer): Promise<ImageBitmap> {
     if (!this.resizeWorker) {
         console.error('[PhotoUpload] Resize worker not available!');
         return Promise.reject(new Error("Resize worker not available."));
@@ -280,7 +300,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
   // UPDATED: processImage to use ArrayBuffer and ImageBitmap flow
   private async processImage(imageSource: string, sourceType: 'camera' | 'gallery') {
-      console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
+      console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}... Source: ${imageSource.substring(0, 100)}...`); // Log start of source
       if (!this.resizeWorker) {
           this.props.showNotification('Image processing service unavailable.', 'error');
           return;
@@ -288,33 +308,43 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       let originalImageBuffer: ArrayBuffer;
       let finalResizedBitmap: ImageBitmap;
       let finalBase64Data: string; // Still need this for PhotoResult temporarily
-      let location: Location | null;
-      let dimensions: { width: number; height: number };
+      let location: Location | null = null; // Initialize to null
+      let dimensions: { width: number; height: number } | null = null; // Initialize to null
       let originalBase64ForExif: string | undefined;
 
       try {
           // 1. Get ORIGINAL data as ArrayBuffer AND Base64 (for EXIF)
-          if (Capacitor.getPlatform() !== 'web' && imageSource.startsWith('file:')) {
+          const platform = Capacitor.getPlatform();
+          if (platform !== 'web') {
+              console.log(`[PhotoUpload] Reading file data from native source: ${imageSource}`);
+              // On native platforms (Android/iOS), read the file content using Filesystem
+              // This works for both file:// paths and content:// URIs
               const fileContent = await Filesystem.readFile({ path: imageSource });
               if (typeof fileContent.data !== 'string') {
                   throw new Error('Filesystem did not return Base64 string.');
               }
               originalBase64ForExif = fileContent.data;
-              originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
+              console.log(`[PhotoUpload] Read ${originalBase64ForExif.length} bytes (Base64) from native source.`);
+              originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif); // Convert raw base64
           } else {
-              originalBase64ForExif = imageSource;
-              originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
+              // On web, the imageSource is already the base64 string (potentially with prefix)
+              console.log('[PhotoUpload] Using base64 data directly from web source.');
+              originalBase64ForExif = imageSource; // Keep original potentially prefixed base64 for EXIF
+              originalImageBuffer = this.base64ToArrayBuffer(imageSource); // Convert potentially prefixed base64
           }
 
           // 2. Resize/Optimize Image using the Worker (pass TRANSFERABLE ArrayBuffer, get ImageBitmap)
-          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer);
+          finalResizedBitmap = await this.resizeImage(originalImageBuffer);
 
           // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
           try {
             location = await this.getLocation(sourceType, originalBase64ForExif);
           } catch (error) {
             console.error('[PhotoUpload] Error getting location:', error);
-            this.props.showNotification('Error getting location from photo', 'error');
+            // Decide if this is critical - maybe proceed without location?
+            // For now, show notification but continue processing
+            this.props.showNotification('Could not get location from photo.', 'error');
+            location = null; // Ensure location is null if it fails
           }
 
           // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
@@ -322,7 +352,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
             dimensions = this.getImageDimensions(finalResizedBitmap);
           } catch (error) {
             console.error('[PhotoUpload] Error getting image dimensions:', error);
-            this.props.showNotification('Error getting image dimensions', 'error');
+            // This is more critical, maybe stop processing?
+            this.props.showNotification('Error processing image dimensions.', 'error');
+            finalResizedBitmap.close(); // Clean up bitmap
+            return; // Stop processing if dimensions fail
           }
 
           // 5. Convert final ImageBitmap to Blob
@@ -338,10 +371,18 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           // !! END TEMPORARY STEP !!
 
           // 6. Prepare and Upload Result (using the temporary Base64)
+          // Ensure location and dimensions are not null before creating result
+          if (location === null) {
+              throw new Error('Failed to get location for the photo.');
+          }
+          if (dimensions === null) {
+              throw new Error('Failed to get dimensions for the photo.');
+          }
+
           const photoResult: PhotoResult = {
               base64Data: finalBase64Data,
-              location,
-              dimensions
+              location, // Now guaranteed to be Location
+              dimensions // Now guaranteed to be { width, height }
           };
           console.log('[PhotoUpload] Processing complete, calling onPhotoUpload.');
           this.props.onPhotoUpload(photoResult);
