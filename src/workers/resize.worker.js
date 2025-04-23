@@ -35,7 +35,7 @@ function blobToBase64(blob) {
 
 self.onmessage = async (event) => {
   // CORRECT: Receive ArrayBuffer
-  const { imageBuffer, maxWidth, quality, id } = event.data;
+  const { imageBuffer, maxDimension, quality, id } = event.data;
   console.log('[Worker] Received job:', id);
 
   try {
@@ -54,9 +54,12 @@ self.onmessage = async (event) => {
     let targetWidth = originalWidth;
     let targetHeight = originalHeight;
 
-    if (targetWidth > maxWidth) {
-      targetWidth = maxWidth;
+    if (originalWidth > originalHeight) {
+      targetWidth = maxDimension;
       targetHeight = Math.round((targetWidth / originalWidth) * originalHeight);
+    } else {
+      targetHeight = maxDimension;
+      targetWidth = Math.round((targetHeight / originalHeight) * originalWidth);
     }
 
     if (targetWidth <= 0 || targetHeight <= 0) {

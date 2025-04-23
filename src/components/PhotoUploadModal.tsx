@@ -22,7 +22,7 @@ interface PhotoUploadProps {
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
-  private imageWidth = 1600;
+  private maxDimension = 1600;
   private quality = 90;
   // Initialize worker directly if supported, otherwise null
   private resizeWorker: Worker | null = window.Worker ? new ResizeWorker() : null;
@@ -194,7 +194,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
         // UPDATED: Post ArrayBuffer and mark it as transferable
         this.resizeWorker?.postMessage({
             imageBuffer: imageBuffer, // Pass buffer
-            maxWidth: this.imageWidth,
+            maxDimension: this.maxDimension,
             quality: this.quality,
             id: jobId
         }, [imageBuffer]); // <-- Transfer ownership
