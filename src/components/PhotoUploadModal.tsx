@@ -21,7 +21,11 @@ interface PhotoUploadProps {
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
-class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
+interface PhotoUploadState {
+  processingSource: 'camera' | 'gallery' | null;
+}
+
+class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUploadState> {
   private maxDimension = 1600;
   private quality = 90;
   // Initialize worker directly if supported, otherwise null
@@ -31,6 +35,9 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
 
   constructor(props: PhotoUploadProps) {
     super(props);
+    this.state = {
+      processingSource: null, // Initialize state
+    };
     // Setup listeners if worker was initialized successfully
     if (this.resizeWorker) {
       console.log('[PhotoUpload] Initializing Resize Worker listeners...');
@@ -391,13 +398,21 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
           const message = error instanceof Error ? error.message : 'Error processing image';
           this.props.showNotification(message, 'error');
+      } finally {
+          this.setState({ processingSource: null });
       }
   }
 
   private handleTakePhoto = async () => {
+    // Delay so native modal has time to open
+    setTimeout(() => {
+      this.setState({ processingSource: 'camera' });
+    }, 300);
+
     let originalPath: string | null = null;
     try {
       console.log('[PhotoUpload] Starting camera capture (requesting URI)');
+
       const image: Photo = await Camera.getPhoto({
         allowEditing: false,
         resultType: CameraResultType.Uri,
@@ -421,77 +436,72 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
       }
       console.error('[PhotoUpload] Error acquiring camera image:', error);
       this.props.showNotification('Error accessing camera', 'error');
+    } finally {
+      this.setState({ processingSource: null });
     }
   };
 
   private handleChooseFromGallery = async () => {
+    // Set processing state
     let originalPathOrBase64: string | null = null;
     try {
       console.log('[PhotoUpload] Starting gallery selection');
-      if (Capacitor.getPlatform() === 'web') {
-        originalPathOrBase64 = await this.getImageFromWebFileInput();
-      } else {
-        originalPathOrBase64 = await this.getImagePathFromNativeGallery();
-      }
-      if (!originalPathOrBase64) return;
-      console.log('[PhotoUpload] Original image acquired from gallery.');
+      const platform = Capacitor.getPlatform();
 
+      if (platform === 'web') {
+          // On web, use Camera plugin to get Base64 directly, which handles cancellation
+          this.setState({ processingSource: 'gallery' });
+          const image = await Camera.getPhoto({
+              quality: 100, // Get original quality, resizing happens later
+              allowEditing: false,
+              resultType: CameraResultType.Base64, // Get Base64 directly
+              source: CameraSource.Photos // Specify gallery source
+          });
+
+          if (!image.base64String) {
+              throw new Error('Camera plugin did not return Base64 string from gallery.');
+          }
+          originalPathOrBase64 = image.base64String;
+          console.log('[PhotoUpload] Acquired Base64 from web gallery via Camera plugin.');
+
+      } else {
+        // Delay so native modal has time to open
+        setTimeout(() => {
+          this.setState({ processingSource: 'gallery' });
+        }, 300);
+        // On native, use the existing file path logic
+        originalPathOrBase64 = await this.getImagePathFromNativeGallery();
+        if (!originalPathOrBase64) {
+          console.log('[PhotoUpload] Native gallery selection cancelled or no path returned.');
+          // No need to throw, the finally block will clear the spinner
+          return;
+        }
+        console.log('[PhotoUpload] Acquired image path from native gallery.');
+      }
+
+      // Proceed to process the image (Base64 on web, path on native)
       await this.processImage(originalPathOrBase64, 'gallery');
 
     } catch (error) {
-      if (error instanceof Error && (error.message.includes('cancel') || error.message.includes('No image selected'))) {
-        console.log('[PhotoUpload] Gallery selection cancelled.');
-        return;
-      }
-      console.error('[PhotoUpload] Error acquiring gallery image:', error);
-      this.props.showNotification('Error accessing photos', 'error');
-    }
-  };
-
-  private getImageFromWebFileInput = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-
-      input.onchange = async (e) => {
-        try {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (!file) {
-            console.log('Photo selection cancelled');
-            resolve('');
-            return;
-          }
-
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            try {
-              const initialBase64WithPrefix = e.target?.result as string;
-              if (!initialBase64WithPrefix) {
-                  throw new Error('FileReader did not return result');
-              }
-              const initialBase64 = initialBase64WithPrefix.split(',')[1];
-
-              resolve(initialBase64);
-
-            } catch (error) {
-                 console.error('[PhotoUpload] Error processing file reader result:', error);
-                 reject(error);
-            }
-          };
-          reader.onerror = (error) => {
-            console.error('[PhotoUpload] FileReader error:', error);
-            reject(new Error('Failed to read file'));
-          };
-          reader.readAsDataURL(file);
-        } catch (error) {
-          reject(error);
+        // Handle potential errors, including cancellation from Camera.getPhoto on web
+        if (error instanceof Error) {
+             const errorMessage = error.message.toLowerCase();
+             // Check for common cancellation/permission messages from Camera plugin or FilePicker
+             if (errorMessage.includes('cancel') || errorMessage.includes('denied') || errorMessage.includes('permission') || errorMessage.includes('no image selected')) {
+                  console.log('[PhotoUpload] Gallery operation cancelled or denied.');
+                  // No notification needed for cancellation
+                  return; // Exit cleanly
+             }
         }
-      };
-
-      input.click();
-    });
-  };
+        // Log and notify for other errors
+        console.error('[PhotoUpload] Error acquiring gallery image:', error);
+        this.props.showNotification('Error accessing photos', 'error');
+    } finally {
+      // Always reset the state when the handler finishes, regardless of outcome.
+      // processImage() will also reset it in its finally block if it runs.
+      this.setState({ processingSource: null });
+     }
+   };
 
   private getImagePathFromNativeGallery = async (): Promise<string | null> => {
     try {
@@ -531,8 +541,18 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
     }
   };
 
+  // Helper function to check for mobile browser user agent
+  private isMobileBrowser = (): boolean => {
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+    return false;
+  };
+
   render() {
     const { isOpen, onClose } = this.props;
+    const { processingSource } = this.state;
+    const platform = Capacitor.getPlatform();
     const isOffline = !OfflineService.getInstance().isNetworkOnline();
 
     return (
@@ -544,25 +564,32 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps> {
           <div className="offline-notice">You're offline. Photos will upload when you're back online.</div>
         )}
 
-        <button
-          className="modal-option-button"
-          onClick={this.handleTakePhoto}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
-            <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-          </svg>
-          Take Photo
-        </button>
+        {/* Only show Take Photo on native platforms OR mobile web */}
+        {(platform !== 'web' || (platform === 'web' && this.isMobileBrowser())) && (
+          <button
+            className="modal-option-button"
+            onClick={this.handleTakePhoto}
+            disabled={processingSource !== null} // Disable if any processing is active
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
+              <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+            </svg>
+            Take Photo
+            {processingSource === 'camera' && <div className="spinner xsmall"></div>}
+          </button>
+        )}
 
         <button
           className="modal-option-button"
           onClick={this.handleChooseFromGallery}
+          disabled={processingSource !== null} // Disable if any processing is active
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
           </svg>
           Choose from Gallery
+          {processingSource === 'gallery' && <div className="spinner xsmall"></div>}
         </button>
       </BaseModal>
     );
