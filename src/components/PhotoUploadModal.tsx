@@ -293,58 +293,102 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     }
   }
 
-  // UPDATED: processImage to use ArrayBuffer and ImageBitmap flow
+  // UPDATED: processImage to use ArrayBuffer and ImageBitmap flow, and handle web blob URLs
   private async processImage(imageSource: string, sourceType: 'camera' | 'gallery') {
       console.log(`[PhotoUpload] Starting processing pipeline for ${sourceType}...`);
       if (!this.resizeWorker) {
           this.props.showNotification('Image processing service unavailable.', 'error');
           return;
       }
-      let originalImageBuffer: ArrayBuffer;
+      let originalImageBuffer: ArrayBuffer | null = null; // Initialize as null
       let finalResizedBitmap: ImageBitmap;
       let finalBase64Data: string; // Still need this for PhotoResult temporarily
-      let location: Location | null;
-      let dimensions: { width: number; height: number };
+      let location: Location | null = null; // Initialize as null
+      let dimensions: { width: number; height: number } | null = null; // Initialize as null
       let originalBase64ForExif: string | undefined;
 
       try {
-          // 1. Get ORIGINAL data as ArrayBuffer AND Base64 (for EXIF)
+          // 1. Get ORIGINAL data as ArrayBuffer AND Base64 (for EXIF if needed)
           if (Capacitor.getPlatform() !== 'web' && imageSource.startsWith('file:')) {
+              console.log('[PhotoUpload] Reading native file path:', imageSource);
               const fileContent = await Filesystem.readFile({ path: imageSource });
               if (typeof fileContent.data !== 'string') {
                   throw new Error('Filesystem did not return Base64 string.');
               }
-              originalBase64ForExif = fileContent.data;
+              originalBase64ForExif = fileContent.data; // Store for potential gallery EXIF later
               originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
+          } else if (Capacitor.getPlatform() === 'web' && imageSource.startsWith('blob:')) {
+              // Web Blob URL (likely from camera): Fetch blob, convert to ArrayBuffer
+              console.log('[PhotoUpload] Handling Blob URL:', imageSource);
+              const response = await fetch(imageSource);
+              if (!response.ok) {
+                  throw new Error(`Failed to fetch blob: ${response.statusText}`);
+              }
+              originalImageBuffer = await response.arrayBuffer();
+              // We don't have original Base64 here for EXIF, but camera source doesn't use it anyway
+              originalBase64ForExif = undefined;
+              // Revoke the blob URL *after* we have the buffer
+              URL.revokeObjectURL(imageSource);
+              console.log('[PhotoUpload] Blob URL fetched and revoked.');
           } else {
-              originalBase64ForExif = imageSource;
+              // Assume it's a Base64 string (likely from web gallery)
+              console.log('[PhotoUpload] Handling Base64 string input.');
+              originalBase64ForExif = imageSource; // Keep for EXIF
               originalImageBuffer = this.base64ToArrayBuffer(originalBase64ForExif);
+          }
+
+          // Ensure we got the buffer
+          if (!originalImageBuffer) {
+              throw new Error("Failed to obtain image data buffer.");
           }
 
           // 2. Resize/Optimize Image using the Worker (pass TRANSFERABLE ArrayBuffer, get ImageBitmap)
-          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer);
+          console.log('[PhotoUpload] Sending image buffer to resize worker...');
+          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer); // Pass the non-null buffer
+          console.log('[PhotoUpload] Received resized ImageBitmap from worker.');
 
           // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
+          console.log('[PhotoUpload] Attempting to get location...');
           try {
-            location = await this.getLocation(sourceType, originalBase64ForExif);
+            // Pass originalBase64ForExif only if it's relevant (gallery) and available
+            const base64ForLocation = sourceType === 'gallery' ? originalBase64ForExif : undefined;
+            location = await this.getLocation(sourceType, base64ForLocation);
+            console.log('[PhotoUpload] Location obtained:', location);
           } catch (error) {
-            console.error('[PhotoUpload] Error getting location:', error);
-            this.props.showNotification('Error getting location from photo', 'error');
+            // Location is mandatory, show error and stop
+            this.props.showNotification('Could not determine photo location.', 'error');
+            finalResizedBitmap?.close(); // Close bitmap if we error out here
+            return; // Stop processing
+          }
+
+          // Ensure location was successfully obtained
+          if (!location) {
+            console.error('[PhotoUpload] Location is missing after attempt, cannot proceed.');
+            this.props.showNotification('Failed to determine photo location.', 'error');
+            finalResizedBitmap?.close(); // Close bitmap if we error out here
+            return; // Stop processing
           }
 
           // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
+          console.log('[PhotoUpload] Attempting to get dimensions...');
           try {
             dimensions = this.getImageDimensions(finalResizedBitmap);
+            console.log('[PhotoUpload] Dimensions obtained:', dimensions);
           } catch (error) {
             console.error('[PhotoUpload] Error getting image dimensions:', error);
-            this.props.showNotification('Error getting image dimensions', 'error');
+            // Dimensions are critical, show error and stop
+            this.props.showNotification('Error processing image dimensions', 'error');
+            finalResizedBitmap?.close(); // Close bitmap if we error out here
+            return; // Stop processing
           }
 
           // 5. Convert final ImageBitmap to Blob
+          console.log('[PhotoUpload] Converting final ImageBitmap to Blob...');
           const finalResizedBlob = await this.imageBitmapToBlob(finalResizedBitmap, this.quality);
 
           // Close the bitmap now that we have the Blob
           finalResizedBitmap.close();
+          console.log('[PhotoUpload] ImageBitmap closed.');
 
           // !! TEMPORARY STEP for Phase 1: Convert Blob back to Base64 for downstream PhotoResult !!
           console.log('[PhotoUpload] Converting final Blob back to Base64 for PhotoResult...');
@@ -352,11 +396,14 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           console.log('[PhotoUpload] Final Base64 conversion complete.');
           // !! END TEMPORARY STEP !!
 
-          // 6. Prepare and Upload Result (using the temporary Base64)
+          // 6. Prepare and Upload Result (Check required fields)
+          // Checks for location and dimensions already happened and returned if failed.
+          // Dimensions check already happened and returned if failed.
+
           const photoResult: PhotoResult = {
               base64Data: finalBase64Data,
-              location,
-              dimensions
+              location: location, // Guaranteed to be non-null here
+              dimensions: dimensions // Guaranteed to be non-null here
           };
           console.log('[PhotoUpload] Processing complete, calling onPhotoUpload.');
           this.props.onPhotoUpload(photoResult);
@@ -365,6 +412,18 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
           console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
           const message = error instanceof Error ? error.message : 'Error processing image';
           this.props.showNotification(message, 'error');
+      } finally {
+          // Ensure blob URL is revoked if it exists and wasn't handled (e.g., due to error before fetch completes)
+          // Check necessary conditions to avoid errors during cleanup
+          if (Capacitor.getPlatform() === 'web' && typeof imageSource === 'string' && imageSource.startsWith('blob:') && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+              // Attempt revocation, catching potential errors if already revoked or invalid
+              try {
+                  URL.revokeObjectURL(imageSource);
+                  console.log('[PhotoUpload] Blob URL final revocation check complete.');
+              } catch (revokeError) {
+                  console.warn('[PhotoUpload] Error during final blob URL revocation (may be harmless):', revokeError);
+              }
+          }
       }
   }
 
