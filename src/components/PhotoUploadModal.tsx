@@ -107,7 +107,15 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.src = `data:image/jpeg;base64,${base64Image}`;
+
+      // Check if the base64 string already has a data URL prefix
+      if (base64Image.startsWith('data:image/')) {
+          img.src = base64Image;
+      } else {
+          // Assume it needs the common JPEG prefix if none is present
+          // This might need adjustment if non-JPEG images are expected
+          img.src = `data:image/jpeg;base64,${base64Image}`;
+      }
 
       img.onload = () => {
         try {
@@ -188,6 +196,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     const cleanedBase64 = base64.replace(/\s/g, '');
 
     // 3. Decode using atob
+    console.debug('[PhotoUpload] Attempting atob on cleaned base64 (first 100 chars):', cleanedBase64.substring(0, 100));
     try {
         const binaryString = atob(cleanedBase64);
         const len = binaryString.length;
@@ -449,20 +458,15 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       const platform = Capacitor.getPlatform();
 
       if (platform === 'web') {
-          // On web, use Camera plugin to get Base64 directly, which handles cancellation
-          this.setState({ processingSource: 'gallery' });
-          const image = await Camera.getPhoto({
-              quality: 100, // Get original quality, resizing happens later
-              allowEditing: false,
-              resultType: CameraResultType.Base64, // Get Base64 directly
-              source: CameraSource.Photos // Specify gallery source
-          });
-
-          if (!image.base64String) {
-              throw new Error('Camera plugin did not return Base64 string from gallery.');
+          // On web, use the input file method to preserve EXIF
+          this.setState({ processingSource: 'gallery' }); // Set spinner state
+          originalPathOrBase64 = await this.getImageFromWebFileInput();
+          if (!originalPathOrBase64) {
+              // This case should be handled by the rejection in getImageFromWebFileInput on cancel
+              console.log('[PhotoUpload] getImageFromWebFileInput returned empty/null.');
+              return;
           }
-          originalPathOrBase64 = image.base64String;
-          console.log('[PhotoUpload] Acquired Base64 from web gallery via Camera plugin.');
+          console.log('[PhotoUpload] Acquired Base64 from web file input.');
 
       } else {
         // Delay so native modal has time to open
@@ -549,6 +553,99 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     return false;
   };
 
+  // Restore this function for web gallery to preserve EXIF and handle cancellation
+  private getImageFromWebFileInput = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      // Keep track if a file was selected
+      let fileSelected = false;
+
+      input.onchange = async (e) => {
+        fileSelected = true; // Mark file as selected
+        try {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) {
+            console.log('Photo selection cancelled');
+            // If no file, reject similarly to cancellation
+            reject(new Error('No file selected.'));
+            cleanup(); // Clean up listeners and input
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const initialBase64WithPrefix = e.target?.result as string;
+              if (!initialBase64WithPrefix) {
+                  throw new Error('FileReader did not return result');
+              }
+              // Return the base64 WITH prefix for EXIF parsing
+              // The prefix removal will happen later in base64ToArrayBuffer if needed
+              resolve(initialBase64WithPrefix);
+
+            } catch (error) {
+                 console.error('[PhotoUpload] Error processing file reader result:', error);
+                 reject(error); // Reject on processing error
+            }
+          };
+          reader.onerror = (error) => {
+            console.error('[PhotoUpload] FileReader error:', error);
+            reject(new Error('Failed to read file')); // Reject on reader error
+          };
+          reader.readAsDataURL(file); // Read as Data URL to get prefix
+        } catch (error) {
+          reject(error); // Reject on initial file access error
+        }
+      };
+
+      // Add focus listener to detect cancellation
+      const handleFocus = () => {
+        // Use a short timeout - if onchange hasn't happened by then, assume cancellation
+        setTimeout(() => {
+          if (!fileSelected) {
+            console.log('[PhotoUpload] Web file selection cancelled (detected via focus). ');
+            reject(new Error('File selection cancelled.')); // Reject on cancellation
+            cleanup(); // Clean up listeners and input
+          }
+        }, 300); // 300ms should be enough time for onchange to trigger if a file was selected
+      };
+
+      window.addEventListener('focus', handleFocus);
+
+      // Cleanup function to remove listener and input
+      const cleanup = () => {
+        window.removeEventListener('focus', handleFocus);
+        // Remove input from DOM if it was added
+        if (input.parentNode) {
+            input.parentNode.removeChild(input);
+        } else if (document.body.contains(input)) {
+            // Fallback check if it was appended differently (less likely)
+            document.body.removeChild(input);
+        }
+      };
+
+      // Ensure cleanup happens when the promise resolves or rejects
+      const originalResolve = resolve;
+      const originalReject = reject;
+      resolve = (value: string | PromiseLike<string>) => { // Correct type annotation
+        cleanup();
+        originalResolve(value);
+      };
+      reject = (reason?: any) => {
+        cleanup();
+        originalReject(reason);
+      };
+
+      // Append to body, hide it, and trigger click
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      input.click();
+      // NO NEED to remove immediately here - cleanup() handles it
+    });
+  };
+
   render() {
     const { isOpen, onClose } = this.props;
     const { processingSource } = this.state;
@@ -567,8 +664,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         <button
           className="modal-option-button"
           onClick={this.handleTakePhoto}
-          // Disable if processing OR if on desktop web
-          disabled={processingSource !== null || (platform === 'web' && !this.isMobileBrowser())}
+          disabled={(platform === 'web' && !this.isMobileBrowser())}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
@@ -581,7 +677,6 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         <button
           className="modal-option-button"
           onClick={this.handleChooseFromGallery}
-          disabled={processingSource !== null} // Disable if any processing is active
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
