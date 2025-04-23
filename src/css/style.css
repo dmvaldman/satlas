@@ -224,7 +224,7 @@ body {
 /* Add this class for the momentary clicked state */
 .marker.clicked {
   filter: brightness(0.7); /* Darken the marker */
-  transform: scale(1.1); /* Scale up slightly */
+  transform: scale(.75); /* Scale up slightly */
 }
 
 /* .marker.seen {

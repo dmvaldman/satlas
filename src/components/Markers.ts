@@ -37,6 +37,22 @@ export class Markers {
     return icon;
   }
 
+  private handleInteractionStart(e: MouseEvent | TouchEvent, container: HTMLElement) {
+    e.stopPropagation();
+    const markerElement = container.querySelector('.marker');
+    if (markerElement) {
+        markerElement.classList.add('clicked');
+    }
+  }
+
+  private handleInteractionEnd(e: MouseEvent | TouchEvent, container: HTMLElement) {
+    e.stopPropagation();
+    const markerElement = container.querySelector('.marker');
+    if (markerElement) {
+        markerElement.classList.remove('clicked');
+    }
+  }
+
   private createMarker(sit: Sit, marks: Set<MarkType>, user: User | null, seenSits: Set<string>): mapboxgl.Marker {
     // Create container for larger hit area
     const container = document.createElement('div');
@@ -51,21 +67,16 @@ export class Markers {
       el.appendChild(this.createIconElement(marks));
     }
 
-    // Add click handler to container
+    // Add interaction handlers
+    container.addEventListener('mousedown', (e) => this.handleInteractionStart(e, container));
+    container.addEventListener('mouseup', (e) => this.handleInteractionEnd(e, container));
+    container.addEventListener('mouseleave', (e) => this.handleInteractionEnd(e, container));
+    container.addEventListener('touchstart', (e) => this.handleInteractionStart(e, container));
+    container.addEventListener('touchend', (e) => this.handleInteractionEnd(e, container));
+
+    // Add click handler
     container.addEventListener('click', (e) => {
       e.stopPropagation();
-
-      // --- Add Click Effect ---
-      const markerElement = container.querySelector('.marker');
-      if (markerElement) {
-          markerElement.classList.add('clicked');
-          setTimeout(() => {
-              markerElement.classList.remove('clicked');
-          }, 150); // Duration matches CSS transition
-      }
-      // --- End Click Effect ---
-
-      // Call the original handler
       this.onMarkerClick(sit);
     });
 
