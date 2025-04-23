@@ -140,6 +140,7 @@ class App extends React.Component<{}, AppState> {
 
   componentDidMount() {
     console.log('[App] Component mounted');
+    window.__version__ = packageJson.version;
 
     // Add location listener before initializations
     this.locationService.onLocationUpdate(this.handleLocationUpdate);
