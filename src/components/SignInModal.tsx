@@ -11,25 +11,7 @@ interface SignInModalProps {
 }
 
 class SignInModal extends React.Component<SignInModalProps> {
-  private _isSafariWeb(): boolean {
-    if (Capacitor.getPlatform() !== 'web') {
-      return false;
-    }
-    const isLikelySafari = navigator.vendor.includes('Apple');
-    return isLikelySafari;
-  }
-
   private handleSignIn = async (method: 'apple' | 'google') => {
-    // --- Safari Web Check ---
-    if (this._isSafariWeb()) {
-      this.props.showNotification(
-        'Sign-in is not supported in Safari. Please use another browser or the iOS app.',
-        'error'
-      );
-      return; // Prevent sign-in attempt
-    }
-
-    // Close modal immediately for better UX
     this.props.onClose();
 
     try {

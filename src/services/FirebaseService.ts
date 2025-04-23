@@ -2,7 +2,6 @@ import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import {
   User,
   getAuth,
-  signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -10,7 +9,10 @@ import {
   indexedDBLocalPersistence,
   Auth,
   OAuthProvider,
-  setPersistence
+  setPersistence,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithPopup
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -32,7 +34,6 @@ import {
 import {
   getStorage,
   ref,
-  uploadString,
   uploadBytes,
   deleteObject
 } from 'firebase/storage';
@@ -129,6 +130,29 @@ function base64ToBlob(base64: string, contentType: string = 'image/jpeg'): Blob 
     const byteArray = new Uint8Array(byteNumbers);
     return new Blob([byteArray], { type: contentType });
 }
+
+// Helper to check if we should use signInWithPopup
+const shouldUsePopupFlow = () => {
+    // Use popup if NODE_ENV is development
+    if (process.env.NODE_ENV === 'development') {
+        return true;
+    }
+    // Use popup if running on web (not native) and accessed via localhost or local IP
+    if (!Capacitor.isNativePlatform()) {
+        const hostname = window.location.hostname;
+        // Basic checks for localhost and common private IP ranges
+        if (hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname.startsWith('192.168.') ||
+            hostname.startsWith('10.') ||
+            /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) // Regex for 172.16.0.0 - 172.31.255.255
+        {
+            return true;
+        }
+    }
+    // Otherwise (production web on custom domain, or native), use the standard flow
+    return false;
+};
 
 // Firebase Service class with static methods
 export class FirebaseService {
@@ -280,13 +304,20 @@ export class FirebaseService {
           throw error;
         }
 
-      } else {
-        // --- WEB --- Revert to Popup Flow
+      } else if (shouldUsePopupFlow()) {
+        // --- WEB POPUP FLOW (Dev, Localhost, Local IP) ---
         console.log('[Firebase] Using web popup authentication for Google');
         const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider); // Use popup
+        await signInWithPopup(auth, provider);
         console.log('[Firebase] Web Google sign-in popup completed.');
-        return;
+      } else {
+        // --- WEB REDIRECT FLOW (Prod Custom Domain) ---
+        console.log('[Firebase] Using web redirect authentication for Google');
+        // Use signInWithRedirect instead of signInWithPopup
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
+        console.log('[Firebase] Web Google sign-in redirect initiated.');
+        // No return needed here, redirect handles flow
       }
     } catch (error) {
       console.error('[Firebase] Error during Google sign-in process:', error);
@@ -342,13 +373,20 @@ export class FirebaseService {
           throw error;
         }
 
-      } else {
-        // --- WEB --- Revert to Popup Flow
+      } else if (shouldUsePopupFlow()) {
+        // --- WEB POPUP FLOW (Dev, Localhost, Local IP) ---
         console.log('[Firebase] Using web popup authentication for Apple');
         const provider = new OAuthProvider('apple.com');
-        await signInWithPopup(auth, provider); // Use popup
+        await signInWithPopup(auth, provider);
         console.log('[Firebase] Web Apple sign-in popup completed.');
-        return;
+      } else {
+        // --- WEB REDIRECT FLOW (Prod Custom Domain) ---
+        console.log('[Firebase] Using web redirect authentication for Apple');
+        // Use signInWithRedirect instead of signInWithPopup
+        const provider = new OAuthProvider('apple.com');
+        await signInWithRedirect(auth, provider);
+        console.log('[Firebase] Web Apple sign-in redirect initiated.');
+        // No return needed here, redirect handles flow
       }
     } catch (error) {
       console.error('[Firebase] Error during Apple sign-in process:', error);
@@ -1769,6 +1807,29 @@ export class FirebaseService {
       }
     }
     return { displayName: finalDisplayName, photoURL: finalPhotoURL };
+  }
+
+  // --- Redirect Handling Logic ---
+  static initializeRedirectHandling() {
+    // Only check for redirect result if NOT using popup flow and on web
+    if (!shouldUsePopupFlow() && !Capacitor.isNativePlatform()) {
+      (async () => {
+        try {
+          console.log('[Firebase] Checking for redirect result (prod web custom domain)...');
+          const result = await getRedirectResult(auth);
+          if (result) {
+            console.log('[Firebase] Handled redirect result. User:', result.user.uid);
+            FirebaseService.ensureUserExists(result.user);
+          } else {
+            console.log('[Firebase] No redirect result found.');
+          }
+        } catch (error) {
+          console.error('[Firebase] Error getting redirect result:', error);
+        }
+      })();
+    } else {
+       console.log('[Firebase] Skipping redirect check (popup flow or native)');
+    }
   }
 }
 
