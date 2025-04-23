@@ -26,6 +26,7 @@ import FullscreenImage from './components/FullscreenImage';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { debounce } from './utils/debounce';
 import SignInModal from './components/SignInModal';
+import packageJson from '../package.json';
 
 interface AppState {
   // Auth state
@@ -1419,6 +1420,7 @@ class App extends React.Component<{}, AppState> {
           user={user}
           preferences={userPreferences}
           currentLocation={currentLocation}
+          version={packageJson.version}
           onClose={this.closeProfileModal}
           onSignOut={this.handleSignOut}
           onSave={this.handleSavePreferences}

@@ -12,6 +12,7 @@ interface ProfileModalProps {
   user: User | null;
   preferences: UserPreferences;
   currentLocation?: Location | null;
+  version: string;
   onClose: () => void;
   onSignOut: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
@@ -680,7 +681,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   };
 
   render() {
-    const { isOpen, onClose, onSignOut } = this.props;
+    const { isOpen, onClose, onSignOut, version } = this.props;
     const {
       username,
       pushNotifications,
@@ -776,6 +777,9 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
             >
               <span className="log-out-text">Log Out</span>
             </button>
+            <div className="version-info">
+              v{version}
+            </div>
           </div>
         </div>
       </BaseModal>

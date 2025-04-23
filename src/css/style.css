@@ -594,11 +594,19 @@ body {
   border: 1px solid var(--dark-red);
   border-radius: 4px;
   margin-top: 1rem;
-  margin-bottom: 1rem;
 }
 
 .profile-section .logout-button:hover {
   background-color: var(--dark-red);
+}
+
+/* Style for the version info */
+.profile-section .version-info {
+  text-align: right;
+  font-size: var(--font-size-small);
+  color: var(--medium-gray);
+  margin-top: 8px;
+  opacity: 0.7;
 }
 
 .image-carousel {
