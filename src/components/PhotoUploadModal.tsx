@@ -501,7 +501,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      // See https://stackoverflow.com/questions/70865878/picking-photo-from-web-in-android-no-longer-includes-exif-gps-location
+      input.accept = 'image/*, text/plain';
 
       input.onchange = async (e) => {
         try {
