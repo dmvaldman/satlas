@@ -8,14 +8,12 @@ type LocationCallback = (location?: Location) => void;
 export class LocationService {
   private locationWatchId: string | null = null;
   private locationCallbacks: LocationCallback[] = [];
-  private hasLocationPermission: boolean = false;
   private static lastKnownLocation: Location | null = null;
   private trackingPollId: number | null = null;
   private readonly TRACKING_POLL_INTERVAL = 1000; // 1 second
   private readonly LOCATION_TIMEOUT = 5000; // 5 seconds
   private readonly LOCATION_MAX_AGE = 10000; // 10 seconds
-  private readonly MIN_UPDATE_INTERVAL_MS = 5000; // Only process updates every 5 seconds
-  private lastUpdateTime: number = 0; // Timestamp of the last processed update
+  private readonly MIN_UPDATE_INTERVAL_MS = 2000; // Only process updates every 2 seconds
 
   constructor() {
     this.onLocationUpdate(LocationService.setLastKnownLocation);
@@ -31,12 +29,9 @@ export class LocationService {
   }
 
   private async _startTracking(): Promise<void> {
-    if (Capacitor.getPlatform() !== 'web') {
-      const permissionStatus = await Geolocation.requestPermissions();
-      this.hasLocationPermission = permissionStatus.location === 'granted';
-      if (!this.hasLocationPermission) {
-        throw new Error('Location permission not granted');
-      }
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) {
+      throw new Error('Location permission not granted');
     }
 
     if (Capacitor.getPlatform() === 'web') {
@@ -46,14 +41,25 @@ export class LocationService {
     }
   }
 
+  private async requestPermissions(): Promise<boolean> {
+    console.log('[LocationService] Requesting permissions...');
+    if (Capacitor.getPlatform() !== 'web') {
+      let permissionStatus = await Geolocation.requestPermissions();
+      return permissionStatus.location === 'granted';
+    }
+    else {
+      let permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      return permissionStatus.state === 'granted';
+    }
+  }
+
   private _startTrackingPoll(): void {
     if (this.trackingPollId) return;
 
-    console.log('Starting location tracking poll...');
+    console.log('[LocationService] Starting location tracking poll...');
     this.trackingPollId = window.setInterval(async () => {
       try {
         await this._startTracking();
-        // Poll is stopped inside the watch callbacks now on first success
       } catch (error) {
         console.warn('Location tracking poll failed:', error);
       }
@@ -62,7 +68,7 @@ export class LocationService {
 
   private _stopTrackingPoll(): void {
     if (this.trackingPollId) {
-      console.log('Stopping location tracking poll...');
+      console.log('[LocationService] Stopping location tracking poll...');
       window.clearInterval(this.trackingPollId);
       this.trackingPollId = null;
     }
@@ -108,7 +114,7 @@ export class LocationService {
       }
 
       const timeoutId = setTimeout(() => {
-        console.log('Location request timed out');
+        console.log('[LocationService] Location request timed out');
         reject(new Error('Location request timed out'));
       }, this.LOCATION_TIMEOUT);
 
@@ -136,15 +142,9 @@ export class LocationService {
   }
 
   private async getLocationNative(): Promise<Location> {
-    if (!this.hasLocationPermission) {
-      console.log('Requesting location permissions...');
-      const request = await Geolocation.requestPermissions();
-      this.hasLocationPermission = request.location === 'granted';
-
-      if (!this.hasLocationPermission) {
-        console.warn('Location permission denied');
-        throw new Error('Location permission denied');
-      }
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) {
+      throw new Error('Location permission not granted');
     }
 
     // Create a timeout promise
@@ -233,18 +233,11 @@ export class LocationService {
 
     // Use optional chaining and nullish coalescing for safer access
     // Reset watch ID in case the error came from a failed watch setup
-    this.locationWatchId = null;
     const errorCode = error?.code;
     const errorMessage = error?.message?.toLowerCase() ?? '';
     const isPermissionDenied = errorCode === 1 || errorMessage.includes('permission denied');
 
     if (isPermissionDenied) {
-      this.hasLocationPermission = false;
-      console.warn('Location permission explicitly denied by user.');
-      // Optionally, stop trying altogether if permission is denied
-      this.stopTracking(); // Stop polling and watching if denied
-    } else {
-      // For other errors (timeout, unavailable, unknown), start polling to recover
       console.warn('Location error occurred, starting recovery poll.');
       this._startTrackingPoll();
     }
@@ -292,37 +285,31 @@ export class LocationService {
       throw new Error('Geolocation not supported in this browser');
     }
 
+    let lastUpdateTime = 0;
+
     // Initiate watch, store ID locally first
-    const localWatchId = navigator.geolocation.watchPosition(
+    this.locationWatchId = navigator.geolocation.watchPosition(
       position => {
+        // Location found. Remove long polling if exists.
+        this._stopTrackingPoll();
+
         // --- Throttling Logic ---
         const now = Date.now();
-        if (now - this.lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
-          // console.log('[LocationService] Throttled web update'); // Optional debug log
+        if (now - lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
           return; // Not enough time passed
         }
-
-        // Assign instance watchId and stop poll ONLY on the first successful update
-        if (this.locationWatchId === null) {
-          console.log(`[LocationService] First success for web watch. Assigning ID: ${localWatchId}`);
-          this.locationWatchId = localWatchId as unknown as string; // Assign and cast
-          this._stopTrackingPoll();
-        }
-
-        this.lastUpdateTime = now;
+        lastUpdateTime = now;
         // --- End Throttling ---
 
         const coordinates = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         };
-        this._stopTrackingPoll();
         console.log('[LocationService] Web watch processed position update.');
         this.handleLocationUpdate(coordinates);
       },
       error => {
         this.handleLocationError(error);
-        // Don't reset lastUpdateTime here
         console.error('Web geolocation error:', error);
       },
       { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT }
