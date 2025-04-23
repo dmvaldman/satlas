@@ -21,6 +21,11 @@ export class LocationService {
 
   // Start watching location changes
   public async startTracking(): Promise<void> {
+    if (this.locationWatchId) {
+      console.log('[LocationService] Watch already active, skipping _startTracking.');
+      return;
+    }
+
     try {
       await this._startTracking();
     } catch (error) {
@@ -147,57 +152,36 @@ export class LocationService {
       throw new Error('Location permission not granted');
     }
 
-    // Create a timeout promise
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+    return new Promise((resolve, reject) => {
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      // Set up timeout
+      timeoutId = setTimeout(() => {
+        console.log('[LocationService Native] Location request timed out');
         reject(new Error('Location request timed out'));
       }, this.LOCATION_TIMEOUT);
-    });
 
-    try {
-      // --- Try Low Accuracy First ---
-      console.log('[LocationService] Attempting low accuracy first...');
-      try {
-        const position = await Promise.race([
-          Geolocation.getCurrentPosition({
-            enableHighAccuracy: false, // Low accuracy
-            timeout: this.LOCATION_TIMEOUT
-          }),
-          timeoutPromise
-        ]);
-        console.log('[LocationService] Low accuracy succeeded.');
-        return {
+      // Request location
+      Geolocation.getCurrentPosition(
+        {
+          enableHighAccuracy: true,
+          timeout: this.LOCATION_TIMEOUT
+        }
+      )
+      .then(position => {
+        if (timeoutId) clearTimeout(timeoutId);
+        console.log('[LocationService Native] High accuracy succeeded.');
+        resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
-        };
-      } catch (lowAccuracyError) {
-        console.warn('[LocationService] Low accuracy failed, trying high accuracy:', lowAccuracyError);
-        // Clear the first timeout promise and create a new one for the high accuracy attempt
-        // Note: The original timeoutPromise might have already rejected, but creating a new one is cleaner.
-        const highAccuracyTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error('High accuracy location request timed out'));
-          }, this.LOCATION_TIMEOUT);
         });
-
-        // --- Fallback to High Accuracy ---
-        const position = await Promise.race([
-          Geolocation.getCurrentPosition({
-            enableHighAccuracy: true, // High accuracy
-            timeout: this.LOCATION_TIMEOUT
-          }),
-          highAccuracyTimeoutPromise
-        ]);
-        console.log('[LocationService] High accuracy fallback succeeded.');
-        return {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
-      }
-    } catch (error) {
-      this.handleLocationError(error);
-      throw error;
-    }
+      })
+      .catch(error => {
+        if (timeoutId) clearTimeout(timeoutId);
+        console.warn('[LocationService Native] High accuracy error:', error);
+        reject(error); // Reject with the actual error
+      });
+    });
   }
 
   public static setLastKnownLocation(location?: Location): void {
@@ -230,9 +214,6 @@ export class LocationService {
 
   private handleLocationError(error: any): void {
     console.error('LocationService error:', error?.code, error?.message, error);
-
-    // Use optional chaining and nullish coalescing for safer access
-    // Reset watch ID in case the error came from a failed watch setup
     const errorCode = error?.code;
     const errorMessage = error?.message?.toLowerCase() ?? '';
     const isPermissionDenied = errorCode === 1 || errorMessage.includes('permission denied');
@@ -244,75 +225,77 @@ export class LocationService {
   }
 
   private async setupNativeWatch(): Promise<void> {
-    // Initiate watch, store ID locally first
-    const localWatchId = await Geolocation.watchPosition(
-      { enableHighAccuracy: true, maximumAge: 0, timeout: this.LOCATION_TIMEOUT }, // Use maximumAge: 0 for watch
-      (position, error) => {
+    console.log('[LocationService] setupNativeWatch called.');
+    let lastUpdateTime = 0;
+    try {
+      this.locationWatchId = await Geolocation.watchPosition(
+        { enableHighAccuracy: true, maximumAge: 0, timeout: this.LOCATION_TIMEOUT }, // Use maximumAge: 0 for watch
+        (position, error) => {
         if (error) {
           this.handleLocationError(error);
           return;
         }
         if (position) {
+          this._stopTrackingPoll(); // Stop poll on first successful callback
           // --- Throttling Logic ---
           const now = Date.now();
-          if (now - this.lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
+          if (now - lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
             return; // Not enough time passed, ignore this update
           }
-          this.lastUpdateTime = now; // Update timestamp for the processed update
-
-          // Assign instance watchId and stop poll ONLY on the first successful update
-          if (this.locationWatchId === null) {
-            console.log(`[LocationService] First success for native watch. Assigning ID: ${localWatchId}`);
-            this.locationWatchId = localWatchId;
-            this._stopTrackingPoll();
-          }
+          lastUpdateTime = now; // Update timestamp for the processed update
           // --- End Throttling ---
 
           const coordinates = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           };
-          this._stopTrackingPoll();
-          console.log('[LocationService] Native watch processed position update.');
           this.handleLocationUpdate(coordinates);
         }
       }
     );
+      console.log(`[LocationService] Native watch started with ID: ${this.locationWatchId}`);
+    } catch (error) {
+      console.error('[LocationService] Error starting native watch:', error);
+      this.locationWatchId = null; // Ensure watchId is null if watch fails to start
+      this.handleLocationError(error);
+    }
   }
 
   private setupWebWatch(): void {
-    if (!navigator.geolocation) {
-      throw new Error('Geolocation not supported in this browser');
-    }
-
+    console.log('[LocationService] setupWebWatch called.');
     let lastUpdateTime = 0;
 
-    // Initiate watch, store ID locally first
-    this.locationWatchId = navigator.geolocation.watchPosition(
-      position => {
-        // Location found. Remove long polling if exists.
-        this._stopTrackingPoll();
+    try {
+      // Initiate watch, store ID locally first
+      this.locationWatchId = navigator.geolocation.watchPosition(
+        position => {
+          // Location found. Remove long polling if exists.
+          this._stopTrackingPoll();
 
-        // --- Throttling Logic ---
-        const now = Date.now();
-        if (now - lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
-          return; // Not enough time passed
-        }
-        lastUpdateTime = now;
-        // --- End Throttling ---
+          // --- Throttling Logic ---
+          const now = Date.now();
+          if (now - lastUpdateTime < this.MIN_UPDATE_INTERVAL_MS) {
+            return; // Not enough time passed
+          }
+          lastUpdateTime = now;
+          // --- End Throttling ---
 
-        const coordinates = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
-        console.log('[LocationService] Web watch processed position update.');
-        this.handleLocationUpdate(coordinates);
-      },
-      error => {
-        this.handleLocationError(error);
-        console.error('Web geolocation error:', error);
-      },
-      { enableHighAccuracy: true, maximumAge: this.LOCATION_MAX_AGE, timeout: this.LOCATION_TIMEOUT }
-    ) as unknown as string;
+          const coordinates = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          console.log('[LocationService] Web watch processed position update.');
+          this.handleLocationUpdate(coordinates);
+        },
+        error => {
+          this.handleLocationError(error);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: this.LOCATION_TIMEOUT }
+      ) as unknown as string;
+    } catch (error) {
+      console.error('[LocationService] Error starting web watch:', error);
+      this.locationWatchId = null; // Ensure watchId is null if watch fails to start
+      this.handleLocationError(error);
+    }
   }
 }
