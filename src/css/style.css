@@ -378,6 +378,11 @@ body {
   transition: all 0.2s ease;
 }
 
+.modal-option-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .modal-option-button:active {
   background: var(--medium-gray);
   border-color: var(--black);
