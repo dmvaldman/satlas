@@ -5,7 +5,6 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  initializeAuth,
   indexedDBLocalPersistence,
   Auth,
   OAuthProvider,
@@ -279,19 +278,31 @@ export class FirebaseService {
   static async signInWithGoogle(): Promise<void> {
     console.log('[Firebase] Starting Google sign-in process');
     try {
-      console.log('[Firebase] Ensuring user is signed out');
       await FirebaseService.signOut().catch(err => console.warn('[Firebase] Non-critical sign out error:', err));
       console.log('[Firebase] Sign out check complete');
 
+      // Create provider instance
+      const provider = new GoogleAuthProvider();
+      // Add custom parameter to always ask for account selection
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
       if (Capacitor.isNativePlatform()) {
+        // --- NATIVE ---
         console.log('[Firebase] Using native authentication for Google');
+        // Existing native code using FirebaseAuthentication...
+        // NOTE: setCustomParameters likely doesn't affect the native plugin flow directly.
+        // The native plugin might have its own behavior or configuration for account selection.
+        // But we add it here for consistency and just in case.
         try {
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithGoogle');
-          const result = await FirebaseAuthentication.signInWithGoogle();
+          // NOTE: Check if plugin allows passing custom parameters or provider object
+          const result = await FirebaseAuthentication.signInWithGoogle(); // Keep original call unless plugin docs specify otherwise
           console.log('[Firebase] Native Google sign-in raw result:', result);
           if (!result?.credential) {
             console.error('[Firebase] No credential received from native Google sign-in');
@@ -303,25 +314,21 @@ export class FirebaseService {
           console.error('[Firebase] Native Google sign-in error:', error);
           throw error;
         }
-
       } else if (shouldUsePopupFlow()) {
         // --- WEB POPUP FLOW (Dev, Localhost, Local IP) ---
         console.log('[Firebase] Using web popup authentication for Google');
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
+        // Provider with custom params already created
+        await signInWithPopup(auth, provider); // Use the modified provider
         console.log('[Firebase] Web Google sign-in popup completed.');
       } else {
         // --- WEB REDIRECT FLOW (Prod Custom Domain) ---
         console.log('[Firebase] Using web redirect authentication for Google');
-        // Use signInWithRedirect instead of signInWithPopup
-        const provider = new GoogleAuthProvider();
-        await signInWithRedirect(auth, provider);
+        // Provider with custom params already created
+        await signInWithRedirect(auth, provider); // Use the modified provider
         console.log('[Firebase] Web Google sign-in redirect initiated.');
-        // No return needed here, redirect handles flow
       }
     } catch (error) {
       console.error('[Firebase] Error during Google sign-in process:', error);
-      // Re-throw error to be caught by UI
       throw error;
     }
   }

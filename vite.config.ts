@@ -16,6 +16,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff,woff2}'],
         globIgnores: ['**/mapbox-gl*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        navigateFallbackDenylist: [/^\/__/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.tiles\.mapbox\.com\/.*/i,
@@ -47,6 +48,9 @@ export default defineConfig({
           },
         ]
       },
+      devOptions: {
+        enabled: false
+      }
     })
   ],
   root: 'src',
