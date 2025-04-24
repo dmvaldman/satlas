@@ -43,6 +43,8 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 input[type="search"]::-webkit-search-cancel-button {
@@ -82,27 +84,26 @@ body {
 
 #app-header {
   position: fixed;
+  height: 66px;
   top: 2rem;
   left: 0;
   right: 0;
-  z-index: 2;
-  padding-left: calc(2rem + var(--safe-area-right));
+  padding-left: calc(2rem + var(--safe-area-left));
   padding-right: calc(2rem + var(--safe-area-right));
   padding-top: var(--safe-area-top);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   z-index: 3;
 }
 
-.auth-container {
+#app-header .auth-container {
   margin-left: auto;
   display: flex;
   align-items: center;
   height: 100%;
 }
 
-.auth-button {
+#app-header .auth-button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -118,19 +119,18 @@ body {
   transition: transform 0.2s;
 }
 
-.auth-button:active {
+#app-header .auth-button:active {
   transform: scale(0.95);
 }
 
-.auth-button svg {
+#app-header .auth-button svg {
   width: 20px;
   height: 20px;
   fill: var(--white);
 }
 
-#profile-container {
+#app-header #profile-container {
   width: 66px;
-  height: 66px;
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
@@ -143,29 +143,57 @@ body {
   transition: transform 0.2s;
 }
 
-/* Add this rule for when there's no profile image */
-#profile-container.no-image {
+#app-header #profile-container.no-image {
   border: none;
   box-shadow: none;
 }
 
-#profile-container:active {
+#app-header #profile-container:active {
   transform: scale(0.95);
 }
 
-#profile-image {
+#app-header #profile-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.profile-placeholder-icon {
+#app-header .profile-placeholder-icon {
   width: 57%;
   height: 100%;
   fill: var(--black);
   stroke: var(--black);
   stroke-width: 3px;
   stroke-linecap: round;
+}
+
+#app-header .view-toggle-container {
+  display: flex;
+  background: var(--dark-gray);
+  border-radius: 20px;
+  padding: 3px;
+  opacity: 0.9;
+  box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
+  gap: 3px;
+}
+
+#app-header .view-toggle-button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--light-gray);
+  font-size: var(--font-size-medium);
+  text-shadow: 0px 1px 2px rgba(0,0,0,.3);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  font-weight: 500;
+}
+
+#app-header .view-toggle-button.active {
+  background: var(--white);
+  color: var(--dark-gray);
+  text-shadow: 0px 1px 2px rgba(168, 168, 168, 0.3);
 }
 
 #map-container {
@@ -180,7 +208,7 @@ body {
   height: calc(100vh) !important;
 }
 
-.mapboxgl-map {
+#map-container .mapboxgl-map {
   width: 100%;
   height: 100%;
 }
@@ -192,11 +220,11 @@ body {
   transform: translate(-50%, -50%);
 }
 
-.mapboxgl-ctrl {
+#map-container .mapboxgl-ctrl {
   display: none !important;
 }
 
-.marker-container {
+#map-container .marker-container {
   width: 60px;  /* Larger hit area */
   height: 60px;
   display: flex;
@@ -206,7 +234,7 @@ body {
   border-radius: 50%;
 }
 
-.marker {
+#map-container .marker {
   width: 26px;
   height: 26px;
   background-color: var(--sit-color);  /* Default green color */
@@ -221,23 +249,29 @@ body {
   transition: filter 0.15s ease-out, transform 0.15s ease-out;
 }
 
-/* Add this class for the momentary clicked state */
-.marker.clicked {
-  filter: brightness(0.7); /* Darken the marker */
-  transform: scale(.75); /* Scale up slightly */
+#map-container .marker.clicked {
+  filter: brightness(0.7);
+  transform: scale(.75);
 }
 
-/* .marker.seen {
+/* #map-container .marker.seen {
   background-color: var(--sit-seen-color);
 } */
 
-
-.marker.own-sit {
+#map-container .marker.own-sit {
   background-color: var(--sit-mine-color);  /* Blue for own sits */
 }
 
+#map-container .location-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  z-index: 2;
+  pointer-events: none !important;
+}
+
 /* Icon styles */
-.marker-icon {
+.marker .marker-icon {
   width: 14px;
   height: 14px;
   opacity: 0.8;
@@ -256,12 +290,80 @@ body {
   font-size: var(--font-size-large);
 }
 
-.location-marker {
+/* --- View Switching --- */
+/* By default, map is visible, gallery is hidden */
+#map-view-content {
+  display: block;
+  width: 100%;
+  height: 100%;
   position: relative;
-  width: 24px;
-  height: 24px;
-  z-index: 2;
-  pointer-events: none !important;
+}
+
+.gallery-view {
+  display: none;
+  position: absolute; /* Ensure it covers the area */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f0f0f0; /* Light background for gallery */
+  overflow-y: auto; /* Allow scrolling */
+  padding-top: calc(var(--safe-area-top)); /* Space for header */
+  padding-bottom: var(--safe-area-bottom);
+  box-sizing: border-box;
+}
+
+.app-view-gallery #map-view-content {
+  display: none;
+}
+
+.app-view-gallery .gallery-view {
+  display: block;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+}
+
+.gallery-item {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  cursor: pointer;
+  overflow: hidden;
+  background-color: var(--light-gray);
+}
+
+.gallery-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.gallery-item:active .gallery-image {
+  transform: scale(0.95);
+}
+
+.gallery-loading,
+.gallery-empty-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100% - 4rem - var(--safe-area-top) - var(--safe-area-bottom)); /* Full height minus padding */
+  color: var(--dark-gray);
+  font-size: var(--font-size-large);
+}
+
+.app-view-gallery .fab {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .fab {
@@ -279,7 +381,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 3;
-  transition: transform 0.2s;
+  transition: transform 0.2s, opacity 0.3s ease;
+  opacity: 1;
 }
 
 .fab svg {

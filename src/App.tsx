@@ -27,6 +27,8 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { debounce } from './utils/debounce';
 import SignInModal from './components/SignInModal';
 import packageJson from '../package.json';
+import ViewToggle, { ViewType } from './components/ViewToggle';
+import GalleryView from './components/GalleryView';
 
 interface AppState {
   // Auth state
@@ -81,6 +83,10 @@ interface AppState {
 
   // Add this new property
   isOffline: boolean;
+
+  // --- New State ---
+  currentView: ViewType;
+  // --- End New State ---
 }
 
 class App extends React.Component<{}, AppState> {
@@ -132,7 +138,11 @@ class App extends React.Component<{}, AppState> {
       },
 
       // Initialize offline state
-      isOffline: false
+      isOffline: false,
+
+      // --- Initialize View State ---
+      currentView: 'map',
+      // --- End Initialize View State ---
     };
 
     this.locationService = new LocationService();
@@ -1348,6 +1358,34 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
+  // --- New Handlers ---
+  private handleViewChange = (view: ViewType) => {
+    this.setState({ currentView: view });
+  };
+
+  private handleSelectSitFromGallery = (sitId: string) => {
+    const sit = this.state.sits.get(sitId);
+    if (sit) {
+      this.setState({ currentView: 'map' }, () => {
+        this.openPopup(sit); // Open popup after switching view
+        // Fly to the sit location on the map
+        if (this.state.map) {
+          this.state.map.flyTo({
+            center: [sit.location.longitude, sit.location.latitude],
+            zoom: 15, // Zoom in a bit more when selecting from gallery
+            duration: 500, // Faster transition
+            essential: true
+          });
+        }
+      });
+    } else {
+      console.error(`[App] Sit not found for ID: ${sitId} from gallery selection.`);
+      this.showNotification("Could not find the selected sit.", "error");
+      this.setState({ currentView: 'map' }); // Switch back to map even if sit not found
+    }
+  };
+  // --- End New Handlers ---
+
   render() {
     const {
       user,
@@ -1362,13 +1400,18 @@ class App extends React.Component<{}, AppState> {
       modals,
       userPreferences,
       drawer,
+      currentView,
     } = this.state;
 
     return (
-      <div id="app">
+      <div id="app" className={`app-view-${currentView}`}>
         <Notifications />
 
         <header id="app-header">
+          <ViewToggle
+            currentView={currentView}
+            onViewChange={this.handleViewChange}
+          />
           <AuthComponent
             user={user}
             isAuthenticated={isAuthenticated}
@@ -1380,30 +1423,39 @@ class App extends React.Component<{}, AppState> {
           />
         </header>
 
-        <div
-          id="map-container"
-          ref={this.mapContainer}
-          style={{ width: '100%' }}
-        />
+        <div id="map-view-content" className={currentView === 'map' ? 'active' : ''}>
+          <div
+            id="map-container"
+            ref={this.mapContainer}
+            style={{ width: '100%' }}
+          />
 
-        {!map && (
-          <div className="map-loading">
-            <div className="spinner large"></div>
-          </div>
-        )}
+          {!map && (
+            <div className="map-loading">
+              <div className="spinner large"></div>
+            </div>
+          )}
 
-        {map && (
-          <MapComponent
-            ref={this.mapComponentRef}
-            map={map}
+          {map && (
+            <MapComponent
+              ref={this.mapComponentRef}
+              map={map}
+              sits={sits}
+              marks={marks}
+              favoriteCount={favoriteCount}
+              currentLocation={currentLocation}
+              user={user}
+              seenSits={seenSits}
+              onLoadSits={this.handleLoadSits}
+              onOpenPopup={this.openPopup}
+            />
+          )}
+        </div>
+
+        {currentView === 'gallery' && (
+          <GalleryView
             sits={sits}
-            marks={marks}
-            favoriteCount={favoriteCount}
-            currentLocation={currentLocation}
-            user={user}
-            seenSits={seenSits}
-            onLoadSits={this.handleLoadSits}
-            onOpenPopup={this.openPopup}
+            onSelectSit={this.handleSelectSitFromGallery}
           />
         )}
 
@@ -1429,16 +1481,18 @@ class App extends React.Component<{}, AppState> {
           showNotification={this.showNotification}
         />
 
-        <AddSitButton
-          isAuthenticated={isAuthenticated}
-          user={user}
-          onSignIn={this.handleSignInModalOpen}
-          currentLocation={currentLocation}
-          findNearbySit={this.findNearbySit}
-          onNearbySitFound={this.handleUploadToExisting}
-          onPhotoUploadOpen={this.handleCreateSit}
-          showNotification={this.showNotification}
-        />
+        {currentView === 'map' && (
+          <AddSitButton
+            isAuthenticated={isAuthenticated}
+            user={user}
+            onSignIn={this.handleSignInModalOpen}
+            currentLocation={currentLocation}
+            findNearbySit={this.findNearbySit}
+            onNearbySitFound={this.handleUploadToExisting}
+            onPhotoUploadOpen={this.handleCreateSit}
+            showNotification={this.showNotification}
+          />
+        )}
 
         <NearbySitModal
           isOpen={modals.nearbySit.isOpen}

@@ -29,7 +29,9 @@ import {
   addDoc,
   writeBatch,
   Firestore,
-  initializeFirestore
+  initializeFirestore,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -1479,6 +1481,56 @@ export class FirebaseService {
   }
 
   /**
+   * Get the first image for a sit's image collection, ordered by creation date.
+   * @param collectionId Collection ID
+   * @returns The first Image object or null if none found or error occurs.
+   */
+  static async getFirstImageForSit(collectionId: string): Promise<Image | null> {
+    if (!collectionId) {
+      console.warn('[Firebase] getFirstImageForSit called with empty collectionId.');
+      return null;
+    }
+    try {
+      // console.log('[Firebase] Fetching first image for collection:', collectionId); // Optional: Verbose logging
+
+      const imagesRef = collection(db, 'images');
+      const q = query(
+        imagesRef,
+        where('collectionId', '==', collectionId),
+        orderBy('createdAt', 'asc'), // Order by creation date ascending
+        limit(1) // Limit to the first document
+      );
+
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        // console.log('[Firebase] No images found for collection:', collectionId); // Optional: Verbose logging
+        return null;
+      }
+
+      const doc = snapshot.docs[0];
+      const data = doc.data();
+
+      // Construct and return the Image object
+      return {
+        id: doc.id,
+        photoURL: data.photoURL,
+        userId: data.userId,
+        userName: data.userName,
+        collectionId: data.collectionId,
+        createdAt: data.createdAt.toDate(), // Convert Timestamp to Date
+        width: data.width || undefined,
+        height: data.height || undefined,
+        location: data.location // Include location if needed
+      };
+
+    } catch (error) {
+      console.error(`[Firebase] Error fetching first image for collection ${collectionId}:`, error);
+      return null; // Return null on error
+    }
+  }
+
+  /**
    * Get images for a sit
    * @param collectionId Collection ID
    * @returns Array of images
@@ -1492,7 +1544,8 @@ export class FirebaseService {
       const imagesRef = collection(db, 'images');
       const q = query(
         imagesRef,
-        where('collectionId', '==', collectionId)
+        where('collectionId', '==', collectionId),
+        orderBy('createdAt', 'asc') // Add ordering here too for consistency
       );
 
       const snapshot = await getDocs(q);
@@ -1504,7 +1557,8 @@ export class FirebaseService {
         collectionId: doc.data().collectionId,
         createdAt: doc.data().createdAt.toDate(),
         width: doc.data().width || undefined,
-        height: doc.data().height || undefined
+        height: doc.data().height || undefined,
+        location: doc.data().location // Add location here as well
       }));
 
       const combinedImages = new Map<string, Image>();
@@ -1533,8 +1587,11 @@ export class FirebaseService {
         combinedImages.set(image.id, image);
       });
 
-      return Array.from(combinedImages.values());
+      // Return sorted combined images
+      return Array.from(combinedImages.values()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     } catch (error) {
+      // Re-throw the error after logging it
+      console.error(`[Firebase] Error in getImages for collection ${collectionId}:`, error);
       throw error;
     }
   }
