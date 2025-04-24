@@ -45,6 +45,7 @@
   user-select: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  touch-action: pan-x pan-y;
 }
 
 input[type="search"]::-webkit-search-cancel-button {
