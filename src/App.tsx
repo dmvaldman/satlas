@@ -1360,6 +1360,13 @@ class App extends React.Component<{}, AppState> {
 
   // --- New Handlers ---
   private handleViewChange = (view: ViewType) => {
+    // If switching back to map view, resize the map in case window resized
+    if (view === 'map' && this.state.map) {
+      // Use requestAnimationFrame to ensure the container is visible and has dimensions
+      requestAnimationFrame(() => {
+        this.state.map?.resize();
+      });
+    }
     this.setState({ currentView: view });
   };
 
