@@ -11,7 +11,8 @@ import {
   setPersistence,
   signInWithRedirect,
   getRedirectResult,
-  signInWithPopup
+  signInWithPopup,
+  initializeAuth
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -46,8 +47,6 @@ import {
 } from './OfflineService';
 import { ValidationUtils } from '../utils/ValidationUtils';
 
-// Your web app's Firebase configuration
-// This should match what's in your current firebase.ts file
 const firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -68,23 +67,27 @@ if (getApps().length === 0) {
   app = getApp(); // Get the already initialized app
 }
 
-// Use getAuth - it should handle retrieving the existing instance correctly
-let auth: Auth = getAuth(app);
-console.log(`[Firebase] Using ${Capacitor.isNativePlatform() ? 'Native' : 'Web'} Auth instance.`);
-
-// Set persistence explicitly AFTER getting the auth instance, only for native
-// Use an IIAFE for the async call at the top level
+// Initialize Auth differently based on platform
+let auth: Auth;
 (async () => {
   if (Capacitor.isNativePlatform()) {
     try {
-      console.log("[Firebase] Attempting to set indexedDBLocalPersistence...");
-      await setPersistence(auth, indexedDBLocalPersistence);
-      console.log("[Firebase] Successfully set indexedDBLocalPersistence.");
+      console.log("[Firebase] Initializing Auth with indexedDBLocalPersistence...");
+      // Initialize Auth WITH persistence setting for native
+      auth = initializeAuth(app, {
+        persistence: indexedDBLocalPersistence
+      });
+      console.log("[Firebase] Successfully initialized Auth with indexedDBLocalPersistence.");
     } catch (error) {
-      // Errors might occur if persistence was already set or other issues
-      console.error("[Firebase] Error setting indexedDBLocalPersistence (may be expected if already set):", error);
+      console.error("[Firebase] Error initializing Auth with indexedDB persistence, falling back:", error);
+      auth = getAuth(app); // Fallback to default initialization
     }
+  } else {
+    // Initialize Auth normally for web
+    console.log("[Firebase] Initializing Auth for Web...");
+    auth = getAuth(app);
   }
+  console.log(`[Firebase] Using ${Capacitor.isNativePlatform() ? 'Native' : 'Web'} Auth instance initialized.`);
 })();
 
 // --- Initialize Firestore with Persistence Check ---
@@ -132,24 +135,29 @@ function base64ToBlob(base64: string, contentType: string = 'image/jpeg'): Blob 
 
 // Helper to check if we should use signInWithPopup
 const shouldUsePopupFlow = () => {
-    // Use popup if NODE_ENV is development
+    // Never use popup on native platforms
+    if (Capacitor.isNativePlatform()) {
+        return false;
+    }
+
+    // Use popup if NODE_ENV is development on the web
     if (process.env.NODE_ENV === 'development') {
         return true;
     }
+
     // Use popup if running on web (not native) and accessed via localhost or local IP
-    if (!Capacitor.isNativePlatform()) {
-        const hostname = window.location.hostname;
-        // Basic checks for localhost and common private IP ranges
-        if (hostname === 'localhost' ||
-            hostname === '127.0.0.1' ||
-            hostname.startsWith('192.168.') ||
-            hostname.startsWith('10.') ||
-            /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) // Regex for 172.16.0.0 - 172.31.255.255
-        {
-            return true;
-        }
+    const hostname = window.location.hostname;
+    // Basic checks for localhost and common private IP ranges
+    if (hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') ||
+        /^172\\.(1[6-9]|2[0-9]|3[0-1])\\./.test(hostname)) // Regex for 172.16.0.0 - 172.31.255.255
+    {
+        return true;
     }
-    // Otherwise (production web on custom domain, or native), use the standard flow
+
+    // Otherwise (production web on custom domain), use the standard redirect flow
     return false;
 };
 
