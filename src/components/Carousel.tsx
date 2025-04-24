@@ -34,7 +34,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   private resizeObserver: ResizeObserver | null = null;
   private momentumAnimationId: number | null = null;
   private padding = 16; // Match CSS
-  private defaultHeight = 340; // Match CSS
+  private defaultHeight = 350; // Match CSS
 
   constructor(props: CarouselProps) {
     super(props);
