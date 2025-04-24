@@ -85,11 +85,11 @@ body {
 #app-header {
   position: fixed;
   height: 66px;
-  top: 2rem;
+  top: 1.5rem;
   left: 0;
   right: 0;
-  padding-left: calc(2rem + var(--safe-area-left));
-  padding-right: calc(2rem + var(--safe-area-right));
+  padding-left: calc(1.5rem + var(--safe-area-left));
+  padding-right: calc(1.5rem + var(--safe-area-right));
   padding-top: var(--safe-area-top);
   display: flex;
   align-items: center;
@@ -172,7 +172,6 @@ body {
   background: var(--dark-gray);
   border-radius: 20px;
   padding: 3px;
-  opacity: 0.9;
   box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
   gap: 3px;
 }
@@ -184,16 +183,16 @@ body {
   background: transparent;
   color: var(--light-gray);
   font-size: var(--font-size-medium);
-  text-shadow: 0px 1px 2px rgba(0,0,0,.3);
+  text-shadow: 0px 1px 2px var(--black);
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
   font-weight: 500;
 }
 
 #app-header .view-toggle-button.active {
   background: var(--white);
   color: var(--dark-gray);
-  text-shadow: 0px 1px 2px rgba(168, 168, 168, 0.3);
+  text-shadow: 0px 1px 2px var(--light-gray-opacity);
 }
 
 #map-container {
@@ -334,7 +333,6 @@ body {
   padding-top: 100%;
   cursor: pointer;
   overflow: hidden;
-  background-color: var(--light-gray);
 }
 
 .gallery-image {
@@ -907,13 +905,13 @@ body {
   fill: white;
 }
 
-.satlas-popup .image-uploader {
+.image-uploader {
   position: absolute;
   bottom: 0;
   right: 0;
   background: rgba(0, 0, 0, 0.6);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  color: rgb(213, 212, 212);
+  color: var(--light-gray);
   padding: 8px 12px;
   border-radius: 10px 0 10px 0;
   font-size: 14px;

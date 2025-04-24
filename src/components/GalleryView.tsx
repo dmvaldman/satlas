@@ -120,8 +120,6 @@ class GalleryView extends React.Component<GalleryViewProps, GalleryViewState> {
                       className="gallery-image"
                       loading="lazy" // Use lazy loading for performance
                     />
-                     {/* Optional: Add uploader name or other info here if desired */}
-                     {/* <span className="gallery-item-uploader">{image.userName}</span> */}
                   </div>
                 );
               }
