@@ -332,17 +332,6 @@ class App extends React.Component<{}, AppState> {
         }
       });
     });
-
-    map.on('moveend', () => {
-        // Ensure map exists in state before using it
-        if (this.state.map) {
-            const bounds = this.state.map.getBounds();
-            console.log('Map Moved Bounds:', bounds);
-            if (bounds) {
-                this.handleLoadSits({ north: bounds.getNorth(), south: bounds.getSouth() });
-            }
-        }
-    });
   };
 
   private initializeOfflineService = async () => {

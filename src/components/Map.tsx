@@ -29,7 +29,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
   private markerManager: Markers;
   private clusterManager: Clusters;
   private userMarker: mapboxgl.Marker | null = null;
-  private debouncedHandleMapMove: (bounds: { north: number; south: number }) => void;
 
   constructor(props: MapProps) {
     super(props);
@@ -41,8 +40,6 @@ class MapComponent extends React.Component<MapProps, MapState> {
     this.markerManager = new Markers(this.handleMarkerClick);
 
     this.clusterManager = new Clusters();
-
-    this.debouncedHandleMapMove = debounce(this.props.onLoadSits, 300);
   }
 
   componentDidMount() {
@@ -96,7 +93,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
   private setupMap(map: mapboxgl.Map) {
     // Setup map event handlers
-    map.on('moveend', this.handleMapMove);
+    map.on('move', debounce(this.loadSits.bind(this), 200));
+    map.on('moveend', this.loadSits.bind(this));
 
     // Setup cluster layer
     this.clusterManager.setupClusterLayer(map, this.props.sits);
@@ -168,11 +166,11 @@ class MapComponent extends React.Component<MapProps, MapState> {
     });
   }
 
-  private handleMapMove = () => {
-    const { map } = this.props;
+  private loadSits = () => {
+    const { map, onLoadSits } = this.props;
     if (!map) return;
     const bounds = map.getBounds()!;
-    this.debouncedHandleMapMove({
+    onLoadSits({
       north: bounds.getNorth(),
       south: bounds.getSouth()
     });
