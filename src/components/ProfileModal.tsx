@@ -4,7 +4,6 @@ import { FirebaseService } from '../services/FirebaseService';
 import { Capacitor } from '@capacitor/core';
 import { PushNotificationService } from '../services/PushNotificationService';
 import mapboxgl from 'mapbox-gl';
-import { App } from '@capacitor/app';
 import BaseModal from './BaseModal';
 
 interface ProfileModalProps {
@@ -38,7 +37,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   private cityInputRef = React.createRef<HTMLInputElement>();
   private notificationService: PushNotificationService | null = null;
   private permissionChangeHandler: ((isGranted: boolean) => void) | null = null;
-  private appStateListenerHandle: { remove: () => void } | null = null;
 
   constructor(props: ProfileModalProps) {
     super(props);
@@ -67,11 +65,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // Sync the toggle state with actual device permissions
     this.syncNotificationToggleState();
-
-    // Add app resume listener for when returning from system settings
-    if (Capacitor.isNativePlatform()) {
-      this.setupAppStateListener();
-    }
 
     // If we have coordinates, resolve them to a city name
     if (this.props.preferences?.cityCoordinates) {
@@ -114,13 +107,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   componentWillUnmount() {
     // Remove permission change listener and clean up notification service
     this.cleanupNotificationService();
-
-    // Remove app resume listener - only remove our specific listener
-    if (this.appStateListenerHandle) {
-      this.appStateListenerHandle.remove();
-      this.appStateListenerHandle = null;
-      console.log('[ProfileModal] App state listener removed');
-    }
   }
 
   private initializeFromProps() {
@@ -453,23 +439,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   };
 
-  // Handle app resuming from background (returning from system settings)
-  private handleAppResume = () => {
-    console.log('[ProfileModal] App resumed, re-initializing notification service');
-
-    // Re-create notification service since the app might have refreshed
-    this.cleanupNotificationService();
-    this.initializeNotificationService();
-
-    // Re-sync notification status immediately when app resumes
-    this.syncNotificationToggleState();
-
-    // If we have a user, make sure notification preferences are up to date
-    if (this.props.user && this.props.preferences) {
-      this.updateNotificationPreferencesIfNeeded();
-    }
-  };
-
   // Add a method to initialize the notification service
   private initializeNotificationService = async () => {
     const { user, preferences } = this.props;
@@ -626,20 +595,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     // If user is available, update preferences to match actual permission
     if (this.props.user?.uid && this.props.preferences) {
       this.saveNotificationPreference(this.props.user.uid, isGranted);
-    }
-  }
-
-  private setupAppStateListener = async () => {
-    try {
-      // Store the listener handle so we can remove it later
-      this.appStateListenerHandle = await App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          this.handleAppResume();
-        }
-      });
-      console.log('[ProfileModal] App state listener added');
-    } catch (error) {
-      console.error('[ProfileModal] Error setting up app state listener:', error);
     }
   }
 
