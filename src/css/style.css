@@ -547,7 +547,7 @@ body {
 
 .profile-section input[type="text"]:focus,
 .profile-section input[type="search"]:focus {
-  border-color: var(--black);
+  border-color: var(--dark-gray);
   box-shadow: 0px 0px 2px 0px var(--medium-gray);
 }
 
@@ -580,7 +580,7 @@ body {
 }
 
 .profile-section #city:focus {
-  border-color: var(--black);
+  border-color: var(--dark-gray);
   outline: none;
 }
 

@@ -12,8 +12,7 @@ import AddSitButton from './components/AddSitButton';
 import NearbySitModal from './components/NearbySitModal';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './services/LocationService';
-import { NotificationService } from './services/NotificationService';
-import Notifications from './components/Notifications';
+import Notifications, { NotificationType } from './components/Notifications';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
@@ -92,6 +91,7 @@ interface AppState {
 class App extends React.Component<{}, AppState> {
   private mapContainer = React.createRef<HTMLDivElement>();
   private mapComponentRef = React.createRef<MapComponent>();
+  private notificationsRef = React.createRef<Notifications>();
   private locationService: LocationService;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
@@ -925,9 +925,9 @@ class App extends React.Component<{}, AppState> {
 
   private showNotification = (
     message: string,
-    type: 'success' | 'error'
+    type: NotificationType
   ) => {
-    NotificationService.getInstance().showNotification({ message, type });
+    this.notificationsRef.current?.showNotification({ message, type });
   };
 
   private configureStatusBar = async () => {
@@ -1412,7 +1412,7 @@ class App extends React.Component<{}, AppState> {
 
     return (
       <div id="app" className={`app-view-${currentView}`}>
-        <Notifications />
+        <Notifications ref={this.notificationsRef} />
 
         <header id="app-header">
           <ViewToggle
