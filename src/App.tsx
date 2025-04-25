@@ -928,10 +928,6 @@ class App extends React.Component<{}, AppState> {
     type: 'success' | 'error'
   ) => {
     NotificationService.getInstance().showNotification({ message, type });
-    if (type === 'error') {
-      // Log error to Sentry
-      Sentry.captureException(new Error(message));
-    }
   };
 
   private configureStatusBar = async () => {
