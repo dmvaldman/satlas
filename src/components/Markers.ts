@@ -38,7 +38,7 @@ export class Markers {
   }
 
   private handleInteractionStart(e: MouseEvent | TouchEvent, container: HTMLElement) {
-    e.stopPropagation();
+    // e.stopPropagation();
     const markerElement = container.querySelector('.marker');
     if (markerElement) {
         markerElement.classList.add('clicked');
@@ -46,7 +46,7 @@ export class Markers {
   }
 
   private handleInteractionEnd(e: MouseEvent | TouchEvent, container: HTMLElement) {
-    e.stopPropagation();
+    // e.stopPropagation();
     const markerElement = container.querySelector('.marker');
     if (markerElement) {
         markerElement.classList.remove('clicked');
