@@ -1,6 +1,7 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
+import { Timestamp } from 'firebase/firestore';
 import * as Sentry from "@sentry/react";
 import AuthComponent from './components/AuthButton';
 import MapComponent from './components/Map';
@@ -72,20 +73,14 @@ interface AppState {
   };
 
   userPreferences: UserPreferences;
-
-  // Add drawer state
   drawer: {
     isOpen: boolean;
     sit?: Sit;
     images: Image[];
   };
-
-  // Add this new property
   isOffline: boolean;
-
-  // --- New State ---
   currentView: ViewType;
-  // --- End New State ---
+  initialLoadTimestamp?: Timestamp | null; // Make optional or allow null in state type
 }
 
 class App extends React.Component<{}, AppState> {
@@ -93,6 +88,7 @@ class App extends React.Component<{}, AppState> {
   private mapComponentRef = React.createRef<MapComponent>();
   private notificationsRef = React.createRef<Notifications>();
   private locationService: LocationService;
+  private initialLoadTimestamp: Timestamp | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
   private firebaseListenersUnsubscribe: (() => void) | null = null;
@@ -130,23 +126,18 @@ class App extends React.Component<{}, AppState> {
         lastVisit: 0,
         username_lowercase: ''
       },
-
-      // Initialize drawer state
       drawer: {
         isOpen: false,
         sit: undefined,
         images: []
       },
-
-      // Initialize offline state
       isOffline: false,
-
-      // --- Initialize View State ---
       currentView: 'map',
-      // --- End Initialize View State ---
     };
 
     this.locationService = new LocationService();
+
+    this.initialLoadTimestamp = Timestamp.now();
   }
 
   componentDidMount() {
@@ -156,14 +147,11 @@ class App extends React.Component<{}, AppState> {
     // Add location listener before initializations
     this.locationService.onLocationUpdate(this.handleLocationUpdate);
 
-    // Set up real-time listeners immediately
-    this.setupRealtimeListeners();
-
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),
-      this.initializeMap(), // initializeMap now handles its own async logic
-      this.initializeOfflineService() // Initialize offline service earlier
+      this.initializeMap(),
+      this.initializeOfflineService()
     ]).catch(error => {
       console.error('[App] Initialization error during Promise.all:', error);
       this.showNotification('Failed to initialize app', 'error');
@@ -173,6 +161,12 @@ class App extends React.Component<{}, AppState> {
     if (Capacitor.isNativePlatform()) {
       // Configure status bar
       this.configureStatusBar();
+
+      try {
+        SplashScreen.hide(); // Fire and forget
+      } catch (e) {
+        console.error('[App] Error hiding splash screen:', e);
+      }
 
       // Add resume listener for native platforms
       CapacitorApp.addListener('resume', () => {
@@ -205,14 +199,8 @@ class App extends React.Component<{}, AppState> {
     // Setup deep links for web/mobile
     this.setupDeepLinks();
 
-    // Attempt to hide splash screen only after primary initializations and listener setups
-    if (Capacitor.isNativePlatform()) {
-      try {
-        SplashScreen.hide(); // Fire and forget
-      } catch (e) {
-        console.error('[App] Error hiding splash screen:', e);
-      }
-    }
+    // Synchronize Firebase sit/mark listeners
+    this.setupRealtimeListeners();
   }
 
   componentWillUnmount() {
@@ -280,12 +268,10 @@ class App extends React.Component<{}, AppState> {
 
     try {
       console.log('[App] Attempting to get initial location...');
-      // Give slightly more time for initial location? Sticking to service default for now.
       initialCoordinates = await this.locationService.getCurrentLocation();
       console.log('[App] Initial location obtained:', initialCoordinates);
       mapCenter = initialCoordinates;
       mapZoom = 13;
-      // Set currentLocation immediately if successful
       this.setState({ currentLocation: initialCoordinates });
     } catch (error) {
       console.warn('[App] Initial location failed:', error);
@@ -294,7 +280,6 @@ class App extends React.Component<{}, AppState> {
         console.log('[App] Using last known location for initial map center:', lastKnown);
         mapCenter = lastKnown;
         mapZoom = 13;
-        // Set currentLocation if using last known
         this.setState({ currentLocation: lastKnown });
       } else if (this.state.userPreferences.cityCoordinates) {
         console.log('[App] Using user preference city for initial map center');
@@ -321,11 +306,8 @@ class App extends React.Component<{}, AppState> {
 
     map.once('idle', () => {
       console.log('[App] Map loaded.');
-      // Set map state *after* it's loaded
       this.setState({ map: map }, async () => {
-        // Actions after map is set in state and loaded
         console.log('[App] Starting location tracking after map load.');
-        // Always attempt to start tracking. LocationService handles retries/state.
         this.locationService.startTracking();
 
         const bounds = map.getBounds();
@@ -514,44 +496,74 @@ class App extends React.Component<{}, AppState> {
       this.firebaseListenersUnsubscribe();
     }
 
-    // Set up new listeners
+    // Ensure we have the timestamp before setting up
+    if (!this.initialLoadTimestamp) {
+      console.warn('[App] Initial load timestamp not set, delaying listener setup.');
+      // Optionally retry or handle this state
+      return;
+    }
+
+    console.log(`[App] Setting up realtime listeners for changes after ${this.initialLoadTimestamp.toDate()}`);
+
+    // Set up new listeners, passing the captured timestamp
     this.firebaseListenersUnsubscribe = FirebaseService.setupRealtimeListeners(
       // Handle new sit added
       (sit) => {
-        console.log('[App] New sit added:', sit.id);
-        this.setState(prevState => {
-          const newSits = new Map(prevState.sits);
-          newSits.set(sit.id, sit);
-          return { sits: newSits };
-        });
+        // Check if the sit already exists from the initial loadSits call
+        if (this.state.sits.has(sit.id)) {
+          console.log(`[App] Realtime: Sit ${sit.id} already exists, likely from initial load. Updating.`);
+          // Treat as update instead of add if it exists
+          this.setState(prevState => {
+            const newSits = new Map(prevState.sits);
+            newSits.set(sit.id, sit); // Update with potentially newer data
+            return { sits: newSits };
+          });
+        } else {
+          console.log('[App] Realtime: New sit added:', sit.id);
+          this.setState(prevState => {
+            const newSits = new Map(prevState.sits);
+            newSits.set(sit.id, sit);
+            return { sits: newSits };
+          });
+        }
       },
       // Handle sit updated
       (sit) => {
-        console.log('[App] Sit updated:', sit.id);
-        this.setState(prevState => {
-          const newSits = new Map(prevState.sits);
-          newSits.set(sit.id, sit);
-          return { sits: newSits };
-        });
+        console.log('[App] Realtime: Sit updated:', sit.id);
+        // Only update if the sit exists in our current state (relevant if bounds filtering were used)
+        if (this.state.sits.has(sit.id)) {
+          this.setState(prevState => {
+            const newSits = new Map(prevState.sits);
+            newSits.set(sit.id, sit);
+            return { sits: newSits };
+          });
+        }
       },
       // Handle sit removed
       (sitId) => {
-        console.log('[App] Sit removed:', sitId);
-        this.setState(prevState => {
-          const newSits = new Map(prevState.sits);
-          newSits.delete(sitId);
-          return { sits: newSits };
-        });
+        console.log('[App] Realtime: Sit removed:', sitId);
+        // Only remove if it exists in our state
+        if (this.state.sits.has(sitId)) {
+          this.setState(prevState => {
+            const newSits = new Map(prevState.sits);
+            newSits.delete(sitId);
+            return { sits: newSits };
+          });
+        }
       },
       // Handle marks changed
       (sitId, marks) => {
-        console.log('[App] Marks changed for sit:', sitId);
-        this.setState(prevState => {
-          const newMarks = new Map(prevState.marks);
-          newMarks.set(sitId, marks);
-          return { marks: newMarks };
-        });
-      }
+        console.log('[App] Realtime: Marks changed for sit:', sitId);
+        // Only update marks if the sit is in our state
+        if (this.state.sits.has(sitId)) {
+          this.setState(prevState => {
+            const newMarks = new Map(prevState.marks);
+            newMarks.set(sitId, marks);
+            return { marks: newMarks };
+          });
+        }
+      },
+      this.initialLoadTimestamp // Pass the timestamp here
     );
   };
 

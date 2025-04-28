@@ -32,7 +32,8 @@ import {
   initializeFirestore,
   orderBy,
   limit,
-  onSnapshot
+  onSnapshot,
+  Timestamp
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -952,39 +953,56 @@ export class FirebaseService {
    * @param onSitUpdated Callback when a sit is updated
    * @param onSitRemoved Callback when a sit is removed
    * @param onMarksChanged Callback when marks for a sit change
+   * @param listenAfterTimestamp Timestamp after which to listen for new sits
    * @returns Function to unsubscribe from all listeners
    */
   static setupRealtimeListeners(
     onSitAdded: (sit: Sit) => void,
     onSitUpdated: (sit: Sit) => void,
     onSitRemoved: (sitId: string) => void,
-    onMarksChanged: (sitId: string, marks: Set<MarkType>) => void
+    onMarksChanged: (sitId: string, marks: Set<MarkType>) => void,
+    listenAfterTimestamp: Timestamp
   ): () => void {
-    // Listen for sit changes
+    // Listen for sit changes *after* the specified timestamp
     const sitsRef = collection(db, 'sits');
-    const sitsListener = onSnapshot(sitsRef, (snapshot) => {
+    const sitsQuery = query(
+      sitsRef,
+      where('createdAt', '>', listenAfterTimestamp) // Add the timestamp condition
+    );
+    const sitsListener = onSnapshot(sitsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
-        const sitData = change.doc.data();
-        const sit: Sit = {
-          id: change.doc.id,
-          location: sitData.location,
-          imageCollectionId: sitData.imageCollectionId,
-          uploadedBy: sitData.uploadedBy,
-          uploadedByUsername: sitData.uploadedByUsername,
-          createdAt: sitData.createdAt?.toDate() || new Date()
-        };
+        try {
+          const sitData = change.doc.data();
+          // Ensure createdAt is converted to Date for consistency if needed by Sit type
+          const createdAtDate = sitData.createdAt?.toDate ? sitData.createdAt.toDate() : new Date();
+          const sit: Sit = {
+            id: change.doc.id,
+            location: sitData.location,
+            imageCollectionId: sitData.imageCollectionId,
+            uploadedBy: sitData.uploadedBy,
+            uploadedByUsername: sitData.uploadedByUsername,
+            createdAt: createdAtDate // Use converted Date
+          };
 
-        if (change.type === 'added') {
-          onSitAdded(sit);
-        } else if (change.type === 'modified') {
-          onSitUpdated(sit);
-        } else if (change.type === 'removed') {
-          onSitRemoved(change.doc.id);
+          if (change.type === 'added') {
+            console.log('[RealtimeListener] New sit detected:', sit.id);
+            onSitAdded(sit);
+          } else if (change.type === 'modified') {
+            console.log('[RealtimeListener] Sit modified:', sit.id);
+            onSitUpdated(sit);
+          } else if (change.type === 'removed') {
+            console.log('[RealtimeListener] Sit removed:', sit.id);
+            onSitRemoved(change.doc.id);
+          }
+        } catch (error) {
+          console.error('[FirebaseService] Error processing sit change:', error);
         }
       });
+    }, (error) => {
+      console.error('[FirebaseService] Error in sits listener:', error);
     });
 
-    // Listen for marks changes
+    // Listen for marks changes (globally, no timestamp filter needed here)
     const marksRef = collection(db, 'marks');
     const marksListener = onSnapshot(marksRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -1222,13 +1240,23 @@ export class FirebaseService {
    */
   static async _createSit(tempSit: Sit): Promise<Sit> {
     try {
-      const sitDoc = await addDoc(collection(db, 'sits'), tempSit);
+      // Data to be saved in Firestore - use the client-provided Date object
+      const sitData = {
+        location: tempSit.location,
+        imageCollectionId: tempSit.imageCollectionId,
+        uploadedBy: tempSit.uploadedBy,
+        uploadedByUsername: tempSit.uploadedByUsername,
+        createdAt: tempSit.createdAt // Use client-generated timestamp (Date object)
+      };
 
+      const sitDoc = await addDoc(collection(db, 'sits'), sitData);
+
+      // The returned Sit object matches the tempSit structure
       const sit: Sit = {
         id: sitDoc.id,
         location: tempSit.location,
         imageCollectionId: tempSit.imageCollectionId,
-        createdAt: tempSit.createdAt,
+        createdAt: tempSit.createdAt, // Return the same client Date
         uploadedBy: tempSit.uploadedBy,
         uploadedByUsername: tempSit.uploadedByUsername
       };
