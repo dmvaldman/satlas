@@ -953,7 +953,7 @@ export class FirebaseService {
    * @param onSitUpdated Callback when a sit is updated
    * @param onSitRemoved Callback when a sit is removed
    * @param onMarksChanged Callback when marks for a sit change
-   * @param listenAfterTimestamp Timestamp after which to listen for new sits
+   * @param listenAfterTimestampMs Milliseconds since epoch after which to listen for new sits
    * @returns Function to unsubscribe from all listeners
    */
   static setupRealtimeListeners(
@@ -961,13 +961,13 @@ export class FirebaseService {
     onSitUpdated: (sit: Sit) => void,
     onSitRemoved: (sitId: string) => void,
     onMarksChanged: (sitId: string, marks: Set<MarkType>) => void,
-    listenAfterTimestamp: Timestamp
+    listenAfterTimestampMs: number
   ): () => void {
-    // Listen for sit changes *after* the specified timestamp
+    // Listen for sit changes *after* the specified timestamp (milliseconds)
     const sitsRef = collection(db, 'sits');
     const sitsQuery = query(
       sitsRef,
-      where('createdAt', '>', listenAfterTimestamp) // Add the timestamp condition
+      where('createdAt', '>', listenAfterTimestampMs) // Use the number directly in the query
     );
     const sitsListener = onSnapshot(sitsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {

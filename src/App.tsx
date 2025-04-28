@@ -1,7 +1,6 @@
 import React from 'react';
 import mapboxgl from 'mapbox-gl';
 import { User } from 'firebase/auth';
-import { Timestamp } from 'firebase/firestore';
 import * as Sentry from "@sentry/react";
 import AuthComponent from './components/AuthButton';
 import MapComponent from './components/Map';
@@ -80,7 +79,7 @@ interface AppState {
   };
   isOffline: boolean;
   currentView: ViewType;
-  initialLoadTimestamp?: Timestamp | null; // Make optional or allow null in state type
+  initialLoadTimestampMs?: number | null;
 }
 
 class App extends React.Component<{}, AppState> {
@@ -88,7 +87,7 @@ class App extends React.Component<{}, AppState> {
   private mapComponentRef = React.createRef<MapComponent>();
   private notificationsRef = React.createRef<Notifications>();
   private locationService: LocationService;
-  private initialLoadTimestamp: Timestamp | null = null;
+  private initialLoadTimestampMs: number | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
   private firebaseListenersUnsubscribe: (() => void) | null = null;
@@ -137,7 +136,8 @@ class App extends React.Component<{}, AppState> {
 
     this.locationService = new LocationService();
 
-    this.initialLoadTimestamp = Timestamp.now();
+    // Capture timestamp (milliseconds) BEFORE setting up listeners
+    this.initialLoadTimestampMs = Date.now(); // Use Date.now()
   }
 
   componentDidMount() {
@@ -497,15 +497,14 @@ class App extends React.Component<{}, AppState> {
     }
 
     // Ensure we have the timestamp before setting up
-    if (!this.initialLoadTimestamp) {
-      console.warn('[App] Initial load timestamp not set, delaying listener setup.');
-      // Optionally retry or handle this state
+    if (!this.initialLoadTimestampMs) {
+      console.warn('[App] Initial load timestamp (ms) not set, delaying listener setup.');
       return;
     }
 
-    console.log(`[App] Setting up realtime listeners for changes after ${this.initialLoadTimestamp.toDate()}`);
+    console.log(`[App] Setting up realtime listeners for changes after ${new Date(this.initialLoadTimestampMs).toISOString()}`);
 
-    // Set up new listeners, passing the captured timestamp
+    // Set up new listeners, passing the captured timestamp number
     this.firebaseListenersUnsubscribe = FirebaseService.setupRealtimeListeners(
       // Handle new sit added
       (sit) => {
@@ -563,7 +562,7 @@ class App extends React.Component<{}, AppState> {
           });
         }
       },
-      this.initialLoadTimestamp // Pass the timestamp here
+      this.initialLoadTimestampMs // Pass the number here
     );
   };
 
