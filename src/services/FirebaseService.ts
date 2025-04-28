@@ -31,7 +31,8 @@ import {
   Firestore,
   initializeFirestore,
   orderBy,
-  limit
+  limit,
+  onSnapshot
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -943,6 +944,68 @@ export class FirebaseService {
       console.error('Error getting sit:', error);
       throw error;
     }
+  }
+
+  /**
+   * Sets up real-time listeners for sits and marks
+   * @param onSitAdded Callback when a new sit is added
+   * @param onSitUpdated Callback when a sit is updated
+   * @param onSitRemoved Callback when a sit is removed
+   * @param onMarksChanged Callback when marks for a sit change
+   * @returns Function to unsubscribe from all listeners
+   */
+  static setupRealtimeListeners(
+    onSitAdded: (sit: Sit) => void,
+    onSitUpdated: (sit: Sit) => void,
+    onSitRemoved: (sitId: string) => void,
+    onMarksChanged: (sitId: string, marks: Set<MarkType>) => void
+  ): () => void {
+    // Listen for sit changes
+    const sitsRef = collection(db, 'sits');
+    const sitsListener = onSnapshot(sitsRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const sitData = change.doc.data();
+        const sit: Sit = {
+          id: change.doc.id,
+          location: sitData.location,
+          imageCollectionId: sitData.imageCollectionId,
+          uploadedBy: sitData.uploadedBy,
+          uploadedByUsername: sitData.uploadedByUsername,
+          createdAt: sitData.createdAt?.toDate() || new Date()
+        };
+
+        if (change.type === 'added') {
+          onSitAdded(sit);
+        } else if (change.type === 'modified') {
+          onSitUpdated(sit);
+        } else if (change.type === 'removed') {
+          onSitRemoved(change.doc.id);
+        }
+      });
+    });
+
+    // Listen for marks changes
+    const marksRef = collection(db, 'marks');
+    const marksListener = onSnapshot(marksRef, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const sitId = change.doc.id;
+        const marksData = change.doc.data();
+
+        // Convert marks data to Set<MarkType>
+        const marks = new Set<MarkType>();
+        if (marksData.favorite) marks.add('favorite');
+        if (marksData.visited) marks.add('visited');
+        if (marksData.wantToGo) marks.add('wantToGo');
+
+        onMarksChanged(sitId, marks);
+      });
+    });
+
+    // Return unsubscribe function
+    return () => {
+      sitsListener();
+      marksListener();
+    };
   }
 
   /**

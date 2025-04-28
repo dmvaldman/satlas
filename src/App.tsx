@@ -95,6 +95,7 @@ class App extends React.Component<{}, AppState> {
   private locationService: LocationService;
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
+  private firebaseListenersUnsubscribe: (() => void) | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -154,6 +155,9 @@ class App extends React.Component<{}, AppState> {
 
     // Add location listener before initializations
     this.locationService.onLocationUpdate(this.handleLocationUpdate);
+
+    // Set up real-time listeners immediately
+    this.setupRealtimeListeners();
 
     // Run all async initializations in parallel
     Promise.all([
@@ -234,6 +238,11 @@ class App extends React.Component<{}, AppState> {
     // Clean up offline service listener
     if (this.offlineServiceUnsubscribe) {
       this.offlineServiceUnsubscribe();
+    }
+
+    // Clean up Firebase listeners
+    if (this.firebaseListenersUnsubscribe) {
+      this.firebaseListenersUnsubscribe();
     }
   }
 
@@ -497,6 +506,53 @@ class App extends React.Component<{}, AppState> {
     } catch (error) {
       console.error('[App] Error signing out:', error);
     }
+  };
+
+  private setupRealtimeListeners = () => {
+    // Clean up existing listeners if any
+    if (this.firebaseListenersUnsubscribe) {
+      this.firebaseListenersUnsubscribe();
+    }
+
+    // Set up new listeners
+    this.firebaseListenersUnsubscribe = FirebaseService.setupRealtimeListeners(
+      // Handle new sit added
+      (sit) => {
+        console.log('[App] New sit added:', sit.id);
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.set(sit.id, sit);
+          return { sits: newSits };
+        });
+      },
+      // Handle sit updated
+      (sit) => {
+        console.log('[App] Sit updated:', sit.id);
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.set(sit.id, sit);
+          return { sits: newSits };
+        });
+      },
+      // Handle sit removed
+      (sitId) => {
+        console.log('[App] Sit removed:', sitId);
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.delete(sitId);
+          return { sits: newSits };
+        });
+      },
+      // Handle marks changed
+      (sitId, marks) => {
+        console.log('[App] Marks changed for sit:', sitId);
+        this.setState(prevState => {
+          const newMarks = new Map(prevState.marks);
+          newMarks.set(sitId, marks);
+          return { marks: newMarks };
+        });
+      }
+    );
   };
 
   // UI methods
