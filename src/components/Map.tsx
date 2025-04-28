@@ -94,7 +94,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   private setupMap(map: mapboxgl.Map) {
     // Setup map event handlers
     map.on('move', debounce(this.loadSits.bind(this), 200));
-    map.on('moveend', this.loadSits.bind(this));
+    // map.on('moveend', this.loadSits.bind(this));
 
     // Setup cluster layer
     this.clusterManager.setupClusterLayer(map, this.props.sits);
