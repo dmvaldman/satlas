@@ -248,7 +248,14 @@ body {
   align-items: center;
   justify-content: center;
   position: relative;
-  transition: filter 0.15s ease-out, transform 0.15s ease-out;
+  transition: filter 0.15s ease-out, transform 0.15s ease-out, background-color 0.2s ease; /* Added background-color transition */
+  transform-origin: center;
+  animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#map-container .marker.removing {
+  animation: scaleOut 0.15s ease-in;
+  pointer-events: none;
 }
 
 #map-container .marker.clicked {
@@ -1175,5 +1182,27 @@ body {
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0);
+    opacity: 0;
   }
 }

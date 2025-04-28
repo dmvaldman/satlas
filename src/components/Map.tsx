@@ -194,7 +194,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     // Get current zoom level
     const zoom = map.getZoom();
-    const clusterMaxZoom = 13; // Should match the value in ClusterManager
+    const clusterMaxZoom = 13;
 
     // If zoomed in beyond clustering threshold, show individual markers
     if (zoom >= clusterMaxZoom) {
@@ -202,7 +202,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
       map.setLayoutProperty('clusters', 'visibility', 'none');
       map.setLayoutProperty('cluster-count', 'visibility', 'none');
 
-      // Show individual markers
+      // Show all markers
       this.markerManager.showMarkers(map, sits, marks, user, seenSits);
     } else {
       // Show cluster layers
@@ -225,11 +225,8 @@ class MapComponent extends React.Component<MapProps, MapState> {
           .filter(([id]) => unclusteredIds.has(id))
       );
 
-      // Show markers only for unclustered points
-      this.markerManager.removeAllMarkers();
-      if (unclusteredSits.size > 0) {
-        this.markerManager.showMarkers(map, unclusteredSits, marks, user, seenSits);
-      }
+      // Update markers to only show unclustered points
+      this.markerManager.updateMarkersForClustering(map, sits, unclusteredSits, marks, user, seenSits);
     }
   };
 

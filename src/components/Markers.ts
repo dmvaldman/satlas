@@ -88,6 +88,18 @@ export class Markers {
     }).setLngLat([sit.location.longitude, sit.location.latitude]);
   }
 
+  private removeMarker(marker: mapboxgl.Marker, id: string): void {
+    const container = marker.getElement();
+    const el = container.firstElementChild as HTMLElement;
+    el.classList.add('removing');
+
+    // Wait for animation to complete before removing
+    el.addEventListener('animationend', () => {
+      marker.remove();
+      this.markers.delete(id);
+    }, { once: true });
+  }
+
   public showMarkers(
     map: mapboxgl.Map,
     sits: Map<string, Sit>,
@@ -95,52 +107,88 @@ export class Markers {
     user: User | null,
     seenSits: Set<string> = new Set()
   ): void {
-    Array.from(sits.values()).forEach(sit => {
-      const sitMarks = marks.get(sit.id) || new Set();
-
-      if (!this.markers.has(sit.id)) {
-        const marker = this.createMarker(sit, sitMarks, user, seenSits);
-        marker.addTo(map);
-        this.markers.set(sit.id, marker);
-      } else {
-        // Update existing marker
-        const marker = this.markers.get(sit.id)!;
-        const container = marker.getElement();
-        container.className = 'mapboxgl-marker marker-container';
-
-        const el = container.firstElementChild as HTMLElement;
-        el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
-
-        // Clear existing icon
-        const existingIcon = el.querySelector('.marker-icon');
-        if (existingIcon) {
-          existingIcon.remove();
-        }
-
-        // Add new icon if needed
-        if (sitMarks.size > 0) {
-          el.appendChild(this.createIconElement(sitMarks));
-        }
-
-        // Update position if needed
-        marker.setLngLat([sit.location.longitude, sit.location.latitude]);
-
-        // Make sure the marker is visible and added to the map
-        marker.addTo(map);
-      }
-    });
-
     // Remove any markers that no longer exist
     this.markers.forEach((marker, id) => {
       if (!sits.has(id)) {
-        marker.remove();
-        this.markers.delete(id);
+        this.removeMarker(marker, id);
       }
     });
 
     // Remove any cluster markers
     this.clusterMarkers.forEach(marker => marker.remove());
     this.clusterMarkers.clear();
+
+    // Update or add markers for all sits
+    this.updateOrAddMarkers(map, sits, marks, user, seenSits);
+  }
+
+  public updateMarkersForClustering(
+    map: mapboxgl.Map,
+    allSits: Map<string, Sit>,
+    unclusteredSits: Map<string, Sit>,
+    marks: Map<string, Set<MarkType>>,
+    user: User | null,
+    seenSits: Set<string> = new Set()
+  ): void {
+    // Remove markers for sits that are now clustered
+    this.markers.forEach((marker, sitId) => {
+      if (!unclusteredSits.has(sitId)) {
+        this.removeMarker(marker, sitId);
+      }
+    });
+
+    // Update or add markers for unclustered sits
+    this.updateOrAddMarkers(map, unclusteredSits, marks, user, seenSits);
+  }
+
+  private updateOrAddMarkers(
+    map: mapboxgl.Map,
+    sits: Map<string, Sit>,
+    marks: Map<string, Set<MarkType>>,
+    user: User | null,
+    seenSits: Set<string>
+  ): void {
+    sits.forEach(sit => {
+      const sitMarks = marks.get(sit.id) || new Set();
+
+      if (!this.markers.has(sit.id)) {
+        // Create new marker
+        const marker = this.createMarker(sit, sitMarks, user, seenSits);
+        marker.addTo(map);
+        this.markers.set(sit.id, marker);
+      } else {
+        // Update existing marker
+        this.updateExistingMarker(sit, sitMarks, user, seenSits);
+      }
+    });
+  }
+
+  private updateExistingMarker(
+    sit: Sit,
+    sitMarks: Set<MarkType>,
+    user: User | null,
+    seenSits: Set<string>
+  ): void {
+    const marker = this.markers.get(sit.id)!;
+    const container = marker.getElement();
+    container.className = 'mapboxgl-marker marker-container';
+
+    const el = container.firstElementChild as HTMLElement;
+    el.className = this.getMarkerClasses(sit, user, sitMarks, seenSits).join(' ');
+
+    // Clear existing icon
+    const existingIcon = el.querySelector('.marker-icon');
+    if (existingIcon) {
+      existingIcon.remove();
+    }
+
+    // Add new icon if needed
+    if (sitMarks.size > 0) {
+      el.appendChild(this.createIconElement(sitMarks));
+    }
+
+    // Update position if needed
+    marker.setLngLat([sit.location.longitude, sit.location.latitude]);
   }
 
   public updateMarker(
@@ -161,7 +209,9 @@ export class Markers {
   }
 
   public removeAllMarkers(): void {
-    this.markers.forEach(marker => marker.remove());
+    this.markers.forEach((marker, id) => {
+      this.removeMarker(marker, id);
+    });
     this.markers.clear();
     this.clusterMarkers.forEach(marker => marker.remove());
     this.clusterMarkers.clear();
