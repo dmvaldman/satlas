@@ -124,7 +124,6 @@ export class Markers {
 
   public updateMarkersForClustering(
     map: mapboxgl.Map,
-    allSits: Map<string, Sit>,
     unclusteredSits: Map<string, Sit>,
     marks: Map<string, Set<MarkType>>,
     user: User | null,

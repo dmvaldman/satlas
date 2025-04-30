@@ -75,7 +75,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
     }
 
     // If map is available and sits have changed, update the GeoJSON source
-    if (map && prevProps.sits !== sits && this.clusterManager.isClusterSourceAdded()) {
+    if (map && prevProps.sits !== sits && this.clusterManager.areClusterLayersReady(map)) {
       this.clusterManager.updateClusterSource(map, sits);
       this.updateVisibleMarkers();
     }
@@ -183,7 +183,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   private updateVisibleMarkers = () => {
     const { map, sits, user, seenSits } = this.props;
     const { marks } = this.state;
-    if (!map || !this.clusterManager.isClusterSourceAdded()) return;
+    if (!map) return;
 
     // Check if cluster layers are ready before proceeding
     if (!this.clusterManager.areClusterLayersReady(map)) {
@@ -226,7 +226,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
       );
 
       // Update markers to only show unclustered points
-      this.markerManager.updateMarkersForClustering(map, sits, unclusteredSits, marks, user, seenSits);
+      this.markerManager.updateMarkersForClustering(map, unclusteredSits, marks, user, seenSits);
     }
   };
 

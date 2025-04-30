@@ -2,7 +2,6 @@ import mapboxgl from 'mapbox-gl';
 import { Sit } from '../types';
 
 export class Clusters {
-  private clusterSourceAdded: boolean = false;
   private clusterColor!: string;
   private clusterRadius: number = 24;
 
@@ -26,22 +25,15 @@ export class Clusters {
       this.initializeClusterLayers(map, sits);
     } else {
       // Source already exists, just update it and mark as added
-      this.clusterSourceAdded = true;
       this.updateClusterSource(map, sits);
     }
   }
 
   public updateClusterSource(map: mapboxgl.Map, sits: Map<string, Sit>): void {
-    if (!this.clusterSourceAdded) return;
-
     const source = map.getSource('sits') as mapboxgl.GeoJSONSource;
     if (source) {
       source.setData(this.createGeoJSONFromSits(sits));
     }
-  }
-
-  public isClusterSourceAdded(): boolean {
-    return this.clusterSourceAdded;
   }
 
   public areClusterLayersReady(map: mapboxgl.Map): boolean {
@@ -109,9 +101,6 @@ export class Clusters {
         'circle-stroke-width': 0
       }
     });
-
-    // Set state to indicate the cluster source is added
-    this.clusterSourceAdded = true;
 
     // Add click handler for clusters
     map.on('click', 'clusters', this.handleClusterClick);
