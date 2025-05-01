@@ -95,29 +95,48 @@ let auth: Auth;
 })();
 
 // --- Initialize Firestore with Persistence Check ---
-let db: Firestore;
+let db: Firestore = undefined as any; // Initialize with dummy value
 const firestoreCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
 
-// Attempt to get existing Firestore instance first
 try {
-  console.log("[Firebase] Attempting to get existing Firestore instance...");
-  db = getFirestore(app);
-  console.log("[Firebase] Got existing Firestore instance.");
-} catch (e) {
-  // If getFirestore throws without settings, it likely means it needs initialization
-  console.log("[Firebase] Firestore instance not found or needs settings, initializing...");
-  try {
-      console.log(`[Firebase] Initializing Firestore with persistentLocalCache (size: ${firestoreCacheSizeBytes} bytes)...`);
-      // Initialize with settings
-      db = initializeFirestore(app, {
-          localCache: persistentLocalCache({cacheSizeBytes: firestoreCacheSizeBytes})
-      });
-      console.log("[Firebase] Firestore initialized with explicit persistence.");
-  } catch (error) {
-      console.error("[Firebase] Error initializing Firestore with persistent cache:", error);
-      console.log("[Firebase] Falling back to in-memory Firestore cache.");
-      // Initialize with fallback settings
-      db = initializeFirestore(app, {localCache: memoryLocalCache()});
+  console.log(`[Firebase] Attempting to initialize Firestore with persistentLocalCache (size: ${firestoreCacheSizeBytes} bytes)...`);
+  // Prioritize initializing with persistent cache settings
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ cacheSizeBytes: firestoreCacheSizeBytes })
+  });
+  console.log("[Firebase] Firestore initialized with explicit persistence.");
+} catch (error: any) {
+  // Check if the error is because Firestore was already initialized
+  // Note: The exact error code/message might vary across SDK versions.
+  // We'll use a common check, but this might need adjustment.
+  if (error.code === 'failed-precondition' && error.message.includes('initializeFirestore')) {
+    console.log("[Firebase] Firestore appears to be already initialized. Attempting to get existing instance...");
+    try {
+      db = getFirestore(app);
+      console.log("[Firebase] Successfully got existing Firestore instance.");
+      // We assume this existing instance has the desired settings,
+      // but if offline issues persist, this assumption might be wrong.
+    } catch (getError) {
+      console.error("[Firebase] Error getting existing Firestore instance after initialization attempt failed:", getError);
+      console.log("[Firebase] Falling back to in-memory Firestore cache initialization.");
+      // Fallback to memory cache initialization if getting the existing instance fails
+      try {
+         db = initializeFirestore(app, {localCache: memoryLocalCache()});
+         console.log("[Firebase] Firestore initialized with memory cache as fallback.");
+      } catch (memoryError) {
+         console.error("[Firebase] CRITICAL: Failed to initialize Firestore even with memory cache fallback:", memoryError);
+      }
+    }
+  } else {
+    // Handle other initialization errors (e.g., invalid settings)
+    console.error("[Firebase] Error initializing Firestore with persistent cache (non-precondition error):", error);
+    console.log("[Firebase] Falling back to in-memory Firestore cache initialization.");
+     try {
+         db = initializeFirestore(app, {localCache: memoryLocalCache()});
+         console.log("[Firebase] Firestore initialized with memory cache as fallback.");
+      } catch (memoryError) {
+         console.error("[Firebase] CRITICAL: Failed to initialize Firestore even with memory cache fallback:", memoryError);
+      }
   }
 }
 // --- End Firestore Initialization ---
