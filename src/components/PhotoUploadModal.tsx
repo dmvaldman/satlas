@@ -460,7 +460,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
     try {
       console.log('[PhotoUpload] Starting gallery selection');
       if (Capacitor.getPlatform() === 'web') {
-        // Don't set processing on web
+        // Don't set processing on web because we don't have an exit event
         // this.setState({ processingSource: 'gallery' });
         originalPathOrBase64 = await this.getImageFromWebFileInput();
       } else {
@@ -583,7 +583,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         onClose={onClose}
       >
         {isOffline && (
-          <div className="offline-notice">You're offline. Photos will upload when you're back online.</div>
+          <div className="offline-notice">You're offline. Photos will upload when back online.</div>
         )}
 
         <button

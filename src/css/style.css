@@ -25,7 +25,7 @@
   --light-gray: #ccc;
   --medium-gray: #888;
   --dark-gray: #444;
-  --black: #000000;
+  --black: #111;
   --light-blue: #aadcec;
   --dark-blue: #007AFF;
   --light-green: #afe7b3;
@@ -364,7 +364,7 @@ body {
   justify-content: center;
   align-items: center;
   height: calc(100% - 4rem - var(--safe-area-top) - var(--safe-area-bottom)); /* Full height minus padding */
-  color: var(--dark-gray);
+  color: var(--black);
   font-size: var(--font-size-large);
 }
 
@@ -472,7 +472,7 @@ body {
 
 .modal-content p {
   font-size: var(--font-size-large);
-  line-height: 1.25em;
+  line-height: 1.5em;
 }
 
 .modal-option-button {
@@ -481,7 +481,7 @@ body {
   padding: 14px;
   margin: 14px 0;
   border: none;
-  color: var(--dark-gray);
+  color: var(--black);
   background: var(--light-gray-opacity);
   border: 1px solid var(--medium-gray);
   border-radius: 8px;
@@ -500,8 +500,8 @@ body {
 }
 
 .modal-option-button:active {
-  background: var(--medium-gray);
-  border-color: var(--black);
+  background: var(--light-gray);
+  border-color: var(--dark-gray);
 }
 
 .modal-option-button .spinner {
@@ -875,7 +875,7 @@ body {
 }
 
 .satlas-popup .sit-metadata-container {
-  color: var(--dark-gray);
+  color: var(--black);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -971,7 +971,7 @@ body {
   cursor: pointer;
   font-size: var(--font-size-small);
   transition: all 0.2s;
-  color: var(--dark-gray);
+  color: var(--black);
   height: 40px;
   flex: 1; /* Make all buttons take equal width */
   min-width: 0; /* Allow buttons to shrink if needed */
@@ -1095,7 +1095,7 @@ body {
   border-radius: 4px;
   margin-bottom: 15px;
   text-align: center;
-  font-size: var(--font-size-medium);
+  font-size: var(--font-size-small);
 }
 
 .fullscreen-image-overlay {
