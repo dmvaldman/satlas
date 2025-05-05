@@ -1466,11 +1466,10 @@ class App extends React.Component<{}, AppState> {
     if (sit) {
       this.setState({ currentView: 'map' }, () => {
         this.openPopup(sit); // Open popup after switching view
-        // Fly to the sit location on the map
+        // Fly to the sit location on the map. Don't zoom in.
         if (this.state.map) {
           this.state.map.flyTo({
             center: [sit.location.longitude, sit.location.latitude],
-            zoom: 15, // Zoom in a bit more when selecting from gallery
             duration: 500, // Faster transition
             essential: true
           });
