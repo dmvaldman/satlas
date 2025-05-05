@@ -17,8 +17,10 @@ export class InvalidLocationError extends ValidationError {
 }
 
 export class SitTooCloseError extends ValidationError {
-  constructor(message: string = 'Too close to an existing sit') {
+  sitId?: string;
+  constructor(message: string = 'Too close to an existing sit', sitId?: string) {
     super(message);
+    this.sitId = sitId;
   }
 }
 
@@ -76,7 +78,7 @@ export class ValidationUtils {
   static isLocationNearSit(
     location: Location,
     sit: Sit,
-    maxDistanceFeet: number = 100
+    maxDistanceFeet: number = 300
   ): boolean {
     return getDistanceInFeet(location, sit.location) <= maxDistanceFeet;
   }
@@ -138,7 +140,7 @@ export class ValidationUtils {
     location: Location,
     userId: string,
     nearbySits?: Sit[],
-    maxDistanceFeet: number = 100
+    maxDistanceFeet: number = 300
   ): boolean {
     // Check authentication - will throw UserNotAuthenticatedError if not authenticated
     this.isUserAuthenticated(userId);
@@ -146,13 +148,23 @@ export class ValidationUtils {
     // Check location validity - will throw InvalidLocationError if invalid
     this.isLocationValid(location);
 
+    let closestSit: Sit | null = null;
+    let minDistance = Infinity;
+
     // If we have nearby sits, check distance
     if (nearbySits && nearbySits.length > 0) {
       for (const sit of nearbySits) {
-        if (this.isLocationNearSit(location, sit, maxDistanceFeet)) {
-          throw new SitTooCloseError();
+        const distance = getDistanceInFeet(location, sit.location);
+        if (distance <= maxDistanceFeet && distance < minDistance) {
+          minDistance = distance;
+          closestSit = sit;
         }
       }
+    }
+
+    // If a close sit was found, throw the error with its ID
+    if (closestSit) {
+      throw new SitTooCloseError(undefined, closestSit.id);
     }
 
     return true;

@@ -1090,7 +1090,9 @@ class App extends React.Component<{}, AppState> {
     this.setState(prevState => ({
       drawer: {
         ...prevState.drawer,
-        isOpen: false
+        isOpen: false,
+        sit: undefined,
+        images: []
       }
     }));
   };
@@ -1224,8 +1226,33 @@ class App extends React.Component<{}, AppState> {
         );
       } catch (error) {
         if (error instanceof SitTooCloseError) {
-          this.showNotification('This Sit is too close to an existing one', 'error');
-          return null;
+
+          if (!error.sitId) {
+            this.showNotification('This Sit is too close to an existing one', 'error');
+            return null;
+          }
+
+          const sit = sits.get(error.sitId);
+          if (!sit) {
+            throw new Error('Sit not found');
+          }
+
+          const existingImages = await FirebaseService.getImages(sit.imageCollectionId);
+
+          try {
+            ValidationUtils.canUserAddImageToSit(
+              sit.imageCollectionId,
+              user.uid,
+              existingImages
+            );
+
+            // Add to existing sit
+            this.addImageToSit(sit, photoResult);
+            return sit;
+          } catch (error) {
+            this.showNotification('This Sit is too close to an existing one', 'error');
+            return null;
+          }
         }
         throw error; // Re-throw other validation errors
       }
@@ -1331,12 +1358,20 @@ class App extends React.Component<{}, AppState> {
         userPreferences.username
       );
 
-      // Update drawer with optimistic data
+      let images = drawer.images;
+      if (drawer.isOpen) {
+        images = [...drawer.images];
+      } else {
+        // TODO: this won't be optimistic if the user has closed the drawer
+        images = await FirebaseService.getImages(sit.imageCollectionId)
+      }
+      images.push(tempImage);
+
       this.setState({
         drawer: {
           isOpen: true,
           sit,
-          images: [...drawer.images, tempImage]
+          images: images
         }
       });
 
