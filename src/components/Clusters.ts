@@ -54,7 +54,7 @@ export class Clusters {
       cluster: true,
       clusterMaxZoom: 12, // Max zoom to cluster points on
       clusterMinPoints: 2, // Minimum points to form a cluster
-      clusterRadius: 40 // Radius of each cluster when clustering points
+      clusterRadius: 50 // Radius of each cluster when clustering points
     });
 
     // Add a layer for the clusters
