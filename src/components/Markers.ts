@@ -216,6 +216,27 @@ export class Markers {
     this.clusterMarkers.clear();
   }
 
+  // Method to hide all markers by setting display to none
+  public hideAllMarkers(map: mapboxgl.Map): void {
+    this.markers.forEach(marker => {
+      marker.getElement().style.display = 'none';
+    });
+    // Also hide cluster markers if any were manually added (though typically managed by layers)
+    this.clusterMarkers.forEach(marker => {
+      marker.getElement().style.display = 'none';
+    });
+  }
+
+  // Method to show all markers by resetting display style
+  public showAllMarkers(map: mapboxgl.Map): void {
+    this.markers.forEach(marker => {
+      marker.getElement().style.display = ''; // Revert to stylesheet's display property
+    });
+    this.clusterMarkers.forEach(marker => {
+      marker.getElement().style.display = '';
+    });
+  }
+
   public hasMarker(sitId: string): boolean {
     return this.markers.has(sitId);
   }

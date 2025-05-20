@@ -18,11 +18,16 @@ interface MapProps {
   onLoadSits: (bounds: { north: number; south: number }) => void;
   onLocationUpdate?: (location: Location) => void;
   onOpenPopup: (sit: Sit) => void;
+  isEditingLocation?: boolean; // New prop
+  onConfirmLocation?: (location: Location) => void; // New prop
+  onCancelLocationEdit?: () => void; // New prop
 }
 
 interface MapState {
   marks: Map<string, Set<MarkType>>;
   favoriteCount: Map<string, number>;
+  // Storing previous visibility state might be complex due to dynamic updates.
+  // Instead, we'll rely on re-evaluating visibility when editing mode ends.
 }
 
 class MapComponent extends React.Component<MapProps, MapState> {
@@ -55,40 +60,92 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   componentDidUpdate(prevProps: MapProps) {
-    const { map, sits, marks, favoriteCount, user, currentLocation } = this.props;
+    const { map, sits, marks, favoriteCount, user, currentLocation, isEditingLocation } = this.props;
 
-    // If props marks or favoriteCount changed, update state
-    if (prevProps.marks !== marks) {
-      this.setState({ marks: new Map(marks) }, () => {
-        // After marks state is updated, refresh the markers
+    // Handle location editing mode changes
+    if (prevProps.isEditingLocation !== isEditingLocation && map) {
+      if (isEditingLocation) {
+        this.showLocationEditingUI(map);
+      } else {
+        this.hideLocationEditingUI(map);
+      }
+    }
+
+    // If not in editing mode, proceed with normal updates
+    if (!isEditingLocation) {
+      if (prevProps.marks !== marks) {
+        this.setState({ marks: new Map(marks) }, () => {
+          this.updateVisibleMarkers();
+        });
+      }
+
+      if (prevProps.favoriteCount !== favoriteCount) {
+        this.setState({ favoriteCount: new Map(favoriteCount) });
+      }
+
+      if (prevProps.user !== user) {
         this.updateVisibleMarkers();
-      });
+      }
+
+      if (map && prevProps.sits !== sits && this.clusterManager.areClusterLayersReady(map)) {
+        this.clusterManager.updateClusterSource(map, sits);
+        this.updateVisibleMarkers();
+      }
+
+      if (prevProps.map !== map && map) {
+        this.setupMap(map); // This will also call updateUserLocation if needed
+      }
+
+      if (prevProps.currentLocation !== currentLocation && currentLocation && this.userMarker) {
+        this.userMarker.setLngLat([currentLocation.longitude, currentLocation.latitude]);
+        // Ensure user marker is visible if it was hidden during editing
+        if(this.userMarker?.getElement().style.display === 'none') {
+            this.userMarker.getElement().style.display = '';
+        }
+      }
+    } else {
+      // While editing, if the map instance itself changes (e.g. re-created), re-apply editing UI
+      if (prevProps.map !== map && map) {
+          this.setupMap(map); // Basic setup
+          this.showLocationEditingUI(map); // Re-apply editing UI to new map instance
+      }
+    }
+  }
+
+  private showLocationEditingUI(map: mapboxgl.Map) {
+    console.log('[MapComponent] Entering location editing mode.');
+    // Hide sit markers (markerManager needs a method for this, or iterate and hide)
+    this.markerManager.hideAllMarkers(map); // Assuming this method exists or will be added
+
+    // Hide user marker
+    if (this.userMarker) {
+      this.userMarker.getElement().style.display = 'none';
     }
 
-    if (prevProps.favoriteCount !== favoriteCount) {
-      this.setState({ favoriteCount: new Map(favoriteCount) });
+    // Hide cluster layers
+    if (this.clusterManager.areClusterLayersReady(map)) {
+      map.setLayoutProperty('clusters', 'visibility', 'none');
+      map.setLayoutProperty('cluster-count', 'visibility', 'none');
+      map.setLayoutProperty('unclustered-point', 'visibility', 'none');
+    }
+    // Crosshair and buttons are rendered conditionally via render() method
+  }
+
+  private hideLocationEditingUI(map: mapboxgl.Map) {
+    console.log('[MapComponent] Exiting location editing mode.');
+    // Show user marker
+    if (this.userMarker) {
+      this.userMarker.getElement().style.display = '';
     }
 
-    // If user auth state changed, refresh markers
-    if (prevProps.user !== user) {
-      this.updateVisibleMarkers();
+    // Restore cluster layers (visibility will be handled by updateVisibleMarkers)
+    if (this.clusterManager.areClusterLayersReady(map)) {
+        // No need to explicitly set to visible here, updateVisibleMarkers will handle it
     }
-
-    // If map is available and sits have changed, update the GeoJSON source
-    if (map && prevProps.sits !== sits && this.clusterManager.areClusterLayersReady(map)) {
-      this.clusterManager.updateClusterSource(map, sits);
-      this.updateVisibleMarkers();
-    }
-
-    // If map changed, setup the new map
-    if (prevProps.map !== map && map) {
-      this.setupMap(map);
-    }
-
-    // If current location changed, update user marker
-    if (prevProps.currentLocation !== currentLocation && currentLocation && this.userMarker) {
-      this.userMarker.setLngLat([currentLocation.longitude, currentLocation.latitude]);
-    }
+    
+    // Re-show sit markers and update cluster visibility based on zoom
+    this.updateVisibleMarkers();
+    // Crosshair and buttons are rendered conditionally via render() method
   }
 
   private setupMap(map: mapboxgl.Map) {
@@ -238,7 +295,72 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   render() {
-    return null;
+    const { isEditingLocation, map } = this.props;
+
+    // Styles for crosshair and buttons (can be moved to CSS)
+    const crosshairStyle: React.CSSProperties = {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      fontSize: '24px',
+      color: 'red',
+      pointerEvents: 'none', // So it doesn't interfere with map interactions
+      zIndex: 1000, // Ensure it's above the map but below modal controls if any
+    };
+
+    const buttonContainerStyle: React.CSSProperties = {
+      position: 'absolute',
+      bottom: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      display: 'flex',
+      gap: '10px',
+      zIndex: 1000,
+    };
+
+    const buttonStyle: React.CSSProperties = {
+      padding: '10px 15px',
+      fontSize: '16px',
+      cursor: 'pointer',
+    };
+
+    return (
+      <>
+        {isEditingLocation && (
+          <>
+            <div style={crosshairStyle}>+</div>
+            <div style={buttonContainerStyle}>
+              <button
+                style={buttonStyle}
+                onClick={() => {
+                  if (map && this.props.onConfirmLocation) {
+                    const center = map.getCenter();
+                    this.props.onConfirmLocation({
+                      latitude: center.lat,
+                      longitude: center.lng,
+                    });
+                  }
+                }}
+              >
+                Confirm Location
+              </button>
+              <button
+                style={{...buttonStyle, backgroundColor: '#ccc' }}
+                onClick={() => {
+                  if (this.props.onCancelLocationEdit) {
+                    this.props.onCancelLocationEdit();
+                  }
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+        {/* The map container itself is managed by the parent, this component renders overlays */}
+      </>
+    );
   }
 }
 

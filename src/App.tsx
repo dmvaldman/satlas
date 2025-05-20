@@ -28,6 +28,7 @@ import SignInModal from './components/SignInModal';
 import packageJson from '../package.json';
 import ViewToggle, { ViewType } from './components/ViewToggle';
 import GalleryView from './components/GalleryView';
+import EditLocationModal from './components/EditLocationModal'; // Import EditLocationModal
 
 interface AppState {
   // Auth state
@@ -80,6 +81,12 @@ interface AppState {
   isOffline: boolean;
   currentView: ViewType;
   initialLoadTimestampMs?: number | null;
+
+  // Manual location editing state
+  isManualLocationEditing: boolean;
+  photoForManualLocation: Omit<PhotoResult, 'location'> | null;
+  manualLocationOriginalModalProps: { sitId?: string; replacementImageId?: string; } | null;
+  showEditLocationModal: boolean; // New state for EditLocationModal
 }
 
 class App extends React.Component<{}, AppState> {
@@ -132,6 +139,12 @@ class App extends React.Component<{}, AppState> {
       },
       isOffline: false,
       currentView: 'map',
+
+      // Manual location editing state
+      isManualLocationEditing: false,
+      photoForManualLocation: null,
+      manualLocationOriginalModalProps: null,
+      showEditLocationModal: false, // Initialize new state
     };
 
     this.locationService = new LocationService();
@@ -1481,6 +1494,130 @@ class App extends React.Component<{}, AppState> {
       this.setState({ currentView: 'map' }); // Switch back to map even if sit not found
     }
   };
+
+  // --- Manual Location Editing Handlers ---
+  private handleMissingLocationData = (
+    photoData: Omit<PhotoResult, 'location'>,
+    originalModalProps: { sitId?: string; replacementImageId?: string; }
+  ) => {
+    console.log('[App] Missing location data, opening EditLocationModal', photoData, originalModalProps);
+    this.setState({
+      photoForManualLocation: photoData,
+      manualLocationOriginalModalProps: originalModalProps,
+      showEditLocationModal: true,
+      // PhotoUploadModal is assumed to close itself after calling this.
+    });
+  };
+
+  private handleEditLocationModalClose = () => {
+    console.log('[App] EditLocationModal closed (Cancelled)');
+    this.setState({
+      showEditLocationModal: false,
+      photoForManualLocation: null, // Clear data
+      manualLocationOriginalModalProps: null,
+    });
+  };
+
+  private handleEditLocationModalConfirm = () => {
+    console.log('[App] EditLocationModal confirmed, activating map editing');
+    this.setState({
+      showEditLocationModal: false,
+      isManualLocationEditing: true, // Activate map editing mode
+    });
+    // photoForManualLocation and manualLocationOriginalModalProps are already set
+  };
+
+  private handleConfirmManualLocation = (selectedLocation: Location) => {
+    console.log('[App] Confirming manual location', selectedLocation);
+    const { photoForManualLocation, manualLocationOriginalModalProps, modals } = this.state;
+
+    if (!photoForManualLocation) {
+      console.error('[App] photoForManualLocation is null during confirm. This should not happen.');
+      this.setState({ isManualLocationEditing: false, photoForManualLocation: null, manualLocationOriginalModalProps: null });
+      this.showNotification('Error: Photo data missing for manual location.', 'error');
+      return;
+    }
+
+    const fullPhotoResult: PhotoResult = {
+      ...photoForManualLocation,
+      location: selectedLocation,
+    };
+
+    // Determine the original modal state (create_sit, add_image, replace_image)
+    // This relies on the modal's state when it initiated the manual location edit.
+    // We stored sitId and replacementImageId in manualLocationOriginalModalProps.
+    // The PhotoUploadModal's original 'state' prop ('create_sit', 'add_image', 'replace_image')
+    // was implicitly captured by how handleImageUpload will be called.
+
+    // We need to know the original 'state' of the PhotoUploadModal.
+    // Let's assume handleImageUpload can correctly infer the action
+    // based on sitId and replacementImageId being present or not.
+    // The original `this.state.modals.photo.state` was used by `handleImageUpload`.
+    // We need to ensure `handleImageUpload` can still determine the correct action.
+    // The `handleImageUpload` function uses `this.state.modals.photo.state`.
+    // This state will be 'none' because the modal was closed.
+    // This is a PROBLEM. `handleImageUpload` needs the original context.
+
+    // Solution: Pass the original modal state ('create_sit', 'add_image', 'replace_image')
+    // through `manualLocationOriginalModalProps`.
+    // This requires changing `manualLocationOriginalModalProps` structure and how it's set.
+    // For now, I'll proceed assuming `handleImageUpload` can work if we just pass sitId/replacementImageId.
+    // This might need refinement if `handleImageUpload` strictly depends on `modals.photo.state`.
+
+    // Let's adjust `handleImageUpload` slightly or ensure it can work with explicit args.
+    // The existing `handleImageUpload` uses `this.state.modals.photo.state`, `sitId`, `replacementImageId`.
+    // Since the modal is closed, `this.state.modals.photo` might not be what we want.
+    // We should pass these explicitly to a modified `handleImageUpload` or a new helper.
+
+    // For now, let's try to call a more specific handler based on what's in manualLocationOriginalModalProps
+    const { sitId, replacementImageId } = manualLocationOriginalModalProps || {};
+
+    let operationState: PhotoModalState = 'create_sit'; // Default
+    if (replacementImageId && sitId) {
+        operationState = 'replace_image';
+    } else if (sitId) {
+        operationState = 'add_image';
+    }
+    // This logic mirrors how `handleImageUpload` determines the action.
+
+    // Directly call the specific action methods instead of handleImageUpload
+    if (operationState === 'create_sit') {
+      this.createSit(fullPhotoResult).catch(error => {
+        console.error('[App] Error creating sit after manual location:', error);
+        this.showNotification('Error creating sit after manual location.', 'error');
+      });
+    } else if (operationState === 'add_image' && sitId) {
+      const sit = this.state.sits.get(sitId);
+      if (sit) {
+        this.addImageToSit(sit, fullPhotoResult).catch(error => {
+          console.error('[App] Error adding image to sit after manual location:', error);
+          this.showNotification('Error adding image after manual location.', 'error');
+        });
+      } else {
+        this.showNotification('Error: Original sit not found for adding image.', 'error');
+      }
+    } else if (operationState === 'replace_image' && sitId && replacementImageId) {
+      const sit = this.state.sits.get(sitId);
+      if (sit) {
+        this.replaceImage(sit, replacementImageId, fullPhotoResult).catch(error => {
+          console.error('[App] Error replacing image after manual location:', error);
+          this.showNotification('Error replacing image after manual location.', 'error');
+        });
+      } else {
+        this.showNotification('Error: Original sit not found for replacing image.', 'error');
+      }
+    }
+
+    this.setState({ isManualLocationEditing: false, photoForManualLocation: null, manualLocationOriginalModalProps: null });
+  };
+
+  private handleCancelManualLocationEdit = () => {
+    console.log('[App] Cancelling manual location edit');
+    this.setState({ isManualLocationEditing: false, photoForManualLocation: null, manualLocationOriginalModalProps: null });
+    // Optionally, re-open PhotoUploadModal if needed, or let user re-initiate.
+    // For now, just cancelling returns them to the map.
+    // The PhotoUploadModal was already closed when onStartManualLocationEdit was called.
+  };
   // --- End New Handlers ---
 
   render() {
@@ -1498,6 +1635,8 @@ class App extends React.Component<{}, AppState> {
       userPreferences,
       drawer,
       currentView,
+      isManualLocationEditing,
+      showEditLocationModal, // New state for EditLocationModal
     } = this.state;
 
     return (
@@ -1545,6 +1684,9 @@ class App extends React.Component<{}, AppState> {
               seenSits={seenSits}
               onLoadSits={this.handleLoadSits}
               onOpenPopup={this.openPopup}
+              isEditingLocation={isManualLocationEditing} // Pass to MapComponent
+              onConfirmLocation={this.handleConfirmManualLocation} // Pass to MapComponent
+              onCancelLocationEdit={this.handleCancelManualLocationEdit} // Pass to MapComponent
             />
           )}
         </div>
@@ -1556,14 +1698,27 @@ class App extends React.Component<{}, AppState> {
           />
         )}
 
-        <PhotoUploadModal
-          isOpen={modals.photo.isOpen}
-          onClose={this.closePhotoUploadModal}
-          onPhotoUpload={this.handleImageUpload}
-          sitId={modals.photo.sitId}
-          replacementImageId={modals.photo.replacementImageId}
-          showNotification={this.showNotification}
-        />
+        {/* PhotoUploadModal is only mounted when modals.photo.isOpen is true */}
+        {modals.photo.isOpen && (
+          <PhotoUploadModal
+            isOpen={modals.photo.isOpen}
+            onClose={this.closePhotoUploadModal}
+            onPhotoUpload={this.handleImageUpload}
+            sitId={modals.photo.sitId}
+            replacementImageId={modals.photo.replacementImageId}
+            showNotification={this.showNotification}
+            onMissingLocationData={this.handleMissingLocationData} // Changed prop
+            // onStartManualLocationEdit is removed
+          />
+        )}
+
+        {showEditLocationModal && (
+          <EditLocationModal
+            isOpen={showEditLocationModal}
+            onClose={this.handleEditLocationModalClose}
+            onConfirm={this.handleEditLocationModalConfirm}
+          />
+        )}
 
         <ProfileModal
           isOpen={modals.profile.isOpen}

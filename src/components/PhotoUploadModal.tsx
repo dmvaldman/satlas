@@ -27,10 +27,13 @@ interface PhotoUploadProps {
   onClose: () => void;
   onPhotoUpload: (result: PhotoResult) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
+  onStartManualLocationEdit: (photoData: Omit<PhotoResult, 'location'>, originalModalProps: { sitId?: string; replacementImageId?: string; }) => void; // This prop will be replaced
+  onMissingLocationData: (photoData: Omit<PhotoResult, 'location'>, originalModalProps: { sitId?: string; replacementImageId?: string; }) => void; // New callback prop
 }
 
 interface PhotoUploadState {
   processingSource: 'camera' | 'gallery' | null;
+  // isEditingLocation and pendingPhotoDataWithoutLocation are removed
 }
 
 class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUploadState> {
@@ -44,7 +47,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   constructor(props: PhotoUploadProps) {
     super(props);
     this.state = {
-      processingSource: null
+      processingSource: null,
+      // isEditingLocation and pendingPhotoDataWithoutLocation initializations are removed
     };
     // Setup listeners if worker was initialized successfully
     if (this.resizeWorker) {
@@ -342,51 +346,61 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
           // 2. Resize/Optimize Image using the Worker (pass TRANSFERABLE ArrayBuffer, get ImageBitmap)
           console.log('[PhotoUpload] Sending image buffer to resize worker...');
-          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer); // Pass the non-null buffer
+          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer); 
           console.log('[PhotoUpload] Received resized ImageBitmap from worker.');
 
-          // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
-          try {
-            // Pass originalBase64ForExif only if it's relevant (gallery) and available
-            const base64ForLocation = sourceType === 'gallery' ? originalBase64ForExif : undefined;
-            location = await this.getLocation(sourceType, base64ForLocation);
-          } catch (error) {
-            // Location is mandatory, show error and stop
-            this.props.showNotification('Could not determine photo location.', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
-          }
-
-          // Ensure location was successfully obtained
-          if (!location) {
-            console.error('[PhotoUpload] Location is missing after attempt, cannot proceed.');
-            this.props.showNotification('Failed to determine photo location.', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
-          }
-
-          // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
+          // Get Dimensions (directly from the FINAL processed ImageBitmap) - MOVED UP
           try {
             dimensions = this.getImageDimensions(finalResizedBitmap);
           } catch (error) {
             console.error('[PhotoUpload] Error getting image dimensions:', error);
-            // Dimensions are critical, show error and stop
             this.props.showNotification('Error processing image dimensions', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
+            finalResizedBitmap?.close();
+            return; 
           }
 
-          // 5. Convert final ImageBitmap to Blob
+          // Convert final ImageBitmap to Blob, then to Base64 - MOVED UP
           const finalResizedBlob = await this.imageBitmapToBlob(finalResizedBitmap, this.quality);
-
-          // Close the bitmap now that we have the Blob
-          finalResizedBitmap.close();
-
-          // !! TEMPORARY STEP for Phase 1: Convert Blob back to Base64 for downstream PhotoResult !!
           finalBase64Data = await this.blobToBase64(finalResizedBlob);
-          // !! END TEMPORARY STEP !!
+          // finalResizedBitmap.close(); // Close bitmap after blob conversion and base64 data is extracted
 
-          // 6. Prepare and Upload Result (Check required fields)
+          // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
+          try {
+            const base64ForLocation = sourceType === 'gallery' ? originalBase64ForExif : undefined;
+            location = await this.getLocation(sourceType, base64ForLocation);
+          } catch (error) {
+            console.error('[PhotoUpload] Error getting location, initiating manual edit flow:', error);
+            // Ensure finalBase64Data and dimensions are available
+            if (!finalBase64Data || !dimensions) {
+                console.error('[PhotoUpload] Missing base64 data or dimensions when location failed.');
+                this.props.showNotification('Internal error preparing photo data.', 'error');
+                finalResizedBitmap?.close();
+                this.props.onClose(); // Close modal on critical internal error
+                return;
+            }
+            // Call the new onMissingLocationData prop instead of setting internal state
+            this.props.onMissingLocationData(
+              { base64Data: finalBase64Data, dimensions },
+              { sitId: this.props.sitId, replacementImageId: this.props.replacementImageId }
+            );
+            finalResizedBitmap?.close(); // Close bitmap as we have the data needed
+            this.props.onClose(); // Close the modal as control is handed off
+            return; // Stop further processing in this path
+          }
+          
+          finalResizedBitmap?.close(); // Ensure bitmap is closed if location was successful
+
+          // Ensure location was successfully obtained
+          if (!location) {
+            // This case should ideally not be reached if the catch block above handles it by calling onMissingLocationData.
+            // However, as a fallback, show a generic error and close.
+            console.error('[PhotoUpload] Location is missing after attempt and was not caught by onMissingLocationData flow.');
+            this.props.showNotification('Failed to determine photo location.', 'error');
+            this.props.onClose();
+            return; 
+          }
+
+          // 6. Prepare and Upload Result (Check required fields) - Dimensions and Base64 already prepared
           // Checks for location and dimensions already happened and returned if failed.
           // Dimensions check already happened and returned if failed.
 
@@ -574,8 +588,11 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
   render() {
     const { isOpen, onClose } = this.props;
     const isOffline = !OfflineService.getInstance().isNetworkOnline();
-    const { processingSource } = this.state;
+    const { processingSource } = this.state; // isEditingLocation is removed
     const platform = Capacitor.getPlatform();
+
+    // The conditional rendering block for isEditingLocation is removed.
+    // The modal now only shows its primary UI.
 
     return (
       <BaseModal
@@ -589,7 +606,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         <button
           className="modal-option-button"
           onClick={this.handleTakePhoto}
-          disabled={(platform === 'web' && !isMobileBrowser())}
+          disabled={(platform === 'web' && !isMobileBrowser()) || processingSource !== null}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
@@ -602,6 +619,7 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
         <button
           className="modal-option-button"
           onClick={this.handleChooseFromGallery}
+          disabled={processingSource !== null}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
             <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
