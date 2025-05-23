@@ -1,7 +1,7 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 import { FilePicker, PickedFile } from '@capawesome/capacitor-file-picker';
-import { Location, PhotoResult } from '../types';
+import { Location, PhotoResult, PhotoModalState } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { OfflineService } from '../services/OfflineService';
@@ -20,12 +20,22 @@ const isMobileBrowser = (): boolean => {
   return false;
 };
 
+interface PhotoDataWithoutLocation {
+  base64Data: string;
+  dimensions: { width: number; height: number };
+  sourceType: 'camera' | 'gallery';
+  sitId?: string;
+  replacementImageId?: string;
+}
+
 interface PhotoUploadProps {
   isOpen: boolean;
+  modalState: PhotoModalState;
   sitId?: string;
   replacementImageId?: string;
   onClose: () => void;
   onPhotoUpload: (result: PhotoResult) => void;
+  onLocationNotFound: (photoData: PhotoDataWithoutLocation) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -302,9 +312,8 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
       }
       let originalImageBuffer: ArrayBuffer | null = null; // Initialize as null
       let finalResizedBitmap: ImageBitmap;
-      let finalBase64Data: string; // Still need this for PhotoResult temporarily
-      let location: Location | null = null; // Initialize as null
-      let dimensions: { width: number; height: number } | null = null; // Initialize as null
+      let finalBase64Data: string;
+      let dimensions: { width: number; height: number };
       let originalBase64ForExif: string | undefined;
       const platform = Capacitor.getPlatform(); // Define platform outside try for finally block access
 
@@ -340,73 +349,69 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
               throw new Error("Failed to obtain image data buffer.");
           }
 
-          // 2. Resize/Optimize Image using the Worker (pass TRANSFERABLE ArrayBuffer, get ImageBitmap)
+          // 2. Resize/Optimize Image using the Worker
           console.log('[PhotoUpload] Sending image buffer to resize worker...');
-          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer); // Pass the non-null buffer
+          finalResizedBitmap = await this.resizeImageUnified(originalImageBuffer);
           console.log('[PhotoUpload] Received resized ImageBitmap from worker.');
 
-          // 3. Get Location (using ORIGINAL base64 if needed for EXIF)
-          try {
-            // Pass originalBase64ForExif only if it's relevant (gallery) and available
-            const base64ForLocation = sourceType === 'gallery' ? originalBase64ForExif : undefined;
-            location = await this.getLocation(sourceType, base64ForLocation);
-          } catch (error) {
-            // Location is mandatory, show error and stop
-            this.props.showNotification('Could not determine photo location.', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
-          }
-
-          // Ensure location was successfully obtained
-          if (!location) {
-            console.error('[PhotoUpload] Location is missing after attempt, cannot proceed.');
-            this.props.showNotification('Failed to determine photo location.', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
-          }
-
-          // 4. Get Dimensions (directly from the FINAL processed ImageBitmap)
+          // 3. Get Dimensions (from the processed ImageBitmap)
           try {
             dimensions = this.getImageDimensions(finalResizedBitmap);
           } catch (error) {
             console.error('[PhotoUpload] Error getting image dimensions:', error);
-            // Dimensions are critical, show error and stop
             this.props.showNotification('Error processing image dimensions', 'error');
-            finalResizedBitmap?.close(); // Close bitmap if we error out here
-            return; // Stop processing
+            finalResizedBitmap?.close();
+            return;
           }
 
-          // 5. Convert final ImageBitmap to Blob
+          // 4. Convert ImageBitmap to Blob and then to Base64
           const finalResizedBlob = await this.imageBitmapToBlob(finalResizedBitmap, this.quality);
-
-          // Close the bitmap now that we have the Blob
-          finalResizedBitmap.close();
-
-          // !! TEMPORARY STEP for Phase 1: Convert Blob back to Base64 for downstream PhotoResult !!
+          finalResizedBitmap.close(); // Close bitmap after conversion
           finalBase64Data = await this.blobToBase64(finalResizedBlob);
-          // !! END TEMPORARY STEP !!
 
-          // 6. Prepare and Upload Result (Check required fields)
-          // Checks for location and dimensions already happened and returned if failed.
-          // Dimensions check already happened and returned if failed.
+          // 5. Get Location (last step, after image processing is complete)
+          try {
+            const base64ForLocation = sourceType === 'gallery' ? originalBase64ForExif : undefined;
+            const location = await this.getLocation(sourceType, base64ForLocation);
 
-          const photoResult: PhotoResult = {
+            // Success path: Create PhotoResult and upload
+            const photoResult: PhotoResult = {
+                base64Data: finalBase64Data,
+                location: location,
+                dimensions: dimensions
+            };
+            console.log('[PhotoUpload] Processing complete, calling onPhotoUpload.');
+            this.props.onPhotoUpload(photoResult);
+
+          } catch (error) {
+            // Location couldn't be determined
+            console.log('[PhotoUpload] Location not found...');
+
+            // Only offer location choosing for creating new sits
+            if (this.props.modalState !== 'create_sit') {
+              console.log('[PhotoUpload] Not creating sit, showing location error instead');
+              this.props.showNotification('Could not determine photo location', 'error');
+              return;
+            }
+
+            // For create_sit: offer location choosing with processed image data
+            console.log('[PhotoUpload] Offering location choosing for new sit');
+            this.props.onLocationNotFound({
               base64Data: finalBase64Data,
-              location: location, // Guaranteed to be non-null here
-              dimensions: dimensions // Guaranteed to be non-null here
-          };
-          console.log('[PhotoUpload] Processing complete, calling onPhotoUpload.');
-          this.props.onPhotoUpload(photoResult);
+              dimensions: dimensions,
+              sourceType: sourceType,
+              sitId: this.props.sitId,
+              replacementImageId: this.props.replacementImageId
+            });
+          }
 
       } catch (error) {
           console.error(`[PhotoUpload] Error during image processing pipeline (${sourceType}):`, error);
           const message = error instanceof Error ? error.message : 'Error processing image';
           this.props.showNotification(message, 'error');
       } finally {
-          // Ensure blob URL is revoked if it exists and wasn't handled (e.g., due to error before fetch completes)
-          // Check necessary conditions to avoid errors during cleanup
+          // Ensure blob URL is revoked if it exists and wasn't handled
           if (platform === 'web' && typeof imageSource === 'string' && imageSource.startsWith('blob:') && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-              // Attempt revocation, catching potential errors if already revoked or invalid
               try {
                   URL.revokeObjectURL(imageSource);
                   console.log('[PhotoUpload] Blob URL final revocation check complete.');

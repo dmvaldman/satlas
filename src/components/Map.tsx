@@ -15,6 +15,7 @@ interface MapProps {
   user: User | null;
   currentLocation: Location | null;
   seenSits: Set<string>;
+  isChoosingLocation: boolean;
   onLoadSits: (bounds: { north: number; south: number }) => void;
   onLocationUpdate?: (location: Location) => void;
   onOpenPopup: (sit: Sit) => void;
@@ -55,7 +56,7 @@ class MapComponent extends React.Component<MapProps, MapState> {
   }
 
   componentDidUpdate(prevProps: MapProps) {
-    const { map, sits, marks, favoriteCount, user, currentLocation } = this.props;
+    const { map, sits, marks, favoriteCount, user, currentLocation, isChoosingLocation } = this.props;
 
     // If props marks or favoriteCount changed, update state
     if (prevProps.marks !== marks) {
@@ -71,6 +72,11 @@ class MapComponent extends React.Component<MapProps, MapState> {
 
     // If user auth state changed, refresh markers
     if (prevProps.user !== user) {
+      this.updateVisibleMarkers();
+    }
+
+    // If location choosing state changed, refresh markers
+    if (prevProps.isChoosingLocation !== isChoosingLocation) {
       this.updateVisibleMarkers();
     }
 
@@ -181,9 +187,21 @@ class MapComponent extends React.Component<MapProps, MapState> {
   };
 
   private updateVisibleMarkers = () => {
-    const { map, sits, user, seenSits } = this.props;
+    const { map, sits, user, seenSits, isChoosingLocation } = this.props;
     const { marks } = this.state;
     if (!map) return;
+
+    // If choosing location, hide all markers
+    if (isChoosingLocation) {
+      // Hide cluster layers
+      if (this.clusterManager.areClusterLayersReady(map)) {
+        map.setLayoutProperty('clusters', 'visibility', 'none');
+        map.setLayoutProperty('cluster-count', 'visibility', 'none');
+      }
+      // Hide all individual markers
+      this.markerManager.showMarkers(map, new Map(), marks, user, seenSits);
+      return;
+    }
 
     // Check if cluster layers are ready before proceeding
     if (!this.clusterManager.areClusterLayersReady(map)) {

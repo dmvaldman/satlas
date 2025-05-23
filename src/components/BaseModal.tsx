@@ -7,6 +7,7 @@ interface BaseModalProps {
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  closeOnOverlayClick?: boolean;
   onClose: () => void;
 }
 
@@ -103,7 +104,7 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
   };
 
   render() {
-    const { children, className = '', contentClassName = '' } = this.props;
+    const { children, className = '', contentClassName = '', closeOnOverlayClick = true } = this.props;
     const { isActive, isVisible, isKeyboardVisible, keyboardHeight } = this.state;
 
     if (!isVisible) return null;
@@ -111,12 +112,16 @@ class BaseModal extends React.Component<BaseModalProps, BaseModalState> {
     return (
       <div
         className={`modal-overlay ${isActive ? 'active' : ''} ${className}`}
-        onClick={this.handleClose}
+        onClick={closeOnOverlayClick ? this.handleClose : undefined}
+        style={{ pointerEvents: closeOnOverlayClick ? 'auto' : 'none' }}
       >
         <div
           className={`modal-content ${isActive ? 'active' : ''} ${isKeyboardVisible ? 'keyboard-visible' : ''} ${contentClassName}`}
           onClick={e => e.stopPropagation()}
-          style={{ '--keyboard-height-px': `${keyboardHeight}px` } as React.CSSProperties}
+          style={{
+            '--keyboard-height-px': `${keyboardHeight}px`,
+            pointerEvents: 'auto' // Modal content should always be interactive
+          } as React.CSSProperties}
         >
           {children}
         </div>

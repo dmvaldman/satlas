@@ -300,6 +300,42 @@ body {
   position: relative;
 }
 
+/* Location chooser crosshair */
+.location-chooser-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1100; /* Higher than modal z-index */
+  width: 40px;
+  height: 40px;
+}
+
+.location-chooser-crosshair::before,
+.location-chooser-crosshair::after {
+  content: '';
+  position: absolute;
+  background: var(--black);
+  border-radius: 2px;
+}
+
+.location-chooser-crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.location-chooser-crosshair::after {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  transform: translateY(-50%);
+}
+
 .gallery-view {
   display: none;
   position: absolute; /* Ensure it covers the area */
@@ -519,6 +555,16 @@ body {
 
 .modal-option-button .apple-icon {
   transform: translateY(-2px);
+}
+
+.modal-option-button.secondary {
+  background: transparent;
+  border: 1px solid var(--medium-gray);
+  color: var(--dark-gray);
+}
+
+.modal-option-button.secondary:active {
+  background: var(--light-gray-opacity);
 }
 
 .profile-section {
@@ -1207,3 +1253,4 @@ body {
     opacity: 0;
   }
 }
+

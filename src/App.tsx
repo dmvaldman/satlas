@@ -28,6 +28,8 @@ import SignInModal from './components/SignInModal';
 import packageJson from '../package.json';
 import ViewToggle, { ViewType } from './components/ViewToggle';
 import GalleryView from './components/GalleryView';
+import LocationChooserModal from './components/LocationChooserModal';
+import LocationChoosingOverlay from './components/LocationChoosingOverlay';
 
 interface AppState {
   // Auth state
@@ -69,6 +71,16 @@ interface AppState {
       isOpen: boolean;
       message?: string;
     };
+    locationChooser: {
+      isOpen: boolean;
+      photoData?: {
+        base64Data: string;
+        dimensions: { width: number; height: number };
+        sourceType: 'camera' | 'gallery';
+        sitId?: string;
+        replacementImageId?: string;
+      };
+    };
   };
 
   userPreferences: UserPreferences;
@@ -80,6 +92,7 @@ interface AppState {
   isOffline: boolean;
   currentView: ViewType;
   initialLoadTimestampMs?: number | null;
+  isChoosingLocation: boolean;
 }
 
 class App extends React.Component<{}, AppState> {
@@ -116,7 +129,8 @@ class App extends React.Component<{}, AppState> {
         profile: { isOpen: false },
         nearbySit: { isOpen: false, sitId: null, hasUserContributed: false, imageId: undefined },
         fullscreenImage: { isOpen: false, image: null },
-        signIn: { isOpen: false }
+        signIn: { isOpen: false },
+        locationChooser: { isOpen: false }
       },
 
       userPreferences: {
@@ -132,6 +146,7 @@ class App extends React.Component<{}, AppState> {
       },
       isOffline: false,
       currentView: 'map',
+      isChoosingLocation: false,
     };
 
     this.locationService = new LocationService();
@@ -673,15 +688,93 @@ class App extends React.Component<{}, AppState> {
   };
 
   private closeFullscreenImage = () => {
-    this.setState(prevState => ({
+    this.setState({
       modals: {
-        ...prevState.modals,
-        fullscreenImage: {
-          isOpen: false,
-          image: null
+        ...this.state.modals,
+        fullscreenImage: { isOpen: false, image: null }
+      }
+    });
+  };
+
+  private openLocationChooserModal = (photoData: {
+    base64Data: string;
+    dimensions: { width: number; height: number };
+    sourceType: 'camera' | 'gallery';
+    sitId?: string;
+    replacementImageId?: string;
+  }) => {
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        photo: { isOpen: false, state: 'none' }, // Close photo modal
+        locationChooser: {
+          isOpen: true,
+          photoData
         }
       }
-    }));
+    });
+  };
+
+  private closeLocationChooserModal = () => {
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        locationChooser: { isOpen: false, photoData: undefined }
+      },
+      isChoosingLocation: false
+    });
+  };
+
+  private startLocationChoosing = () => {
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        locationChooser: { ...this.state.modals.locationChooser, isOpen: false }
+      },
+      isChoosingLocation: true
+    });
+  };
+
+  private confirmLocationChoice = () => {
+    const { map } = this.state;
+    const { photoData } = this.state.modals.locationChooser;
+
+    if (!map || !photoData) return;
+
+    // Get the center of the map (where the crosshair is)
+    const center = map.getCenter();
+    const chosenLocation: Location = {
+      latitude: center.lat,
+      longitude: center.lng
+    };
+
+    // Create PhotoResult with the chosen location
+    const photoResult: PhotoResult = {
+      base64Data: photoData.base64Data,
+      location: chosenLocation,
+      dimensions: photoData.dimensions
+    };
+
+    // Restore photo modal state for creating a sit (only case this flow handles)
+    this.setState({
+      modals: {
+        ...this.state.modals,
+        photo: {
+          isOpen: false, // Keep it closed
+          state: 'create_sit', // Always create_sit for this flow
+          sitId: undefined, // No sitId for new sits
+          replacementImageId: undefined // No replacement for new sits
+        }
+      },
+      isChoosingLocation: false
+    }, () => {
+      // Process the photo with the chosen location
+      this.handleImageUpload(photoResult);
+    });
+  };
+
+  private cancelLocationChoosing = () => {
+    this.closeLocationChooserModal();
   };
 
   private handleSavePreferences = async (prefs: UserPreferences) => {
@@ -1498,6 +1591,7 @@ class App extends React.Component<{}, AppState> {
       userPreferences,
       drawer,
       currentView,
+      isChoosingLocation,
     } = this.state;
 
     return (
@@ -1543,10 +1637,17 @@ class App extends React.Component<{}, AppState> {
               currentLocation={currentLocation}
               user={user}
               seenSits={seenSits}
+              isChoosingLocation={isChoosingLocation}
               onLoadSits={this.handleLoadSits}
               onOpenPopup={this.openPopup}
             />
           )}
+
+          <LocationChoosingOverlay
+            isVisible={isChoosingLocation}
+            onConfirm={this.confirmLocationChoice}
+            onCancel={this.cancelLocationChoosing}
+          />
         </div>
 
         {currentView === 'gallery' && (
@@ -1558,11 +1659,19 @@ class App extends React.Component<{}, AppState> {
 
         <PhotoUploadModal
           isOpen={modals.photo.isOpen}
+          modalState={modals.photo.state}
           onClose={this.closePhotoUploadModal}
           onPhotoUpload={this.handleImageUpload}
+          onLocationNotFound={this.openLocationChooserModal}
           sitId={modals.photo.sitId}
           replacementImageId={modals.photo.replacementImageId}
           showNotification={this.showNotification}
+        />
+
+        <LocationChooserModal
+          isOpen={modals.locationChooser.isOpen}
+          onClose={this.closeLocationChooserModal}
+          onChooseLocation={this.startLocationChoosing}
         />
 
         <ProfileModal

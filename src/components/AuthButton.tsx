@@ -14,8 +14,6 @@ interface AuthProps {
 }
 
 class AuthComponent extends React.Component<AuthProps> {
-  private defaultProfileImage = './assets/imgs/profile_blank.png';
-
   constructor(props: AuthProps) {
     super(props);
   }
