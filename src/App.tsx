@@ -777,6 +777,27 @@ class App extends React.Component<{}, AppState> {
     this.closeLocationChooserModal();
   };
 
+  private handleMissingLocationData = (photoData: {
+    base64Data: string;
+    dimensions: { width: number; height: number };
+    sourceType: 'camera' | 'gallery';
+    sitId?: string;
+    replacementImageId?: string;
+  }) => {
+    const { modals } = this.state;
+
+    // Only offer location choosing for creating new sits
+    if (modals.photo.state !== 'create_sit') {
+      console.log('[App] Not creating sit, showing location error instead');
+      this.showNotification('Could not determine photo location', 'error');
+      return;
+    }
+
+    // For create_sit: offer location choosing with processed image data
+    console.log('[App] Offering location choosing for new sit');
+    this.openLocationChooserModal(photoData);
+  };
+
   private handleSavePreferences = async (prefs: UserPreferences) => {
     const { user } = this.state;
     if (!user) return;
@@ -1659,10 +1680,9 @@ class App extends React.Component<{}, AppState> {
 
         <PhotoUploadModal
           isOpen={modals.photo.isOpen}
-          modalState={modals.photo.state}
           onClose={this.closePhotoUploadModal}
           onPhotoUpload={this.handleImageUpload}
-          onLocationNotFound={this.openLocationChooserModal}
+          onMissingLocationData={this.handleMissingLocationData}
           sitId={modals.photo.sitId}
           replacementImageId={modals.photo.replacementImageId}
           showNotification={this.showNotification}

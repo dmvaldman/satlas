@@ -1,7 +1,7 @@
 import React from 'react';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 import { FilePicker, PickedFile } from '@capawesome/capacitor-file-picker';
-import { Location, PhotoResult, PhotoModalState } from '../types';
+import { Location, PhotoResult } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { OfflineService } from '../services/OfflineService';
@@ -30,12 +30,11 @@ interface PhotoDataWithoutLocation {
 
 interface PhotoUploadProps {
   isOpen: boolean;
-  modalState: PhotoModalState;
   sitId?: string;
   replacementImageId?: string;
   onClose: () => void;
   onPhotoUpload: (result: PhotoResult) => void;
-  onLocationNotFound: (photoData: PhotoDataWithoutLocation) => void;
+  onMissingLocationData: (photoData: PhotoDataWithoutLocation) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
 }
 
@@ -385,18 +384,10 @@ class PhotoUploadComponent extends React.Component<PhotoUploadProps, PhotoUpload
 
           } catch (error) {
             // Location couldn't be determined
-            console.log('[PhotoUpload] Location not found...');
+            console.log('[PhotoUpload] Location not found, calling onMissingLocationData...');
 
-            // Only offer location choosing for creating new sits
-            if (this.props.modalState !== 'create_sit') {
-              console.log('[PhotoUpload] Not creating sit, showing location error instead');
-              this.props.showNotification('Could not determine photo location', 'error');
-              return;
-            }
-
-            // For create_sit: offer location choosing with processed image data
-            console.log('[PhotoUpload] Offering location choosing for new sit');
-            this.props.onLocationNotFound({
+            // Always call onMissingLocationData and let parent decide what to do
+            this.props.onMissingLocationData({
               base64Data: finalBase64Data,
               dimensions: dimensions,
               sourceType: sourceType,
