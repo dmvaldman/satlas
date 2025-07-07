@@ -14,6 +14,7 @@ interface ProfileModalProps {
   version: string;
   onClose: () => void;
   onSignOut: () => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
   onSave: (preferences: UserPreferences) => Promise<void>;
   onUpdatePreferences: (preferences: UserPreferences) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
@@ -636,7 +637,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   };
 
   render() {
-    const { isOpen, onClose, onSignOut, version } = this.props;
+    const { isOpen, onClose, onSignOut, onDeleteAccount, version } = this.props;
     const {
       username,
       pushNotifications,
@@ -727,14 +728,24 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
               className="logout-button"
               onClick={async () => {
                 await onSignOut();
-                onClose();
+                this.handleClose();
               }}
             >
               <span className="log-out-text">Log Out</span>
             </button>
-            <div className="version-info">
-              v{version}
-            </div>
+            <div
+              id="delete-account"
+              onClick={async () => {
+                const confirmDelete = window.confirm(
+                  'Are you sure you want to delete your account? This action is irreversible and will permanently delete all your data.'
+                );
+                if (confirmDelete) {
+                  await onDeleteAccount();
+                  this.handleClose();
+                }
+              }}
+            >Delete Account</div>
+            <div className="version-info">v{version}</div>
           </div>
         </div>
       </BaseModal>

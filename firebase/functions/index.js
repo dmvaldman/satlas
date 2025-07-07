@@ -5,9 +5,13 @@ const path = require("path");
 const logger = require("firebase-functions/logger");
 const {initializeApp} = require("firebase-admin/app");
 const functions = require("firebase-functions");
+const {getFirestore} = require("firebase-admin/firestore");
+const { HttpsError } = require("firebase-functions/v2/https");
+const { getAuth } = require("firebase-admin/auth");
 
 // Initialize Firebase Admin
 initializeApp();
+const db = getFirestore();
 
 exports.processImage = storage.onObjectFinalized({
   bucket: 'satlas-world.firebasestorage.app'
@@ -193,5 +197,84 @@ exports.deleteImageVariations = storage.onObjectDeleted({
   } catch (error) {
     logger.error('Error during cleanup:', error);
     return logger.error('Cleanup failed');
+  }
+});
+
+exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
+  // 1. Check for authentication
+  if (!context.auth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated.",
+    );
+  }
+
+  const uid = context.auth.uid;
+  logger.log(`Starting account deletion for user: ${uid}`);
+
+  try {
+    // 2. Delete all user-related data in Firestore
+    const batch = db.batch();
+
+    // Delete user's document
+    const userDocRef = db.collection("users").doc(uid);
+    batch.delete(userDocRef);
+    logger.log(`Marked user document for deletion: users/${uid}`);
+
+    // Delete sits created by the user
+    const sitsQuery = db.collection("sits").where("uploadedBy", "==", uid);
+    const sitsSnapshot = await sitsQuery.get();
+    sitsSnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+      logger.log(`Marked sit for deletion: ${doc.ref.path}`);
+    });
+
+    // Delete images uploaded by the user
+    const imagesQuery = db.collection("images").where("userId", "==", uid);
+    const imagesSnapshot = await imagesQuery.get();
+    const imagePaths = [];
+    imagesSnapshot.forEach((doc) => {
+      const imageData = doc.data();
+      if (imageData.photoURL) {
+        // Extract the path from the URL, assuming a consistent structure
+        const url = new URL(imageData.photoURL);
+        // Path will be something like /images/sits/sit_12345.jpg
+        // We need to remove the leading '/images/' part
+        const fullPath = decodeURIComponent(url.pathname);
+        const storagePath = fullPath.startsWith('/images/') ? fullPath.substring(8) : fullPath;
+        imagePaths.push(storagePath);
+      }
+      batch.delete(doc.ref);
+      logger.log(`Marked image for deletion: ${doc.ref.path}`);
+    });
+
+    // Commit all Firestore deletions
+    await batch.commit();
+    logger.log("Successfully deleted user data from Firestore.");
+
+    // 3. Delete user's images from Storage
+    const bucket = getStorage().bucket("satlas-world.firebasestorage.app");
+    for (const imagePath of imagePaths) {
+      try {
+        await bucket.file(imagePath).delete();
+        logger.log(`Successfully deleted from Storage: ${imagePath}`);
+      } catch (storageError) {
+        // Log error but continue, as Firestore data is already gone
+        logger.error(`Failed to delete ${imagePath} from Storage:`, storageError);
+      }
+    }
+
+    // 4. Delete user from Firebase Authentication
+    await getAuth().deleteUser(uid);
+    logger.log(`Successfully deleted user account: ${uid}`);
+
+    return { success: true };
+  } catch (error) {
+    logger.error("Error deleting user account:", error);
+    throw new HttpsError(
+      "internal",
+      "An error occurred while deleting the account.",
+      error,
+    );
   }
 });

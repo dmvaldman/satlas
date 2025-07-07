@@ -41,6 +41,10 @@ import {
   uploadBytes,
   deleteObject
 } from 'firebase/storage';
+import {
+  getFunctions,
+  httpsCallable
+} from 'firebase/functions';
 import { Sit, Image, Location, UserPreferences, MarkType, PushToken } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -142,6 +146,7 @@ try {
 // --- End Firestore Initialization ---
 
 const storage = getStorage(app);
+const functions = getFunctions(app);
 
 // Helper function (can be moved to utils if used elsewhere)
 function base64ToBlob(base64: string, contentType: string = 'image/jpeg'): Blob {
@@ -189,6 +194,7 @@ export class FirebaseService {
   static auth = auth;
   static db = db;
   static storage = storage;
+  static functions = functions;
   static tempImageMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
   static tempSitMapping: Map<string, string | null> = new Map(); // Maps temp IDs to real Firebase IDs
   static tempImages: Map<string, Image> = new Map(); // In-memory storage for temporary images
@@ -2011,6 +2017,17 @@ export class FirebaseService {
       })();
     } else {
        console.log('[Firebase] Skipping redirect check (popup flow or native)');
+    }
+  }
+
+  static async deleteUserAccount(): Promise<void> {
+    const deleteUserAccount = httpsCallable(functions, 'deleteUserAccount');
+    try {
+      await deleteUserAccount();
+      console.log('Successfully called deleteUserAccount function.');
+    } catch (error) {
+      console.error('Error calling deleteUserAccount function:', error);
+      throw error;
     }
   }
 }

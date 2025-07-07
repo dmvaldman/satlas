@@ -505,6 +505,18 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
+  private handleDeleteAccount = async () => {
+    console.log('[App] Starting account deletion process');
+    try {
+      await FirebaseService.deleteUserAccount();
+      this.showNotification('Account deleted successfully.', 'success');
+      await this.handleSignOut();
+    } catch (error) {
+      console.error('[App] Error deleting account:', error);
+      this.showNotification('Failed to delete account. Please try again.', 'error');
+    }
+  };
+
   private setupRealtimeListeners = () => {
     // Clean up existing listeners if any
     if (this.firebaseListenersUnsubscribe) {
@@ -1702,6 +1714,7 @@ class App extends React.Component<{}, AppState> {
           version={packageJson.version}
           onClose={this.closeProfileModal}
           onSignOut={this.handleSignOut}
+          onDeleteAccount={this.handleDeleteAccount}
           onSave={this.handleSavePreferences}
           onUpdatePreferences={this.updatePreferences}
           showNotification={this.showNotification}
