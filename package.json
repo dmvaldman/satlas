@@ -1,6 +1,6 @@
 {
   "name": "Satlas",
-  "version": "0.0.19",
+  "version": "1.0.19",
   "description": "An atlas of sits",
   "type": "module",
   "keywords": [],
@@ -25,7 +25,7 @@
     "clean:ios": "cd ios/App && xcodebuild clean && cd ../..",
     "setup:ios": "bash scripts/setup-ios.sh",
     "nuke:ios": "rm -rf ios && npx cap add ios && npm run setup:ios",
-    "release:ios": "npm run gen-assets && npx cap sync ios && cd ios/App && agvtool next-version -all && xcodebuild archive -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' && cd ../..",
+    "release:ios": "npm run gen-assets && npx cap sync ios && cd ios/App && agvtool new-marketing-version $npm_package_version && agvtool next-version -all && xcodebuild archive -workspace App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' && cd ../..",
     "release:all": "npm run release && npm run release:web && npm run release:android && npm run release:ios && git push && git push --tags"
   },
   "main": "index.js",
