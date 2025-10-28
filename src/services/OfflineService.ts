@@ -345,10 +345,9 @@ export class OfflineService {
       console.log('[OfflineService] Saving pending uploads:', this.pendingUploads.length);
       const data = JSON.stringify(this.pendingUploads);
 
-      // Use our helper function to properly encode the JSON string
+      // Encode JSON string to base64
       const base64Data = utf8ToBase64(data);
-      const encodedData = `data:application/json;base64,${base64Data}`;
-      await this.fileStorageService.saveFile('pending_uploads_json', encodedData);
+      await this.fileStorageService.saveFile('pending_uploads_json', base64Data);
       console.log('[OfflineService] Successfully saved pending uploads');
     } catch (error) {
       console.error('[OfflineService] Error saving pending uploads:', error);
@@ -363,17 +362,21 @@ export class OfflineService {
       const fileRef = Capacitor.isNativePlatform() ? 'file:pending_uploads_json' : 'idb:pending_uploads_json';
       const fileData = await this.fileStorageService.loadFile(fileRef);
 
-      // Extract the JSON data from the base64 data URI
-      const base64Data = fileData.replace('data:application/json;base64,', '');
-
-      // Decode using our helper function
-      const jsonString = base64ToUtf8(base64Data);
+      // Decode base64 to UTF-8 string
+      const jsonString = decodeURIComponent(
+        Array.prototype.map.call(atob(fileData), (c: any) =>
+          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        ).join('')
+      );
 
       this.pendingUploads = JSON.parse(jsonString);
       console.log('[OfflineService] Successfully loaded pending uploads:', this.pendingUploads.length);
     } catch (error) {
       console.error('[OfflineService] Error loading pending uploads:', error);
+
+      // Clear corrupted data
       this.pendingUploads = [];
+      await this.savePendingUploads();
     }
   }
 
