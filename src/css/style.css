@@ -979,12 +979,31 @@ body {
   align-items: center;
   cursor: pointer;
   padding: 0;
+  transition: background-color 0.2s ease;
+}
+
+.satlas-popup .image-controls .image-control-button:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.satlas-popup .image-controls .image-control-button:active {
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
 .satlas-popup .image-controls .image-control-button svg {
   width: 20px;
   height: 20px;
   fill: white;
+}
+
+.satlas-popup .image-controls .image-control-button.flag svg {
+  width: 18px;
+  height: 18px;
+  fill: white;
+  stroke: white;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .image-uploader {

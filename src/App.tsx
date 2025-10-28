@@ -959,6 +959,29 @@ class App extends React.Component<{}, AppState> {
     this.deleteImage(imageId, user.uid);
   };
 
+  private handleImageFlag = async (imageId: string) => {
+    const { user } = this.state;
+    if (!user) {
+      await this.handleSignInModalOpen('Sign in to report content');
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = window.confirm('Flag photo as objectionable content?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await FirebaseService.flagImage(imageId, user.uid);
+      this.showNotification('Content reported.', 'success');
+    } catch (error) {
+      console.error('Error flagging image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to report content. Please try again.';
+      this.showNotification(errorMessage, 'error');
+    }
+  };
+
   private deleteSit = async (sitId: string) => {
     const { sits } = this.state;
     if (!sits.has(sitId)) return;
@@ -1761,6 +1784,7 @@ class App extends React.Component<{}, AppState> {
             onSignIn={this.handleSignInModalOpen}
             onOpenFullscreenImage={this.openFullscreenImage}
             showNotification={this.showNotification}
+            onImageFlag={this.handleImageFlag}
           />
         )}
 

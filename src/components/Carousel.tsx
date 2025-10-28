@@ -8,6 +8,7 @@ interface CarouselProps {
   onImageDelete: (imageId: string) => void;
   onImageReplace: (imageId: string) => void;
   onOpenFullscreenImage: (image: Image) => void;
+  onImageFlag?: (imageId: string) => void;
 }
 
 // Define image status types
@@ -488,7 +489,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, currentUserId, onImageDelete, onImageReplace } = this.props;
+    const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag } = this.props;
     const {
       translateX,
       imageStatuses,
@@ -597,6 +598,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                                 e.stopPropagation();
                                 onImageReplace(image.id);
                               }}
+                              title="Replace photo"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
@@ -608,6 +610,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                                 e.stopPropagation();
                                 onImageDelete(image.id);
                               }}
+                              title="Delete photo"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -615,6 +618,23 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                             </button>
                           </>
                         )}
+                      </div>
+                    )}
+                    {!canShowControls && currentUserId && onImageFlag && (
+                      <div className="image-controls">
+                        <button
+                          className="image-control-button flag"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onImageFlag(image.id);
+                          }}
+                          title="Report objectionable content"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                            <line x1="4" y1="22" x2="4" y2="15"/>
+                          </svg>
+                        </button>
                       </div>
                     )}
                   </div>

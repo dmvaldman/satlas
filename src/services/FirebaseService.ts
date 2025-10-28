@@ -2030,6 +2030,38 @@ export class FirebaseService {
       throw error;
     }
   }
+
+  /**
+   * Flag an image as objectionable content
+   * @param imageId Image ID to flag
+   * @param userId User ID reporting the content
+   */
+  static async flagImage(imageId: string, userId: string): Promise<void> {
+    try {
+      // Create a flag document in Firestore
+      // The document ID is `${userId}_${imageId}` to prevent duplicate flags from the same user
+      const flagRef = doc(db, 'flags', `${userId}_${imageId}`);
+
+      // Check if flag already exists
+      const flagDoc = await getDoc(flagRef);
+      if (flagDoc.exists()) {
+        console.log(`[Firebase] User ${userId} already flagged image ${imageId}`);
+        throw new Error('You have already reported this content');
+      }
+
+      await setDoc(flagRef, {
+        imageId,
+        userId,
+        createdAt: new Date(),
+        status: 'pending' // Flagged content awaiting review
+      });
+
+      console.log(`[Firebase] Image ${imageId} flagged by user ${userId}`);
+    } catch (error) {
+      console.error('Error flagging image:', error);
+      throw error;
+    }
+  }
 }
 
 // Export the initialized auth instance if needed elsewhere
