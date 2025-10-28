@@ -77,6 +77,13 @@ class SignInModal extends React.Component<SignInModalProps> {
             Sign in with Google
           </button>
         </div>
+
+        <p className="sign-in-terms">
+          By signing in, you agree to our{' '}
+          <a href="https://satlas.earth/terms-of-service.html" target="_blank" rel="noopener noreferrer">
+            Terms of Service
+          </a>
+        </p>
       </BaseModal>
     );
   }

@@ -567,6 +567,20 @@ body {
   background: var(--light-gray-opacity);
 }
 
+.sign-in-terms {
+  margin-top: 20px;
+  font-size: var(--font-size-small) !important;
+  color: var(--medium-gray);
+  line-height: 1.4;
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.sign-in-terms a {
+  color: var(--dark-gray);
+  text-decoration: underline;
+}
+
 .profile-section {
   margin-bottom: 1.75rem;
 }
