@@ -1041,13 +1041,30 @@ body {
 
 .image-uploader-name.clickable {
   cursor: pointer;
-  /* text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px; */
 }
 
 .image-uploader-name.clickable:active {
   opacity: 0.7;
+}
+
+/* Blocked user placeholder */
+.blocked-user-placeholder {
+  background-color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #666;
+}
+
+.blocked-user-placeholder .blocked-message {
+  margin-bottom: 10px;
+}
+
+.blocked-user-placeholder .unblock-link {
+  color: #007AFF;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .satlas-popup .mark-buttons {

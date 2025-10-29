@@ -1013,6 +1013,38 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
+  private handleUnblockUser = async (unblockedUserId: string, unblockedUsername: string) => {
+    const { user, userPreferences } = this.state;
+    if (!user) {
+      return;
+    }
+
+    try {
+      // Remove user from blocked list in Firestore
+      const updatedBlockedUsers = (userPreferences.blockedUsers || []).filter(id => id !== unblockedUserId);
+
+      // Update Firestore with the new blocked list
+      await FirebaseService.saveUserPreferences(user.uid, {
+        ...userPreferences,
+        blockedUsers: updatedBlockedUsers
+      });
+
+      // Update local state
+      this.setState({
+        userPreferences: {
+          ...userPreferences,
+          blockedUsers: updatedBlockedUsers
+        }
+      });
+
+      this.showNotification(`${unblockedUsername} unblocked.`, 'success');
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to unblock user. Please try again.';
+      this.showNotification(errorMessage, 'error');
+    }
+  };
+
   private deleteSit = async (sitId: string) => {
     const { sits } = this.state;
     if (!sits.has(sitId)) return;
@@ -1220,16 +1252,10 @@ class App extends React.Component<{}, AppState> {
     this.setState({ userPreferences: preferences });
   };
 
-  // Helper method to filter images from blocked users
-  private filterBlockedImages = (images: Image[]): Image[] => {
+  // Helper method to mark which images are from blocked users
+  private getBlockedUserIds = (): string[] => {
     const { userPreferences } = this.state;
-    const blockedUsers = userPreferences.blockedUsers || [];
-
-    if (blockedUsers.length === 0) {
-      return images;
-    }
-
-    return images.filter(image => !blockedUsers.includes(image.userId));
+    return userPreferences.blockedUsers || [];
   };
 
   // Add these methods to control the drawer
@@ -1256,17 +1282,14 @@ class App extends React.Component<{}, AppState> {
             ? await this.getImagesForSit(sit.imageCollectionId)
             : [];
 
-        // Filter out images from blocked users
-        const filteredImages = this.filterBlockedImages(fetchedImages);
-
         // Update the state *only if* the drawer is still open for the same sit
         this.setState(prevState => {
             if (prevState.drawer.isOpen && prevState.drawer.sit?.id === sit.id) {
-                console.log(`[App] Fetched ${fetchedImages.length} images (${filteredImages.length} after filtering) for sit ${sit.id}, updating drawer.`);
+                console.log(`[App] Fetched ${fetchedImages.length} images for sit ${sit.id}, updating drawer.`);
                 return {
                     drawer: {
                         ...prevState.drawer,
-                        images: filteredImages // Update with filtered images
+                        images: fetchedImages // Update with all images (filtering happens in Carousel)
                     }
                 };
             } else {
@@ -1696,8 +1719,8 @@ class App extends React.Component<{}, AppState> {
       isChoosingLocation,
     } = this.state;
 
-    // Filter drawer images to exclude blocked users
-    const filteredDrawerImages = this.filterBlockedImages(drawer.images);
+    // Get list of blocked user IDs to pass to components
+    const blockedUserIds = this.getBlockedUserIds();
 
     return (
       <div id="app" className={`app-view-${currentView}`}>
@@ -1815,12 +1838,12 @@ class App extends React.Component<{}, AppState> {
           onReplaceImage={this.handleReplaceImage}
         />
 
-        {drawer.sit && filteredDrawerImages.length > 0 && (
+        {drawer.sit && (
           <SitComponent
             isOpen={drawer.isOpen}
             photoModalIsOpen={modals.photo.isOpen}
             sit={drawer.sit}
-            images={filteredDrawerImages}
+            images={drawer.images}
             user={user}
             marks={marks.get(drawer.sit.id) || new Set()}
             favoriteCount={favoriteCount.get(drawer.sit.id) || 0}
@@ -1835,6 +1858,8 @@ class App extends React.Component<{}, AppState> {
             showNotification={this.showNotification}
             onImageFlag={this.handleImageFlag}
             onBlockUser={this.handleBlockUser}
+            onUnblockUser={this.handleUnblockUser}
+            blockedUserIds={blockedUserIds}
           />
         )}
 

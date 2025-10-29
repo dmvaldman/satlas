@@ -11,6 +11,8 @@ interface CarouselProps {
   onOpenFullscreenImage: (image: Image) => void;
   onImageFlag?: (imageId: string) => void;
   onBlockUser?: (userId: string, username: string) => void;
+  onUnblockUser?: (userId: string, username: string) => void;
+  blockedUserIds: string[];
 }
 
 // Define image status types
@@ -491,7 +493,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag, onBlockUser } = this.props;
+    const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag, onBlockUser, onUnblockUser, blockedUserIds } = this.props;
     const {
       translateX,
       imageStatuses,
@@ -530,6 +532,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
             ) : (
               // Render actual images when available
               images.map((image, index) => {
+                const isBlocked = blockedUserIds.includes(image.userId);
                 const status = imageStatuses[index] || 'notLoaded';
                 const isVisible = status === 'loading' || status === 'loaded';
                 const isLoaded = status === 'loaded';
@@ -541,6 +544,41 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                   carouselHeight,
                   hasMultipleImages
                 );
+
+                // If the image is from a blocked user, show a white placeholder
+                if (isBlocked) {
+                  return (
+                    <div
+                      key={image.id}
+                      className={`carousel-item blocked-user-item ${index === images.length - 1 ? 'last-item' : ''}`}
+                      style={{
+                        width: `${Math.floor(imageWidth)}px`,
+                        height: `${carouselHeight}px`
+                      }}
+                    >
+                      <div
+                        className="blocked-user-placeholder carousel-image"
+                        style={{
+                          width: `${Math.floor(imageWidth)}px`,
+                          height: `${imageHeight}px`
+                        }}
+                      >
+                        <div className="blocked-message">Content from blocked user</div>
+                        {onUnblockUser && (
+                          <span
+                            className="image-uploader-name clickable unblock-link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUnblockUser(image.userId, image.userName);
+                            }}
+                          >
+                            Unblock {image.userName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <div
