@@ -61,6 +61,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       lastPositionY: 0,
       velocity: 0,
       dragDirection: null,
+      openMenuImageId: null,
     };
   }
 
@@ -76,6 +77,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       window.addEventListener('mousemove', this.handleDragMove);
       window.addEventListener('mouseup', this.handleDragEnd);
     }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', this.handleOutsideClick);
 
     // Set up resize observer to handle container size changes
     this.resizeObserver = new ResizeObserver(this.handleResize);
@@ -104,6 +108,9 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       window.removeEventListener('mousemove', this.handleDragMove);
       window.removeEventListener('mouseup', this.handleDragEnd);
     }
+
+    // Clean up outside click listener
+    document.removeEventListener('click', this.handleOutsideClick);
 
     // Clean up resize observer
     if (this.resizeObserver) {
@@ -493,6 +500,38 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     return image.id.startsWith('temp_');
   };
 
+  private toggleMenu = (imageId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    this.setState(prevState => ({
+      openMenuImageId: prevState.openMenuImageId === imageId ? null : imageId
+    }));
+  };
+
+  private closeMenu = () => {
+    this.setState({ openMenuImageId: null });
+  };
+
+  private handleOutsideClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Close menu if clicking outside the menu or menu button
+    if (!target.closest('.image-menu-dropdown') && !target.closest('.image-control-button.menu')) {
+      this.closeMenu();
+    }
+  };
+
+  private handleMenuAction = (action: 'flag' | 'block', image: Image, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { onImageFlag, onBlockUser } = this.props;
+
+    if (action === 'flag' && onImageFlag) {
+      onImageFlag(image.id);
+    } else if (action === 'block' && onBlockUser) {
+      onBlockUser(image.userId, image.userName);
+    }
+
+    this.closeMenu();
+  };
+
   render() {
     const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag, onBlockUser, onUnblockUser, blockedUserIds } = this.props;
     const {
@@ -622,22 +661,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     </div>
                     {isVisible && (
                       <div className="image-uploader">
-                        {/* Make username clickable if it's not the current user and onBlockUser is provided */}
-                        {currentUserId &&
-                         image.userId !== currentUserId &&
-                         onBlockUser ? (
-                          <span
-                            className="image-uploader-name clickable"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onBlockUser(image.userId, image.userName);
-                            }}
-                          >
-                            {image.userName}
-                          </span>
-                        ) : (
-                          image.userName
-                        )}
+                        {image.userName}
                       </div>
                     )}
                     {canShowControls && (
@@ -676,21 +700,39 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                         )}
                       </div>
                     )}
-                    {!canShowControls && currentUserId && onImageFlag && (
+                    {!canShowControls && currentUserId && (onImageFlag || onBlockUser) && (
                       <div className="image-controls">
                         <button
-                          className="image-control-button flag"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onImageFlag(image.id);
-                          }}
-                          title="Report objectionable content"
+                          className="image-control-button menu"
+                          onClick={(e) => this.toggleMenu(image.id, e)}
+                          title="Options"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                            <line x1="4" y1="22" x2="4" y2="15"/>
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="12" cy="12" r="2"/>
+                            <circle cx="12" cy="19" r="2"/>
                           </svg>
                         </button>
+                        {this.state.openMenuImageId === image.id && (
+                          <div className="image-menu-dropdown">
+                            {onImageFlag && (
+                              <button
+                                className="image-menu-item"
+                                onClick={(e) => this.handleMenuAction('flag', image, e)}
+                              >
+                                Flag image
+                              </button>
+                            )}
+                            {onBlockUser && (
+                              <button
+                                className="image-menu-item"
+                                onClick={(e) => this.handleMenuAction('block', image, e)}
+                              >
+                                Block {image.userName}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
