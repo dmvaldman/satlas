@@ -42,6 +42,7 @@ interface PopupProps {
   onOpenFullscreenImage: (image: Image) => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
   onImageFlag?: (imageId: string) => void;
+  onBlockUser?: (userId: string, username: string) => void;
 }
 
 class PopupComponent extends React.Component<PopupProps> {
@@ -125,7 +126,7 @@ class PopupComponent extends React.Component<PopupProps> {
   }
 
   private renderCarousel() {
-    const { images, user, onImageFlag } = this.props;
+    const { images, user, onImageFlag, onBlockUser } = this.props;
 
     if (!images) {
       console.error('images is undefined');
@@ -140,6 +141,7 @@ class PopupComponent extends React.Component<PopupProps> {
         onImageReplace={this.handleImageReplace}
         onOpenFullscreenImage={this.props.onOpenFullscreenImage}
         onImageFlag={onImageFlag}
+        onBlockUser={onBlockUser}
       />
     );
   }

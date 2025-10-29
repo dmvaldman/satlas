@@ -2062,6 +2062,35 @@ export class FirebaseService {
       throw error;
     }
   }
+
+  /**
+   * Block a user
+   * @param currentUserId Current user's ID
+   * @param blockedUserId User ID to block
+   */
+  static async blockUser(currentUserId: string, blockedUserId: string): Promise<void> {
+    try {
+      // Get current user preferences
+      const userDoc = await getDoc(doc(db, 'users', currentUserId));
+      const currentPrefs = userDoc.data() as UserPreferences;
+
+      // Add blocked user to the list (initialize if doesn't exist)
+      const blockedUsers = currentPrefs.blockedUsers || [];
+      if (!blockedUsers.includes(blockedUserId)) {
+        blockedUsers.push(blockedUserId);
+      }
+
+      // Update user preferences
+      await setDoc(doc(db, 'users', currentUserId), {
+        blockedUsers
+      }, { merge: true });
+
+      console.log(`[Firebase] User ${currentUserId} blocked user ${blockedUserId}`);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      throw error;
+    }
+  }
 }
 
 // Export the initialized auth instance if needed elsewhere

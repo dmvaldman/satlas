@@ -44,6 +44,7 @@ export interface UserPreferences {
     latitude: number;
     longitude: number;
   };
+  blockedUsers?: string[];
 }
 
 export interface PhotoResult {

@@ -1039,6 +1039,17 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.6);
 }
 
+.image-uploader-name.clickable {
+  cursor: pointer;
+  /* text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px; */
+}
+
+.image-uploader-name.clickable:active {
+  opacity: 0.7;
+}
+
 .satlas-popup .mark-buttons {
   display: flex;
   gap: 8px;

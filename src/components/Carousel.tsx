@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image } from '../types';
 import { OfflineService } from '../services/OfflineService';
+import { Capacitor } from '@capacitor/core';
 
 interface CarouselProps {
   images: Image[];
@@ -9,6 +10,7 @@ interface CarouselProps {
   onImageReplace: (imageId: string) => void;
   onOpenFullscreenImage: (image: Image) => void;
   onImageFlag?: (imageId: string) => void;
+  onBlockUser?: (userId: string, username: string) => void;
 }
 
 // Define image status types
@@ -489,7 +491,7 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
   };
 
   render() {
-    const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag } = this.props;
+    const { images, currentUserId, onImageDelete, onImageReplace, onImageFlag, onBlockUser } = this.props;
     const {
       translateX,
       imageStatuses,
@@ -581,7 +583,22 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                     </div>
                     {isVisible && (
                       <div className="image-uploader">
-                        {image.userName}
+                        {/* Make username clickable if it's not the current user and onBlockUser is provided */}
+                        {currentUserId &&
+                         image.userId !== currentUserId &&
+                         onBlockUser ? (
+                          <span
+                            className="image-uploader-name clickable"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBlockUser(image.userId, image.userName);
+                            }}
+                          >
+                            {image.userName}
+                          </span>
+                        ) : (
+                          image.userName
+                        )}
                       </div>
                     )}
                     {canShowControls && (
