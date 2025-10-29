@@ -31,6 +31,7 @@ interface CarouselState {
   lastPositionY: number;
   velocity: number;
   dragDirection: 'horizontal' | 'vertical' | null;
+  openMenuImageId: string | null;
 }
 
 class Carousel extends React.Component<CarouselProps, CarouselState> {

@@ -1037,10 +1037,15 @@ body {
   z-index: 2;
   opacity: 0.7;
   border: 1px solid rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 
 .image-uploader-name.clickable {
   cursor: pointer;
+  pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
 }
 
 .image-uploader-name.clickable:active {
