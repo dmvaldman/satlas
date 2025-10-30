@@ -486,6 +486,13 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
       return;
     }
 
+    // If a menu is open, close it instead of opening fullscreen
+    if (this.state.openMenuImageId !== null) {
+      e.stopPropagation();
+      this.closeMenu();
+      return;
+    }
+
     console.log('handleImageClick', image);
     e.stopPropagation();
     this.props.onOpenFullscreenImage(image);
@@ -519,14 +526,18 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
     }
   };
 
-  private handleMenuAction = (action: 'flag' | 'block', image: Image, e: React.MouseEvent) => {
+  private handleMenuAction = (action: 'flag' | 'block' | 'replace' | 'delete', image: Image, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { onImageFlag, onBlockUser } = this.props;
+    const { onImageFlag, onBlockUser, onImageReplace, onImageDelete } = this.props;
 
     if (action === 'flag' && onImageFlag) {
       onImageFlag(image.id);
     } else if (action === 'block' && onBlockUser) {
       onBlockUser(image.userId, image.userName);
+    } else if (action === 'replace') {
+      onImageReplace(image.id);
+    } else if (action === 'delete') {
+      onImageDelete(image.id);
     }
 
     this.closeMenu();
@@ -664,74 +675,65 @@ class Carousel extends React.Component<CarouselProps, CarouselState> {
                         {image.userName}
                       </div>
                     )}
-                    {canShowControls && (
+                    {currentUserId && (
                       <div className="image-controls">
-                        {this.isImageUploading(image) ? (
+                        {canShowControls && this.isImageUploading(image) ? (
                           <div className="image-upload-loading active">
                             <div className="spinner small"></div>
                           </div>
                         ) : (
                           <>
                             <button
-                              className="image-control-button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onImageReplace(image.id);
-                              }}
-                              title="Replace photo"
+                              className="image-control-button menu"
+                              onClick={(e) => this.toggleMenu(image.id, e)}
+                              title="Options"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                                <circle cx="12" cy="5" r="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <circle cx="12" cy="19" r="2"/>
                               </svg>
                             </button>
-                            <button
-                              className="image-control-button delete"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onImageDelete(image.id);
-                              }}
-                              title="Delete photo"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                              </svg>
-                            </button>
+                            {this.state.openMenuImageId === image.id && (
+                              <div className="image-menu-dropdown">
+                                {canShowControls ? (
+                                  <>
+                                    <button
+                                      className="image-menu-item"
+                                      onClick={(e) => this.handleMenuAction('replace', image, e)}
+                                    >
+                                      Replace
+                                    </button>
+                                    <button
+                                      className="image-menu-item"
+                                      onClick={(e) => this.handleMenuAction('delete', image, e)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {onImageFlag && (
+                                      <button
+                                        className="image-menu-item"
+                                        onClick={(e) => this.handleMenuAction('flag', image, e)}
+                                      >
+                                        Flag image
+                                      </button>
+                                    )}
+                                    {onBlockUser && (
+                                      <button
+                                        className="image-menu-item"
+                                        onClick={(e) => this.handleMenuAction('block', image, e)}
+                                      >
+                                        Block {image.userName}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </>
-                        )}
-                      </div>
-                    )}
-                    {!canShowControls && currentUserId && (onImageFlag || onBlockUser) && (
-                      <div className="image-controls">
-                        <button
-                          className="image-control-button menu"
-                          onClick={(e) => this.toggleMenu(image.id, e)}
-                          title="Options"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <circle cx="12" cy="5" r="2"/>
-                            <circle cx="12" cy="12" r="2"/>
-                            <circle cx="12" cy="19" r="2"/>
-                          </svg>
-                        </button>
-                        {this.state.openMenuImageId === image.id && (
-                          <div className="image-menu-dropdown">
-                            {onImageFlag && (
-                              <button
-                                className="image-menu-item"
-                                onClick={(e) => this.handleMenuAction('flag', image, e)}
-                              >
-                                Flag image
-                              </button>
-                            )}
-                            {onBlockUser && (
-                              <button
-                                className="image-menu-item"
-                                onClick={(e) => this.handleMenuAction('block', image, e)}
-                              >
-                                Block {image.userName}
-                              </button>
-                            )}
-                          </div>
                         )}
                       </div>
                     )}
