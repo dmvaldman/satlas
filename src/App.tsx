@@ -1020,14 +1020,11 @@ class App extends React.Component<{}, AppState> {
     }
 
     try {
-      // Remove user from blocked list in Firestore
+      // Remove user from blocked list
       const updatedBlockedUsers = (userPreferences.blockedUsers || []).filter(id => id !== unblockedUserId);
 
-      // Update Firestore with the new blocked list
-      await FirebaseService.saveUserPreferences(user.uid, {
-        ...userPreferences,
-        blockedUsers: updatedBlockedUsers
-      });
+      // Update Firestore with just the blockedUsers field
+      await FirebaseService.unblockUser(user.uid, unblockedUserId);
 
       // Update local state
       this.setState({

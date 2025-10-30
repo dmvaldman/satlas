@@ -2091,6 +2091,32 @@ export class FirebaseService {
       throw error;
     }
   }
+
+  /**
+   * Unblock a user
+   * @param currentUserId Current user's ID
+   * @param unblockedUserId User ID to unblock
+   */
+  static async unblockUser(currentUserId: string, unblockedUserId: string): Promise<void> {
+    try {
+      // Get current user preferences
+      const userDoc = await getDoc(doc(db, 'users', currentUserId));
+      const currentPrefs = userDoc.data() as UserPreferences;
+
+      // Remove user from blocked list
+      const blockedUsers = (currentPrefs.blockedUsers || []).filter(id => id !== unblockedUserId);
+
+      // Update user preferences
+      await setDoc(doc(db, 'users', currentUserId), {
+        blockedUsers
+      }, { merge: true });
+
+      console.log(`[Firebase] User ${currentUserId} unblocked user ${unblockedUserId}`);
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      throw error;
+    }
+  }
 }
 
 // Export the initialized auth instance if needed elsewhere

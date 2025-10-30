@@ -1030,12 +1030,12 @@ body {
   position: absolute;
   top: 42px;
   right: 0;
-  background: white;
+  /* background: rgba(255, 255, 255, 0.5); */
   border: 1px solid var(--dark-gray);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 10;
-  min-width: 100px;
+  width: max-content;
   overflow: hidden;
 }
 
@@ -1044,7 +1044,7 @@ body {
   width: 100%;
   padding: 12px 16px;
   border: none;
-  background: white;
+  background: rgba(255, 255, 255, 0.8);
   color: var(--black);
   font-size: var(--font-size-medium);
   text-align: left;
@@ -1055,11 +1055,11 @@ body {
 }
 
 .image-menu-item:hover {
-  background-color: var(--light-gray);
+  background-color: var(--light-gray-opacity);
 }
 
 .image-menu-item:active {
-  background-color: var(--light-gray);
+  background-color: var(--light-gray-opacity);
 }
 
 .image-menu-item + .image-menu-item {
