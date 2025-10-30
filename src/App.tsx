@@ -1782,6 +1782,7 @@ class App extends React.Component<{}, AppState> {
           <GalleryView
             sits={sits}
             onSelectSit={this.handleSelectSitFromGallery}
+            blockedUserIds={blockedUserIds}
           />
         )}
 

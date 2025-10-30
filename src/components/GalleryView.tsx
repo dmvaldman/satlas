@@ -5,6 +5,7 @@ import { FirebaseService } from '../services/FirebaseService';
 interface GalleryViewProps {
   sits: Map<string, Sit>;
   onSelectSit: (sitId: string) => void;
+  blockedUserIds: string[];
 }
 
 interface GalleryViewState {
@@ -86,11 +87,21 @@ class GalleryView extends React.Component<GalleryViewProps, GalleryViewState> {
   };
 
   render() {
-    const { sits } = this.props;
+    const { sits, blockedUserIds } = this.props;
     const { firstImages, isLoading } = this.state;
 
-    // Filter out sits without imageCollectionId before rendering
-    const sitsWithImages = Array.from(sits.values()).filter(sit => sit.imageCollectionId);
+    // Filter out sits without imageCollectionId and sits with images from blocked users
+    const sitsWithImages = Array.from(sits.values()).filter(sit => {
+      if (!sit.imageCollectionId) return false;
+
+      const image = firstImages.get(sit.id);
+      // Filter out images from blocked users
+      if (image && blockedUserIds.includes(image.userId)) {
+        return false;
+      }
+
+      return true;
+    });
 
     return (
       <div className="gallery-view">
