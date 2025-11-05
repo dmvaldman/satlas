@@ -6,4 +6,4 @@ Satlas is a mobile/web application built with React and Capacitor, designed to h
 
 - [web](https://satlas.earth)
 - [Android](https://play.google.com/store/apps/details?id=com.dmvaldman.Satlas)
-- [iOS]()
+- [iOS](https://apps.apple.com/us/app/satlas/id6744280675)
