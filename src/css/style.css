@@ -433,6 +433,80 @@ body {
   opacity: 1;
 }
 
+.app-store-buttons {
+  position: fixed;
+  bottom: calc(2rem + var(--safe-area-bottom));
+  left: calc(2rem + var(--safe-area-left));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 3;
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 1s ease-out;
+}
+
+.app-store-buttons.fading-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-store-buttons .app-store-dismiss-button {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--white);
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  z-index: 4;
+  padding: 0;
+  box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
+}
+
+.app-store-buttons:hover .app-store-dismiss-button {
+  opacity: 1;
+}
+
+.app-store-buttons .app-store-dismiss-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+/* .app-store-buttons .app-store-dismiss-button:active {
+  transform: scale(0.9);
+} */
+
+.app-store-button {
+  display: block;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  opacity: 0.75;
+}
+
+/* .app-store-button:hover {
+  transform: scale(1.05);
+}
+
+.app-store-button:active {
+  transform: scale(0.95);
+} */
+
+.app-store-button img {
+  height: 40px;
+  width: auto;
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0px 2px 4px 0px rgba(0,0,0,.3);
+}
+
 .fab svg {
   width: 28px;
   height: 28px;

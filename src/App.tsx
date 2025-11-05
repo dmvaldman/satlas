@@ -30,6 +30,7 @@ import ViewToggle, { ViewType } from './components/ViewToggle';
 import GalleryView from './components/GalleryView';
 import LocationChooserModal from './components/LocationChooserModal';
 import LocationChoosingOverlay from './components/LocationChoosingOverlay';
+import AppStoreButtons from './components/AppStoreButtons';
 
 interface AppState {
   // Auth state
@@ -1873,6 +1874,8 @@ class App extends React.Component<{}, AppState> {
           message={modals.signIn.message}
           showNotification={this.showNotification}
         />
+
+        <AppStoreButtons />
       </div>
     );
   }
