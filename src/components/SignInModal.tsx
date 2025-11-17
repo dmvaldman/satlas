@@ -12,6 +12,8 @@ interface SignInModalProps {
 
 class SignInModal extends React.Component<SignInModalProps> {
   private handleSignIn = async (method: 'apple' | 'google') => {
+    const platform = Capacitor.getPlatform();
+    console.log(`[SignInModal] Starting ${method} sign-in on ${platform}`);
     this.props.onClose();
 
     try {
@@ -19,10 +21,20 @@ class SignInModal extends React.Component<SignInModalProps> {
         FirebaseService.signInWithApple :
         FirebaseService.signInWithGoogle;
 
+      console.log(`[SignInModal] Calling sign-in method for ${method}`);
       await signInMethod();
+      console.log(`[SignInModal] Sign-in method completed successfully for ${method}`);
 
     } catch (error) {
       console.error('[SignInModal] Sign-in error:', error);
+      console.error('[SignInModal] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+        platform: platform,
+        method: method
+      });
+
       // Check if error is a user cancellation
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();

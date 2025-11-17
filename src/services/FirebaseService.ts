@@ -327,28 +327,41 @@ export class FirebaseService {
 
       if (Capacitor.isNativePlatform()) {
         // --- NATIVE ---
-        console.log('[Firebase] Using native authentication for Google');
-        // Existing native code using FirebaseAuthentication...
-        // NOTE: setCustomParameters likely doesn't affect the native plugin flow directly.
-        // The native plugin might have its own behavior or configuration for account selection.
-        // But we add it here for consistency and just in case.
+        const platform = Capacitor.getPlatform();
+        console.log(`[Firebase] Using native authentication for Google on ${platform}`);
+        console.log('[Firebase] Current user before sign-in:', auth.currentUser?.uid || 'none');
+
         try {
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithGoogle');
-          // NOTE: Check if plugin allows passing custom parameters or provider object
-          const result = await FirebaseAuthentication.signInWithGoogle(); // Keep original call unless plugin docs specify otherwise
-          console.log('[Firebase] Native Google sign-in raw result:', result);
+
+          const result = await FirebaseAuthentication.signInWithGoogle();
+          console.log('[Firebase] Native Google sign-in raw result:', JSON.stringify(result, null, 2));
+
           if (!result?.credential) {
             console.error('[Firebase] No credential received from native Google sign-in');
+            console.error('[Firebase] Full result object:', result);
             throw new Error('No credential received from native Google sign-in');
           }
+
+          console.log('[Firebase] Credential received:', {
+            hasIdToken: !!result.credential.idToken,
+            hasAccessToken: !!result.credential.accessToken,
+            providerId: result.credential.providerId
+          });
+
           console.log('[Firebase] Native Google sign-in seems complete via plugin.');
 
         } catch (error) {
           console.error('[Firebase] Native Google sign-in error:', error);
+          console.error('[Firebase] Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            name: error instanceof Error ? error.name : undefined
+          });
           throw error;
         }
       } else if (shouldUsePopupFlow()) {
@@ -398,22 +411,40 @@ export class FirebaseService {
       console.log('[Firebase] Sign out check complete');
 
       if (Capacitor.isNativePlatform()) {
-        console.log('[Firebase] Using native authentication for Apple');
+        const platform = Capacitor.getPlatform();
+        console.log(`[Firebase] Using native authentication for Apple on ${platform}`);
+        console.log('[Firebase] Current user before sign-in:', auth.currentUser?.uid || 'none');
+
         try {
           if (!FirebaseAuthentication) {
             console.error('[Firebase] FirebaseAuthentication plugin not available');
             throw new Error('FirebaseAuthentication plugin not available');
           }
           console.log('[Firebase] Calling FirebaseAuthentication.signInWithApple');
+
           const result = await FirebaseAuthentication.signInWithApple();
-          console.log('[Firebase] Native Apple sign-in raw result:', result);
+          console.log('[Firebase] Native Apple sign-in raw result:', JSON.stringify(result, null, 2));
+
           if (!result?.credential?.idToken) {
             console.error('[Firebase] No idToken received from native Apple sign-in');
+            console.error('[Firebase] Full result object:', result);
             throw new Error('No idToken received from native Apple sign-in');
           }
+
+          console.log('[Firebase] Credential received:', {
+            hasIdToken: !!result.credential.idToken,
+            hasAccessToken: !!result.credential.accessToken,
+            providerId: result.credential.providerId
+          });
+
           console.log('[Firebase] Native Apple sign-in seems complete via plugin.');
         } catch (error) {
           console.error('[Firebase] Native Apple sign-in error:', error);
+          console.error('[Firebase] Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            name: error instanceof Error ? error.name : undefined
+          });
           throw error;
         }
 
@@ -469,12 +500,17 @@ export class FirebaseService {
    */
   static onAuthStateChange(callback: (user: User | null) => void): () => void {
     if (Capacitor.isNativePlatform()) {
-      console.log('[Firebase] Setting up native auth state listener');
+      const platform = Capacitor.getPlatform();
+      console.log(`[Firebase] Setting up native auth state listener on ${platform}`);
       // For native platforms, we need to listen to the plugin's auth state changes
       FirebaseAuthentication.addListener('authStateChange', (event) => {
-        console.log('[Firebase] Native auth state change event:', {
-          eventUser: event.user?.uid,
-          currentUser: auth.currentUser?.uid
+        console.log(`[Firebase] Native auth state change event on ${platform}:`, {
+          hasEventUser: !!event.user,
+          eventUserUid: event.user?.uid,
+          eventUserEmail: event.user?.email,
+          currentUserUid: auth.currentUser?.uid,
+          currentUserEmail: auth.currentUser?.email,
+          eventType: event.user ? 'signed_in' : 'signed_out'
         });
 
         const currentUser = auth.currentUser;
@@ -486,7 +522,12 @@ export class FirebaseService {
 
         if (event.user) {
           // User is signed in
-          console.log('[Firebase] Native auth state changed to signed in user:', event.user.uid);
+          console.log(`[Firebase] Native auth state changed to signed in user on ${platform}:`, {
+            uid: event.user.uid,
+            email: event.user.email,
+            displayName: event.user.displayName,
+            providerId: event.user.providerId
+          });
 
           // Use the helper method to get display name and photo URL
           const { displayName, photoURL } = this._extractUserInfo(event.user);
@@ -509,9 +550,10 @@ export class FirebaseService {
              // Add other potentially missing properties if the native type differs significantly
           } as unknown as User; // Cast to unknown first to satisfy linter
 
+          console.log('[Firebase] Calling callback with signed-in user');
           callback(finalUser);
         } else {
-          console.log('[Firebase] Auth state changed to signed out');
+          console.log(`[Firebase] Auth state changed to signed out on ${platform}`);
           callback(null);
         }
       });
