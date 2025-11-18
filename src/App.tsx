@@ -169,6 +169,11 @@ class App extends React.Component<{}, AppState> {
     // Initialize Notification Service
     NotificationService.getInstance().initialize();
 
+    // Request push notifications permission early (pre-sign-in)
+    this.pushNotificationService.requestPermissionOnly().catch((error) => {
+      console.error('[App] Unable to request push notification permission early:', error);
+    });
+
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),

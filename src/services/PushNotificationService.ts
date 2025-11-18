@@ -431,15 +431,39 @@ export class PushNotificationService {
 
   public async promptForInitialPermission(preferences: UserPreferences): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
-    if (!this.userId) return;
     if (preferences.pushNotificationsEnabled) return;
     if (this.getStorageValue(PushNotificationService.INITIAL_PROMPT_KEY) === 'done') return;
 
     try {
-      await this.enable();
+      const granted = await this.requestPermissionOnly();
+      if (granted) {
+        this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
+      }
     } finally {
       this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
     }
+  }
+
+  public async requestPermissionOnly(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) return false;
+
+    const currentStatus = await PushNotifications.checkPermissions();
+    if (currentStatus.receive === 'granted') {
+      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
+      return true;
+    }
+
+    const shouldProceed = await this.showPrePermissionPrompt();
+    if (!shouldProceed) {
+      return false;
+    }
+
+    const permission = await PushNotifications.requestPermissions();
+    const granted = permission.receive === 'granted';
+    if (granted) {
+      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
+    }
+    return granted;
   }
 
   private async showPrePermissionPrompt(): Promise<boolean> {
@@ -448,7 +472,7 @@ export class PushNotificationService {
       return true;
     }
 
-    const message = "Satlas would like to send you a notification when you're close to a beautiful sit.";
+    const message = "Satlas would like to send you notifications to let you know when you're near a beautiful sit.";
     const accepted = window.confirm(`${message}\n\nAllow notifications?`);
     if (accepted) {
       this.setStorageValue(PushNotificationService.PREPROMPT_KEY, 'accepted');

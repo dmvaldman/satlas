@@ -13,6 +13,8 @@ export class NotificationService {
   private notifiedSits: Set<string> = new Set(); // Session cache
   private readonly NOTIFICATION_RADIUS_FEET = 5280; // 1 mile
   private readonly COOLDOWN_MS = 1 * 60 * 1000; // 1 minute for testing
+  private readonly INSTALL_DELAY_MS = 24 * 60 * 60 * 1000; // 1 day grace period
+  private readonly ENABLE_INSTALL_DELAY = false; // flip to true before release
   private watcherId: string | null = null;
 
   private constructor() {
@@ -49,7 +51,10 @@ export class NotificationService {
 
     // 2. Load sits
     try {
-        this.sits = await FirebaseService.getAllSitLocations();
+      if (this.ENABLE_INSTALL_DELAY) {
+        this.recordInstallTimestampIfNeeded();
+      }
+      this.sits = await FirebaseService.getAllSitLocations();
         console.log(`[NotificationService] Loaded ${this.sits.length} sit locations for monitoring`);
 
         // Start the background watcher once sits are loaded
@@ -146,6 +151,15 @@ export class NotificationService {
     if (this.notifiedSits.has(sitId)) return false;
 
     // Check persistent storage
+    // Uncomment the following block before release to avoid alerts during the first 24 hours after install.
+    if (this.ENABLE_INSTALL_DELAY) {
+      const installTs = localStorage.getItem('satlas_install_timestamp');
+      if (installTs && Date.now() - Number(installTs) < this.INSTALL_DELAY_MS) {
+        console.log('[NotificationService] Skipping alert during first-day grace period.');
+        return false;
+      }
+    }
+
     const timestamp = localStorage.getItem(`notified_sit_${sitId}`);
     if (timestamp) {
       const timeSince = Date.now() - parseInt(timestamp, 10);
@@ -160,6 +174,13 @@ export class NotificationService {
   private markAsNotified(sitId: string) {
     this.notifiedSits.add(sitId);
     localStorage.setItem(`notified_sit_${sitId}`, Date.now().toString());
+  }
+
+  private recordInstallTimestampIfNeeded() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    if (!window.localStorage.getItem('satlas_install_timestamp')) {
+      window.localStorage.setItem('satlas_install_timestamp', Date.now().toString());
+    }
   }
 
   private async sendNotification(sitId: string) {
