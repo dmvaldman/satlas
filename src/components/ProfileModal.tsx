@@ -433,9 +433,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
   // Clean up notification service
   private cleanupNotificationService = () => {
     if (this.notificationService && this.permissionChangeHandler) {
-      console.log('[ProfileModal] Cleaning up notification service');
+      console.log('[ProfileModal] Cleaning up notification service listener');
       this.notificationService.removePermissionChangeListener(this.permissionChangeHandler);
-      this.notificationService.cleanup();
       this.notificationService = null;
     }
   };
@@ -449,8 +448,8 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
         // Clean up any existing service first
         this.cleanupNotificationService();
 
-        // Create a new instance instead of using the singleton
-        this.notificationService = new PushNotificationService();
+        // Use shared singleton instance
+        this.notificationService = PushNotificationService.getInstance();
 
         console.log('[ProfileModal] Creating new notification service with userId:', user.uid);
 

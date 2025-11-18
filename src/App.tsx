@@ -32,6 +32,7 @@ import GalleryView from './components/GalleryView';
 import LocationChooserModal from './components/LocationChooserModal';
 import LocationChoosingOverlay from './components/LocationChoosingOverlay';
 import AppStoreButtons from './components/AppStoreButtons';
+import { PushNotificationService } from './services/PushNotificationService';
 
 interface AppState {
   // Auth state
@@ -106,6 +107,7 @@ class App extends React.Component<{}, AppState> {
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
   private firebaseListenersUnsubscribe: (() => void) | null = null;
+  private pushNotificationService = PushNotificationService.getInstance();
 
   constructor(props: {}) {
     super(props);
@@ -218,9 +220,9 @@ class App extends React.Component<{}, AppState> {
 
     // Listen for custom 'openSit' event from NotificationService
     window.addEventListener('openSit', (e: any) => {
-        if (e.detail?.sitId) {
-            this.openSitById(e.detail.sitId);
-        }
+      if (e.detail?.sitId) {
+        this.openSitById(e.detail.sitId);
+      }
     });
 
     // Setup deep links for web/mobile
@@ -259,6 +261,8 @@ class App extends React.Component<{}, AppState> {
     if (this.firebaseListenersUnsubscribe) {
       this.firebaseListenersUnsubscribe();
     }
+
+    this.pushNotificationService.cleanup();
   }
 
   private initializeAuth = async () => {
@@ -428,7 +432,7 @@ class App extends React.Component<{}, AppState> {
     this.offlineServiceUnsubscribe = offlineService.addStatusListener(networkHandler);
   };
 
-  private async loadUserData(user: User) {
+  private async loadUserData(user: User): Promise<UserPreferences | null> {
     const userId = user.uid;
     try {
       const marksMap = await FirebaseService.loadUserMarks(userId);
@@ -442,10 +446,22 @@ class App extends React.Component<{}, AppState> {
         userPreferences: userData,
         seenSits: seenSits
       });
+      return userData;
     } catch (error) {
       console.error('Error loading user data:', error);
+      return null;
     }
   };
+
+  private async promptInitialPushNotifications(user: User, preferences: UserPreferences) {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      await this.pushNotificationService.initialize(user.uid, preferences);
+      await this.pushNotificationService.promptForInitialPermission(preferences);
+    } catch (error) {
+      console.error('[App] Error prompting push notifications:', error);
+    }
+  }
 
   // Auth methods
   private handleSignInModalOpen = async (message?: string) => {
@@ -485,8 +501,11 @@ class App extends React.Component<{}, AppState> {
 
       // Load user preferences after state is updated
       try {
-        await this.loadUserData(user);
+        const preferences = await this.loadUserData(user);
         console.log('[App] User preferences loaded after sign-in');
+        if (preferences) {
+          await this.promptInitialPushNotifications(user, preferences);
+        }
       } catch (error) {
         console.error('[App] Error loading preferences after sign-in:', error);
         this.showNotification('Failed to load user preferences.', 'error');

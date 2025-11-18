@@ -1,5 +1,10 @@
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications, Token, PushNotificationSchema, ActionPerformed as PushActionPerformed } from '@capacitor/push-notifications';
+import {
+  PushNotifications,
+  Token,
+  PushNotificationSchema,
+  ActionPerformed as PushActionPerformed,
+} from '@capacitor/push-notifications';
 import { FirebaseService } from './FirebaseService';
 import { UserPreferences } from '../types';
 import { AndroidSettings, IOSSettings, NativeSettings } from 'capacitor-native-settings';
@@ -9,13 +14,24 @@ import { App } from '@capacitor/app';
 export type NotificationListener = (notification: PushNotificationSchema) => void;
 
 export class PushNotificationService {
-  private static instance: PushNotificationService;
+  private static instance: PushNotificationService | null = null;
+  private static readonly PREPROMPT_KEY = 'satlas_push_pre_prompt_shown';
+  private static readonly INITIAL_PROMPT_KEY = 'satlas_initial_push_prompt_done';
   private initialized = false;
   private listeners: NotificationListener[] = [];
   private permissionCallbacks: ((isGranted: boolean) => void)[] = [];
   private userId: string | null = null;
   private enabled = false;
   private appStateListenerHandle: { remove: () => void } | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): PushNotificationService {
+    if (!this.instance) {
+      this.instance = new PushNotificationService();
+    }
+    return this.instance;
+  }
 
   /**
    * Initialize the notification service
@@ -116,6 +132,11 @@ export class PushNotificationService {
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       if (!isPermissionGranted) {
+        const shouldProceed = await this.showPrePermissionPrompt();
+        if (!shouldProceed) {
+          console.log('[PushNotificationService] User declined pre-permission prompt');
+          return false;
+        }
         console.log('[PushNotificationService] Notifications are currently disabled, requesting permission');
         const permission = await PushNotifications.requestPermissions();
 
@@ -405,6 +426,52 @@ export class PushNotificationService {
     } catch (error) {
       console.error('[PushNotificationService] Error checking permission status:', error);
       return this.enabled;
+    }
+  }
+
+  public async promptForInitialPermission(preferences: UserPreferences): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    if (!this.userId) return;
+    if (preferences.pushNotificationsEnabled) return;
+    if (this.getStorageValue(PushNotificationService.INITIAL_PROMPT_KEY) === 'done') return;
+
+    try {
+      await this.enable();
+    } finally {
+      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
+    }
+  }
+
+  private async showPrePermissionPrompt(): Promise<boolean> {
+    if (typeof window === 'undefined') return true;
+    if (this.getStorageValue(PushNotificationService.PREPROMPT_KEY) === 'accepted') {
+      return true;
+    }
+
+    const message = "Satlas would like to send you a notification when you're close to a beautiful sit.";
+    const accepted = window.confirm(`${message}\n\nAllow notifications?`);
+    if (accepted) {
+      this.setStorageValue(PushNotificationService.PREPROMPT_KEY, 'accepted');
+      return true;
+    }
+    return false;
+  }
+
+  private getStorageValue(key: string): string | null {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private setStorageValue(key: string, value: string): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // ignore
     }
   }
 }
