@@ -921,6 +921,32 @@ export class FirebaseService {
   // ===== Sit Methods =====
 
   /**
+   * Get all sit locations (lightweight)
+   * @returns Promise resolving to array of sits with only id and location
+   */
+  static async getAllSitLocations(): Promise<Pick<Sit, 'id' | 'location' | 'imageCollectionId'>[]> {
+    try {
+      const sitsRef = collection(db, 'sits');
+      // Select only the fields we need to save bandwidth
+      // Note: Firestore client SDK doesn't support 'select' like server SDK,
+      // so we still fetch full documents but we map them immediately.
+      // If bandwidth is a concern, we should create a separate collection with lightweight data
+      // or use a Cloud Function. For now, we fetch all.
+
+      const querySnapshot = await getDocs(sitsRef);
+
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        location: doc.data().location,
+        imageCollectionId: doc.data().imageCollectionId
+      }));
+    } catch (error) {
+      console.error('Error getting all sit locations:', error);
+      return [];
+    }
+  }
+
+  /**
    * Load sits within map bounds
    * @param bounds Map bounds
    * @returns Map of sits

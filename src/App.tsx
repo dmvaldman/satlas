@@ -12,6 +12,7 @@ import AddSitButton from './components/AddSitButton';
 import NearbySitModal from './components/NearbySitModal';
 import { FirebaseService } from './services/FirebaseService';
 import { LocationService } from './services/LocationService';
+import { NotificationService } from './services/NotificationService';
 import Notifications, { NotificationType } from './components/Notifications';
 import { auth } from './services/FirebaseService';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -163,6 +164,9 @@ class App extends React.Component<{}, AppState> {
     // Add location listener before initializations
     this.locationService.onLocationUpdate(this.handleLocationUpdate);
 
+    // Initialize Notification Service
+    NotificationService.getInstance().initialize();
+
     // Run all async initializations in parallel
     Promise.all([
       this.initializeAuth(),
@@ -211,6 +215,13 @@ class App extends React.Component<{}, AppState> {
         });
       });
     }
+
+    // Listen for custom 'openSit' event from NotificationService
+    window.addEventListener('openSit', (e: any) => {
+        if (e.detail?.sitId) {
+            this.openSitById(e.detail.sitId);
+        }
+    });
 
     // Setup deep links for web/mobile
     this.setupDeepLinks();
@@ -1243,6 +1254,9 @@ class App extends React.Component<{}, AppState> {
     if (this.mapComponentRef.current) {
       this.mapComponentRef.current.updateUserLocation(location);
     }
+
+    // NotificationService now handles its own background tracking,
+    // so we don't need to explicitly feed it updates from here.
   };
 
   // Add a new method to update preferences without toggling the modal
