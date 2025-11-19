@@ -2,7 +2,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 import { Location, Sit } from '../types';
-import { getDistanceInFeet } from '../utils/geo';
+import { getDistanceInFeet, getBoundsFromLocation } from '../utils/geo';
 import { FirebaseService } from './FirebaseService';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
@@ -16,6 +16,9 @@ export class NotificationService {
   private readonly INSTALL_DELAY_MS = 0 * 60 * 60 * 1000; // 0 hours grace period
   private readonly ENABLE_INSTALL_DELAY = false; // flip to true before release
   private watcherId: string | null = null;
+  private lastFetchLocation: Location | null = null;
+  private readonly FETCH_RADIUS_MILES = 3;
+  private readonly REFETCH_DISTANCE_MILES = 1;
 
   private constructor() {
     // Private constructor for singleton
@@ -49,18 +52,15 @@ export class NotificationService {
         console.error('[NotificationService] Error initializing permissions', e);
     }
 
-    // 2. Load sits
+    // 2. Load sits (initial load handled by watcher or explicit call if needed)
     try {
       if (this.ENABLE_INSTALL_DELAY) {
         this.recordInstallTimestampIfNeeded();
       }
-      this.sits = await FirebaseService.getAllSitLocations();
-        console.log(`[NotificationService] Loaded ${this.sits.length} sit locations for monitoring`);
-
-        // Start the background watcher once sits are loaded
-        this.startBackgroundWatcher();
+      // We don't fetch all sits here anymore. We fetch on first location update.
+      this.startBackgroundWatcher();
     } catch (e) {
-        console.error('[NotificationService] Error loading sits', e);
+        console.error('[NotificationService] Error initializing', e);
     }
 
     // 3. Setup notification action listener
@@ -98,21 +98,22 @@ export class NotificationService {
             (location, error) => {
                 if (error) {
                     if (error.code === "NOT_AUTHORIZED") {
-                        if (window.confirm(
-                            "To be notified when you are near a sit, please choose 'Always Allow' in settings.\n\n" +
-                            "Open settings now?"
-                        )) {
-                            BackgroundGeolocation.openSettings();
-                        }
+                        // User denied permission. We could show a custom modal here (like PermissionPromptModal)
+                        // or just log it. For now, we suppress the system confirm dialog to avoid bad UX.
+                        console.warn('[NotificationService] Background geolocation not authorized');
                     }
                     return console.error(error);
                 }
 
                 // Process the location update
                 if (location) {
-                    this.checkProximity({
+                    const userLocation = {
                         latitude: location.latitude,
                         longitude: location.longitude
+                    };
+
+                    this.updateSitsIfNeeded(userLocation).then(() => {
+                        this.checkProximity(userLocation);
                     });
                 }
             }
@@ -128,6 +129,28 @@ export class NotificationService {
           await BackgroundGeolocation.removeWatcher({ id: this.watcherId });
           this.watcherId = null;
       }
+  }
+
+  private async updateSitsIfNeeded(currentLocation: Location) {
+    // If we haven't fetched yet, or moved significantly, fetch new sits
+    if (!this.lastFetchLocation || getDistanceInFeet(this.lastFetchLocation, currentLocation) > this.REFETCH_DISTANCE_MILES * 5280) {
+      // console.log('[NotificationService] Fetching sits for new region...');
+
+      const bounds = getBoundsFromLocation(currentLocation, this.FETCH_RADIUS_MILES);
+      try {
+        const sitsMap = await FirebaseService.loadSitsFromBounds(bounds);
+        // Convert Map to array of lightweight objects for the service
+        this.sits = Array.from(sitsMap.values()).map(sit => ({
+            id: sit.id,
+            location: sit.location,
+            imageCollectionId: sit.imageCollectionId
+        }));
+        this.lastFetchLocation = currentLocation;
+        console.log(`[NotificationService] Updated sits cache: ${this.sits.length} sits found within ${this.FETCH_RADIUS_MILES} miles.`);
+      } catch (e) {
+        console.error('[NotificationService] Error updating sits cache', e);
+      }
+    }
   }
 
   checkProximity(userLocation: Location) {

@@ -29,3 +29,21 @@ export function convertDMSToDD(dms: number[], direction: string): number {
 
   return dd;
 }
+
+/**
+ * Calculate a bounding box around a center point given a radius in miles
+ */
+export function getBoundsFromLocation(center: Location, radiusMiles: number): { north: number; south: number; east: number; west: number } {
+  // 1 mile approx 0.01449275362 degrees latitude
+  const latDelta = radiusMiles * 0.0145;
+  // Longitude delta changes with latitude
+  // 1 mile approx 0.0145 / cos(lat)
+  const lonDelta = radiusMiles * 0.0145 / Math.cos(center.latitude * Math.PI / 180);
+
+  return {
+      north: center.latitude + latDelta,
+      south: center.latitude - latDelta,
+      east: center.longitude + lonDelta,
+      west: center.longitude - lonDelta
+  };
+}

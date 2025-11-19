@@ -135,7 +135,7 @@ export class PushNotificationService {
 
         if (permission.receive !== 'granted') {
           console.log('[PushNotificationService] Permission denied, showing settings prompt');
-          if (confirm('Would you like to enable push notifications in settings?')) {
+          if (confirm('Enable push notifications in your settings')) {
             const settingsOpened = await this.openNotificationSettings();
             if (!settingsOpened) {
               console.log('[PushNotificationService] Failed to open settings');
@@ -180,7 +180,7 @@ export class PushNotificationService {
 
       if (isPermissionGranted) {
         console.log('[PushNotificationService] Notifications are currently enabled, showing settings prompt');
-        if (confirm('Would you like to disable push notifications in settings?')) {
+        if (confirm('Disable push notifications in your phone settings')) {
           const settingsOpened = await this.openNotificationSettings();
           if (!settingsOpened) {
             console.log('[PushNotificationService] Failed to open settings');
