@@ -12,8 +12,8 @@ export class NotificationService {
   private sits: Pick<Sit, 'id' | 'location' | 'imageCollectionId'>[] = [];
   private notifiedSits: Set<string> = new Set(); // Session cache
   private readonly NOTIFICATION_RADIUS_FEET = 5280; // 1 mile
-  private readonly COOLDOWN_MS = 1 * 60 * 1000; // 1 minute for testing
-  private readonly INSTALL_DELAY_MS = 24 * 60 * 60 * 1000; // 1 day grace period
+  private readonly COOLDOWN_MS = 0 * 60 * 1000; // 0 minutes for testing
+  private readonly INSTALL_DELAY_MS = 0 * 60 * 60 * 1000; // 0 hours grace period
   private readonly ENABLE_INSTALL_DELAY = false; // flip to true before release
   private watcherId: string | null = null;
 
@@ -133,9 +133,8 @@ export class NotificationService {
   checkProximity(userLocation: Location) {
     if (this.sits.length === 0) return;
 
-    // Find all sits that are within range and eligible for notification
-    const nearbyCandidates = this.sits
-      .filter(sit => this.shouldNotify(sit.id))
+    // 1. Find all sits within range (regardless of whether they've been notified)
+    const nearbySits = this.sits
       .map(sit => ({
         sit,
         distance: getDistanceInFeet(userLocation, sit.location)
@@ -143,13 +142,19 @@ export class NotificationService {
       .filter(item => item.distance < this.NOTIFICATION_RADIUS_FEET)
       .sort((a, b) => a.distance - b.distance); // Sort by closest
 
-    // Only notify for the single closest sit that hasn't been seen
-    if (nearbyCandidates.length > 0) {
-      const closest = nearbyCandidates[0];
-      console.log(`[NotificationService] Sit ${closest.sit.id} is closest (${Math.round(closest.distance)}ft). Sending notification.`);
+    if (nearbySits.length === 0) return;
 
+    // 2. Pick the absolute closest sit
+    const closest = nearbySits[0];
+
+    // 3. Check if we should notify for THIS specific sit
+    if (this.shouldNotify(closest.sit.id)) {
+      console.log(`[NotificationService] Sit ${closest.sit.id} is closest (${Math.round(closest.distance)}ft). Sending notification.`);
       this.sendNotification(closest.sit.id);
       this.markAsNotified(closest.sit.id);
+    } else {
+      // If the closest sit is already notified, we do NOTHING.
+      // We do NOT fall back to the second closest.
     }
   }
 
@@ -204,7 +209,21 @@ export class NotificationService {
     }
 
     try {
-      const url_thumb = (image && image.photoURL) ? `${image.photoURL}?size=thumb` : (image ? `${image.photoURL}?size=med` : undefined);
+      // Use the thumbnail version if available.
+      // We manually construct the _thumb URL since we know the naming convention.
+      let imageUrl = image?.photoURL;
+      if (imageUrl) {
+        // Check if it's already a thumbnail or has query params (skip if complex)
+        if (!imageUrl.includes('_thumb') && !imageUrl.includes('?')) {
+          const lastDotIndex = imageUrl.lastIndexOf('.');
+          if (lastDotIndex !== -1) {
+            imageUrl = imageUrl.substring(0, lastDotIndex) + '_thumb' + imageUrl.substring(lastDotIndex);
+          }
+        }
+      }
+
+      console.log('[NotificationService] Scheduling notification with image:', imageUrl);
+
       await LocalNotifications.schedule({
         notifications: [{
             title: "You're near a Sit!",
@@ -214,9 +233,10 @@ export class NotificationService {
             sound: 'beep.wav',
             extra: { sitId },
             channelId: 'proximity_channel',
-            largeIcon: url_thumb,
+            smallIcon: 'ic_stat_icon_config_sample',
+            largeIcon: imageUrl,
             actionTypeId: 'OPEN_SIT',
-            attachments: url_thumb ? [{ id: 'sit_image', url: url_thumb }] : undefined
+            attachments: imageUrl ? [{ id: 'sit_image', url: imageUrl }] : undefined
         }]
       });
     } catch (e) {
