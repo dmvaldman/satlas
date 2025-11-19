@@ -99,7 +99,7 @@ export class NotificationService {
                 if (error) {
                     if (error.code === "NOT_AUTHORIZED") {
                         if (window.confirm(
-                            "To discover beautiful places to sit when you're near them (even if the app is closed), please choose 'Always Allow' in settings.\n\n" +
+                            "To be notified when you are near a sit, please choose 'Always Allow' in settings.\n\n" +
                             "Open settings now?"
                         )) {
                             BackgroundGeolocation.openSettings();

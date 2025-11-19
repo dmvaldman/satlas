@@ -757,6 +757,12 @@ body {
   height: 0px;
 }
 
+.profile-section .helper-text {
+  color: var(--medium-gray);
+  font-size: var(--font-size-small);
+  margin-top: -12px;
+}
+
 .profile-section .error-message.hidden {
   visibility: hidden;
 }

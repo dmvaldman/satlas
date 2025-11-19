@@ -15,8 +15,6 @@ export type NotificationListener = (notification: PushNotificationSchema) => voi
 
 export class PushNotificationService {
   private static instance: PushNotificationService | null = null;
-  private static readonly PREPROMPT_KEY = 'satlas_push_pre_prompt_shown';
-  private static readonly INITIAL_PROMPT_KEY = 'satlas_initial_push_prompt_done';
   private initialized = false;
   private listeners: NotificationListener[] = [];
   private permissionCallbacks: ((isGranted: boolean) => void)[] = [];
@@ -132,11 +130,6 @@ export class PushNotificationService {
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       if (!isPermissionGranted) {
-        const shouldProceed = await this.showPrePermissionPrompt();
-        if (!shouldProceed) {
-          console.log('[PushNotificationService] User declined pre-permission prompt');
-          return false;
-        }
         console.log('[PushNotificationService] Notifications are currently disabled, requesting permission');
         const permission = await PushNotifications.requestPermissions();
 
@@ -432,16 +425,8 @@ export class PushNotificationService {
   public async promptForInitialPermission(preferences: UserPreferences): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
     if (preferences.pushNotificationsEnabled) return;
-    if (this.getStorageValue(PushNotificationService.INITIAL_PROMPT_KEY) === 'done') return;
 
-    try {
-      const granted = await this.requestPermissionOnly();
-      if (granted) {
-        this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
-      }
-    } finally {
-      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
-    }
+    await this.requestPermissionOnly();
   }
 
   public async requestPermissionOnly(): Promise<boolean> {
@@ -449,53 +434,11 @@ export class PushNotificationService {
 
     const currentStatus = await PushNotifications.checkPermissions();
     if (currentStatus.receive === 'granted') {
-      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
       return true;
-    }
-
-    const shouldProceed = await this.showPrePermissionPrompt();
-    if (!shouldProceed) {
-      return false;
     }
 
     const permission = await PushNotifications.requestPermissions();
-    const granted = permission.receive === 'granted';
-    if (granted) {
-      this.setStorageValue(PushNotificationService.INITIAL_PROMPT_KEY, 'done');
-    }
-    return granted;
+    return permission.receive === 'granted';
   }
 
-  private async showPrePermissionPrompt(): Promise<boolean> {
-    if (typeof window === 'undefined') return true;
-    if (this.getStorageValue(PushNotificationService.PREPROMPT_KEY) === 'accepted') {
-      return true;
-    }
-
-    const message = "Satlas would like to send you notifications to let you know when you're near a beautiful sit.";
-    const accepted = window.confirm(`${message}\n\nAllow notifications?`);
-    if (accepted) {
-      this.setStorageValue(PushNotificationService.PREPROMPT_KEY, 'accepted');
-      return true;
-    }
-    return false;
-  }
-
-  private getStorageValue(key: string): string | null {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }
-
-  private setStorageValue(key: string, value: string): void {
-    if (typeof window === 'undefined' || !window.localStorage) return;
-    try {
-      window.localStorage.setItem(key, value);
-    } catch {
-      // ignore
-    }
-  }
 }

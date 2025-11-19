@@ -498,35 +498,7 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
     }
   }
 
-  // Add a method to update notification preferences if needed
-  private updateNotificationPreferencesIfNeeded = async () => {
-    const { user, preferences, onUpdatePreferences } = this.props;
 
-    if (!user || !preferences || !this.notificationService) return;
-
-    try {
-      // Get the current permission status directly from the service
-      const currentPermissionStatus = await this.notificationService.syncPermissionStatus();
-
-      // If permission status doesn't match preferences, update preferences
-      if (preferences.pushNotificationsEnabled !== currentPermissionStatus) {
-        console.log(`[ProfileModal] Updating push notification preferences to match current status: ${currentPermissionStatus}`);
-
-        const updatedPreferences = {
-          ...preferences,
-          pushNotificationsEnabled: currentPermissionStatus
-        };
-
-        // Save to Firebase
-        await FirebaseService.saveUserPreferences(user.uid, updatedPreferences);
-
-        // Update parent component state
-        onUpdatePreferences(updatedPreferences);
-      }
-    } catch (error) {
-      console.error('[ProfileModal] Error updating notification preferences:', error);
-    }
-  };
 
   private handlePushNotificationToggle = async (enabled: boolean) => {
     const { user, showNotification } = this.props;
@@ -719,6 +691,11 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   <span className="toggle-slider"></span>
                 </label>
               </div>
+            {!pushNotifications && (
+              <p className="helper-text">
+                (Get notified when near a sit)
+              </p>
+            )}
             </div>
           )}
 
