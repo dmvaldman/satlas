@@ -132,17 +132,24 @@ export class NotificationService {
 
   checkProximity(userLocation: Location) {
     if (this.sits.length === 0) return;
-    // console.log('[NotificationService] Checking proximity for', userLocation);
 
-    for (const sit of this.sits) {
-      if (this.shouldNotify(sit.id)) {
-        const dist = getDistanceInFeet(userLocation, sit.location);
-        if (dist < this.NOTIFICATION_RADIUS_FEET) {
-          console.log(`[NotificationService] Sit ${sit.id} is nearby (${Math.round(dist)}ft). Sending notification.`);
-          this.sendNotification(sit.id);
-          this.markAsNotified(sit.id);
-        }
-      }
+    // Find all sits that are within range and eligible for notification
+    const nearbyCandidates = this.sits
+      .filter(sit => this.shouldNotify(sit.id))
+      .map(sit => ({
+        sit,
+        distance: getDistanceInFeet(userLocation, sit.location)
+      }))
+      .filter(item => item.distance < this.NOTIFICATION_RADIUS_FEET)
+      .sort((a, b) => a.distance - b.distance); // Sort by closest
+
+    // Only notify for the single closest sit that hasn't been seen
+    if (nearbyCandidates.length > 0) {
+      const closest = nearbyCandidates[0];
+      console.log(`[NotificationService] Sit ${closest.sit.id} is closest (${Math.round(closest.distance)}ft). Sending notification.`);
+
+      this.sendNotification(closest.sit.id);
+      this.markAsNotified(closest.sit.id);
     }
   }
 
