@@ -93,7 +93,7 @@ export class NotificationService {
                 backgroundTitle: "Satlas is running in the background.",
                 requestPermissions: true,
                 stale: false,
-                distanceFilter: 50 // Only fire if moved 50 meters (saves battery)
+                distanceFilter: 100 // Only fire if moved 100 meters (saves battery)
             },
             (location, error) => {
                 if (error) {
@@ -192,24 +192,26 @@ export class NotificationService {
             image = await FirebaseService.getFirstImageForSit((sit as any).imageCollectionId);
         } catch (e) {
             console.error('Error fetching image for notification', e);
+            return;
         }
     }
 
     try {
-        await LocalNotifications.schedule({
+      const url_thumb = (image && image.photoURL) ? `${image.photoURL}?size=thumb` : (image ? `${image.photoURL}?size=med` : undefined);
+      await LocalNotifications.schedule({
         notifications: [{
-            title: 'Sit Nearby!',
-            body: 'You are within 1 mile of a sit. Check it out!',
+            title: "You're near a Sit!",
+            body: 'Tap to view in Satlas.',
             id: Math.floor(Math.random() * 100000),
             schedule: { at: new Date(Date.now() + 1000) },
             sound: 'beep.wav',
             extra: { sitId },
             channelId: 'proximity_channel',
-            smallIcon: 'ic_stat_icon_config_sample',
+            largeIcon: url_thumb,
             actionTypeId: 'OPEN_SIT',
-            attachments: image ? [{ id: 'sit_image', url: image.photoURL }] : undefined
+            attachments: url_thumb ? [{ id: 'sit_image', url: url_thumb }] : undefined
         }]
-        });
+      });
     } catch (e) {
         console.error('[NotificationService] Error scheduling notification', e);
     }
