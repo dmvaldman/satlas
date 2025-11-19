@@ -805,10 +805,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .profile-section .toggle-section > label {
   display: inline-block; /* Allow side-by-side placement */
+}
+
+.profile-section .toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-section .toggle-text .toggle-sublabel {
+  font-size: var(--font-size-small);
+  color: var(--medium-gray);
+  margin-top: -5px;
+}
+
+.profile-section .toggle-text {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Hidden but toggle slider affects it. Common pattern. */
@@ -859,7 +876,7 @@ body {
 }
 
 .profile-section #delete-account {
-  color: var(--dark-gray);
+  color: var(--medium-gray);
   margin-top: 30px;
   cursor: pointer;
   font-size: var(--font-size-small);

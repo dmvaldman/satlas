@@ -681,7 +681,12 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
           {Capacitor.isNativePlatform() && (
             <div className="profile-section">
               <div className="toggle-section">
-                <label className="toggle-label">Enable Push Notifications</label>
+                <div className="toggle-text">
+                  <label className="toggle-label">Enable Push Notifications</label>
+                  {!pushNotifications && (
+                    <span className="toggle-sublabel">Get notified when near a sit</span>
+                  )}
+                </div>
                 <label className="toggle-switch">
                   <input
                     type="checkbox"
@@ -691,11 +696,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
                   <span className="toggle-slider"></span>
                 </label>
               </div>
-            {!pushNotifications && (
-              <p className="helper-text">
-                (Get notified when near a sit)
-              </p>
-            )}
             </div>
           )}
 

@@ -89,8 +89,8 @@ export class NotificationService {
 
         this.watcherId = await BackgroundGeolocation.addWatcher(
             {
-                backgroundMessage: "Keeping an eye out for nearby Sits.",
-                backgroundTitle: "Satlas is running",
+                backgroundMessage: "",
+                backgroundTitle: "Satlas is running in the background.",
                 requestPermissions: true,
                 stale: false,
                 distanceFilter: 50 // Only fire if moved 50 meters (saves battery)
