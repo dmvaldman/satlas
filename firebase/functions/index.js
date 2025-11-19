@@ -91,6 +91,17 @@ exports.processImage = storage.onObjectFinalized({
 });
 
 exports.serveImages = functions.https.onRequest(async (req, res) => {
+  // Allow CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(204).send('');
+    return;
+  }
+
   // Extract the path from the request URL
   // e.g., /images/sits/example.jpg -> sits/example.jpg
   const imagePath = req.path.replace(/^\/images\//, '');
