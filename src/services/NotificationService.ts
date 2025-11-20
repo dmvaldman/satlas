@@ -1,17 +1,15 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { Capacitor, registerPlugin } from '@capacitor/core';
-import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { Capacitor } from '@capacitor/core';
 import { Location, Sit } from '../types';
 import { getDistanceInFeet, getBoundsFromLocation } from '../utils/geo';
 import { FirebaseService } from './FirebaseService';
 import { CapacitorHttp } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
+import { GeofenceService, Geofence } from './GeofenceService';
+import { LocationService } from './LocationService';
 
 export class NotificationService {
   private static instance: NotificationService;
-  private sits: Pick<Sit, 'id' | 'location' | 'imageCollectionId'>[] = [];
   private notifiedSits: Set<string> = new Set(); // Session cache
 
   // Development mode toggle
@@ -24,13 +22,25 @@ export class NotificationService {
   private readonly COOLDOWN_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
   private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
   private readonly FETCH_RADIUS_MILES = 3;
-  private readonly REFETCH_DISTANCE_MILES = this.IS_DEV ? 0.1 : 1; // Fetch more often in dev
+  private readonly CLOSE_SITS_COUNT = 19; // Number of closest sits to monitor
+  private readonly CLOSE_SITS_RADIUS_FEET = 5280; // 1 mile radius for close sits
 
-  private watcherId: string | null = null;
-  private lastFetchLocation: Location | null = null;
+  private geofenceService: GeofenceService;
+  private currentGeofences: Geofence[] = [];
+  private isRefreshingGeofences = false;
 
   private constructor() {
     // Private constructor for singleton
+    this.geofenceService = GeofenceService.getInstance();
+
+    // Set up geofence event handlers
+    this.geofenceService.onEnter((geofence) => {
+      this.handleGeofenceEnter(geofence);
+    });
+
+    this.geofenceService.onExit((geofence) => {
+      this.handleGeofenceExit(geofence);
+    });
   }
 
   static getInstance(): NotificationService {
@@ -67,13 +77,13 @@ export class NotificationService {
         console.error('[NotificationService] Error initializing permissions', e);
     }
 
-    // 2. Load sits (initial load handled by watcher or explicit call if needed)
+    // 2. Set up geofences when we have a location
     try {
       if (this.INSTALL_DELAY_MS > 0) {
         this.recordInstallTimestampIfNeeded();
       }
-      // We don't fetch all sits here anymore. We fetch on first location update.
-      this.startBackgroundWatcher();
+      // Wait for location, then set up geofences
+      this.setupGeofencesOnLocation();
     } catch (e) {
         console.error('[NotificationService] Error initializing', e);
     }
@@ -96,104 +106,171 @@ export class NotificationService {
     });
   }
 
-  async startBackgroundWatcher() {
-    if (this.watcherId) return;
+  /**
+   * Set up geofences when we have a location
+   */
+  private async setupGeofencesOnLocation(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[NotificationService] Not native platform, skipping geofence setup');
+      return;
+    }
 
     try {
-        console.log('[NotificationService] Starting background geolocation watcher...');
+      // Get current location
+      const location = await LocationService.getLastKnownLocation() ||
+                       await this.getCurrentLocation();
 
-        this.watcherId = await BackgroundGeolocation.addWatcher(
-            {
-                backgroundMessage: "",
-                backgroundTitle: "Satlas is running in the background.",
-                requestPermissions: true,
-                stale: false,
-                distanceFilter: 100 // Only fire if moved 100 meters (saves battery)
-            },
-            (location, error) => {
-                if (error) {
-                    if (error.code === "NOT_AUTHORIZED") {
-                        // User denied permission. We could show a custom modal here (like PermissionPromptModal)
-                        // or just log it. For now, we suppress the system confirm dialog to avoid bad UX.
-                        console.warn('[NotificationService] Background geolocation not authorized');
-                    }
-                    return console.error(error);
-                }
+      if (!location) {
+        console.warn('[NotificationService] No location available, will retry when location is available');
+        // Listen for location updates
+        const locationService = new LocationService();
+        const locationCallback = (loc?: Location) => {
+          if (loc) {
+            this.setupGeofencesForLocation(loc);
+            locationService.offLocationUpdate(locationCallback);
+          }
+        };
+        locationService.onLocationUpdate(locationCallback);
+        return;
+      }
 
-                // Process the location update
-                if (location) {
-                    const userLocation = {
-                        latitude: location.latitude,
-                        longitude: location.longitude
-                    };
-
-                    this.updateSitsIfNeeded(userLocation).then(() => {
-                        this.checkProximity(userLocation);
-                    });
-                }
-            }
-        );
-        console.log('[NotificationService] Watcher started:', this.watcherId);
+      await this.setupGeofencesForLocation(location);
     } catch (e) {
-        console.error('[NotificationService] Error starting background watcher', e);
+      console.error('[NotificationService] Error setting up geofences:', e);
     }
   }
 
-  async stopBackgroundWatcher() {
-      if (this.watcherId) {
-          await BackgroundGeolocation.removeWatcher({ id: this.watcherId });
-          this.watcherId = null;
+  /**
+   * Get current location (helper method)
+   */
+  private async getCurrentLocation(): Promise<Location | null> {
+    try {
+      const locationService = new LocationService();
+      return await locationService.getCurrentLocation();
+    } catch (e) {
+      console.error('[NotificationService] Error getting current location:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Set up geofences for a given location
+   */
+  private async setupGeofencesForLocation(location: Location): Promise<void> {
+    if (this.isRefreshingGeofences) {
+      console.log('[NotificationService] Already refreshing geofences, skipping');
+      return;
+    }
+
+    this.isRefreshingGeofences = true;
+    console.log('[NotificationService] Setting up geofences for location:', location);
+
+    try {
+      // Load sits within bounds
+      const bounds = getBoundsFromLocation(location, this.FETCH_RADIUS_MILES);
+      const sitsMap = await FirebaseService.loadSitsFromBounds(bounds);
+      const allSits = Array.from(sitsMap.values());
+
+      // Calculate distances and sort
+      const sitsWithDistance = allSits
+        .map(sit => ({
+          sit,
+          distance: getDistanceInFeet(location, sit.location)
+        }))
+        .sort((a, b) => a.distance - b.distance);
+
+      // Select 19 closest sits within 1 mile (or all available if less than 19)
+      const closeSits = sitsWithDistance
+        .filter(item => item.distance <= this.CLOSE_SITS_RADIUS_FEET)
+        .slice(0, this.CLOSE_SITS_COUNT);
+
+      // If we have less than 19 sits within 1 mile, use all available sits
+      const selectedCloseSits = closeSits.length > 0
+        ? closeSits
+        : sitsWithDistance.slice(0, Math.min(this.CLOSE_SITS_COUNT, sitsWithDistance.length));
+
+      console.log(`[NotificationService] Selected ${selectedCloseSits.length} close sits`);
+
+      // Create geofences for the close sits (1 mile radius each)
+      const geofences: Geofence[] = selectedCloseSits.map((item, index) => ({
+        id: `sit_${item.sit.id}`,
+        sitId: item.sit.id,
+        center: item.sit.location,
+        radiusFeet: this.CLOSE_SITS_RADIUS_FEET,
+        isOuterBoundary: false
+      }));
+
+      // Calculate outer boundary geofence
+      // If we have 19+ sits, use the fetch radius. Otherwise, calculate radius to encompass all selected sits
+      let outerBoundaryRadius: number;
+      if (selectedCloseSits.length >= this.CLOSE_SITS_COUNT) {
+        // Use the fetch radius (3 miles)
+        outerBoundaryRadius = this.FETCH_RADIUS_MILES * 5280;
+      } else {
+        // Calculate radius to encompass all selected sits
+        const maxDistance = selectedCloseSits.length > 0
+          ? Math.max(...selectedCloseSits.map(item => item.distance))
+          : this.FETCH_RADIUS_MILES * 5280;
+        // Add some buffer (1 mile) to ensure we're outside when we exit
+        outerBoundaryRadius = maxDistance + 5280;
       }
+
+      // Add outer boundary geofence (centered at user location)
+      geofences.push({
+        id: 'outer_boundary',
+        sitId: undefined,
+        center: location,
+        radiusFeet: outerBoundaryRadius,
+        isOuterBoundary: true
+      });
+
+      this.currentGeofences = geofences;
+
+      // Set up geofences
+      await this.geofenceService.setupGeofences(geofences);
+      console.log(`[NotificationService] Set up ${geofences.length} geofences (${geofences.length - 1} sits + 1 outer boundary)`);
+    } catch (e) {
+      console.error('[NotificationService] Error setting up geofences:', e);
+    } finally {
+      this.isRefreshingGeofences = false;
+    }
   }
 
-  private async updateSitsIfNeeded(currentLocation: Location) {
-    // If we haven't fetched yet, or moved significantly, fetch new sits
-    if (!this.lastFetchLocation || getDistanceInFeet(this.lastFetchLocation, currentLocation) > this.REFETCH_DISTANCE_MILES * 5280) {
-      // console.log('[NotificationService] Fetching sits for new region...');
+  /**
+   * Handle geofence enter event
+   */
+  private handleGeofenceEnter(geofence: Geofence): void {
+    if (geofence.isOuterBoundary) {
+      // Shouldn't happen - we start inside the outer boundary
+      console.log('[NotificationService] Entered outer boundary (unexpected)');
+      return;
+    }
 
-      const bounds = getBoundsFromLocation(currentLocation, this.FETCH_RADIUS_MILES);
-      try {
-        const sitsMap = await FirebaseService.loadSitsFromBounds(bounds);
-        // Convert Map to array of lightweight objects for the service
-        this.sits = Array.from(sitsMap.values()).map(sit => ({
-            id: sit.id,
-            location: sit.location,
-            imageCollectionId: sit.imageCollectionId
-        }));
-        this.lastFetchLocation = currentLocation;
-        console.log(`[NotificationService] Updated sits cache: ${this.sits.length} sits found within ${this.FETCH_RADIUS_MILES} miles.`);
-      } catch (e) {
-        console.error('[NotificationService] Error updating sits cache', e);
+    // Entered a sit geofence - send notification
+    if (geofence.sitId) {
+      console.log(`[NotificationService] Entered geofence for sit ${geofence.sitId}`);
+      if (this.shouldNotify(geofence.sitId)) {
+        this.sendNotification(geofence.sitId);
+        this.markAsNotified(geofence.sitId);
       }
     }
   }
 
-  checkProximity(userLocation: Location) {
-    if (this.sits.length === 0) return;
-
-    // 1. Find all sits within range (regardless of whether they've been notified)
-    const nearbySits = this.sits
-      .map(sit => ({
-        sit,
-        distance: getDistanceInFeet(userLocation, sit.location)
-      }))
-      .filter(item => item.distance < this.NOTIFICATION_RADIUS_FEET)
-      .sort((a, b) => a.distance - b.distance); // Sort by closest
-
-    if (nearbySits.length === 0) return;
-
-    // 2. Pick the absolute closest sit
-    const closest = nearbySits[0];
-
-    // 3. Check if we should notify for THIS specific sit
-    if (this.shouldNotify(closest.sit.id)) {
-      console.log(`[NotificationService] Sit ${closest.sit.id} is closest (${Math.round(closest.distance)}ft). Sending notification.`);
-      this.sendNotification(closest.sit.id);
-      this.markAsNotified(closest.sit.id);
-    } else {
-      // If the closest sit is already notified, we do NOTHING.
-      // We do NOT fall back to the second closest.
+  /**
+   * Handle geofence exit event
+   */
+  private handleGeofenceExit(geofence: Geofence): void {
+    if (geofence.isOuterBoundary) {
+      // Exited outer boundary - refresh geofences
+      console.log('[NotificationService] Exited outer boundary, refreshing geofences');
+      const lastKnownLocation = LocationService.getLastKnownLocation();
+      if (lastKnownLocation) {
+        this.setupGeofencesForLocation(lastKnownLocation);
+      } else {
+        this.setupGeofencesOnLocation();
+      }
     }
+    // We don't need to handle exit from sit geofences
   }
 
   private shouldNotify(sitId: string): boolean {
@@ -236,14 +313,15 @@ export class NotificationService {
   private async sendNotification(sitId: string) {
     // Try to fetch the first image for the sit
     let image = null;
-    let sit = this.sits.find(s => s.id === sitId);
-    if (sit && 'imageCollectionId' in sit) {
-        try {
-            image = await FirebaseService.getFirstImageForSit((sit as any).imageCollectionId);
-        } catch (e) {
-            console.error('Error fetching image for notification', e);
-            return;
-        }
+    try {
+      // Fetch the sit data
+      const sit = await FirebaseService.getSit(sitId);
+      if (sit && sit.imageCollectionId) {
+        image = await FirebaseService.getFirstImageForSit(sit.imageCollectionId);
+      }
+    } catch (e) {
+      console.error('Error fetching image for notification', e);
+      return;
     }
 
     try {

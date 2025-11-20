@@ -1,0 +1,65 @@
+{
+  "name": "@satlas/geofencing",
+  "version": "1.0.0",
+  "description": "Native geofencing plugin for Capacitor",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "unpkg": "dist/plugin.js",
+  "files": [
+    "android",
+    "ios",
+    "dist",
+    "src"
+  ],
+  "author": "Satlas",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "geofencing",
+    "location"
+  ],
+  "scripts": {
+    "verify": "npm run verify:ios && npm run verify:android",
+    "verify:ios": "cd ios && pod install && xcodebuild -workspace Plugin.xcworkspace -scheme Plugin -destination 'platform=iOS Simulator,name=iPhone 14'",
+    "verify:android": "cd android && ./gradlew clean build test",
+    "lint": "npm run eslint",
+    "eslint": "eslint . --ext ts",
+    "build": "npm run clean && tsc && rollup -c rollup.config.js",
+    "clean": "rm -rf ./dist",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.1",
+    "@capacitor/core": "^7.0.1",
+    "@capacitor/ios": "^7.1.0",
+    "@typescript-eslint/eslint-plugin": "~5.0.0",
+    "@typescript-eslint/parser": "~5.0.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "eslint": "^8.11.0",
+    "rollup": "^2.32.0",
+    "typescript": "~5.0.0"
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^7.0.0"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  }
+}
+
