@@ -127,9 +127,17 @@ export class NotificationService {
                     };
 
                     console.log(`[NotificationService] Location update received: ${userLocation.latitude}, ${userLocation.longitude}`);
+                    // Use catch to ensure checkProximity runs even if updateSitsIfNeeded fails
                     this.updateSitsIfNeeded(userLocation).then(() => {
                         console.log(`[NotificationService] Checking proximity for ${this.sits.length} sits`);
                         this.checkProximity(userLocation);
+                    }).catch((error) => {
+                        console.error('[NotificationService] Error updating sits, checking proximity anyway:', error);
+                        // Still check proximity with existing sits cache if update fails
+                        if (this.sits.length > 0) {
+                            console.log(`[NotificationService] Checking proximity with cached sits (${this.sits.length} sits)`);
+                            this.checkProximity(userLocation);
+                        }
                     });
                 }
             }
@@ -245,15 +253,20 @@ export class NotificationService {
   }
 
   private async sendNotification(sitId: string) {
-    // Try to fetch the first image for the sit
-    let image = null;
+    // Try to fetch the first image for the sit, but don't fail if it doesn't work in background
+    let image: { photoURL?: string } | null = null;
     let sit = this.sits.find(s => s.id === sitId);
     if (sit && 'imageCollectionId' in sit) {
         try {
-            image = await FirebaseService.getFirstImageForSit((sit as any).imageCollectionId);
+            // Set a timeout for image fetching when in background (5 seconds)
+            const imagePromise = FirebaseService.getFirstImageForSit((sit as any).imageCollectionId);
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Image fetch timeout')), 5000)
+            );
+            image = await Promise.race([imagePromise, timeoutPromise]) as { photoURL?: string } | null;
         } catch (e) {
-            console.error('Error fetching image for notification', e);
-            return;
+            console.warn('[NotificationService] Error fetching image for notification (continuing without image):', e);
+            // Don't return - continue without image
         }
     }
 
@@ -287,12 +300,14 @@ export class NotificationService {
 
       const iconToUse = localImagePath || imageUrl;
 
+      // Send notification immediately (don't schedule for future)
+      // This ensures it works even when app is backgrounded
       await LocalNotifications.schedule({
         notifications: [{
             title: "You're near a Sit!",
             body: 'Tap to view in Satlas.',
             id: Math.floor(Math.random() * 100000),
-            schedule: { at: new Date(Date.now() + 1000) },
+            schedule: { at: new Date() }, // Send immediately
             sound: 'beep.wav',
             extra: { sitId },
             channelId: 'proximity_channel',
@@ -302,6 +317,7 @@ export class NotificationService {
             attachments: iconToUse ? [{ id: 'sit_image', url: iconToUse }] : undefined
         }]
       });
+      console.log('[NotificationService] Notification sent successfully for sit:', sitId);
     } catch (e) {
         console.error('[NotificationService] Error scheduling notification', e);
     }
