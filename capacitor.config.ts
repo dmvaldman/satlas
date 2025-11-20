@@ -41,9 +41,6 @@ const config: CapacitorConfig = {
       skipNativeAuth: false,
       providers: ['google.com', 'apple.com'],
     },
-    PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"]
-    },
     EdgeToEdge: {
       backgroundColor: "#000000"
     },
