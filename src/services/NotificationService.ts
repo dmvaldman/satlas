@@ -41,6 +41,12 @@ export class NotificationService {
   }
 
   async initialize() {
+    // Only request permissions on native platforms, not web
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[NotificationService] Not a native platform, skipping permission requests');
+      return;
+    }
+
     // 1. Request Notification Permissions (handled mostly by PushNotificationService, but good to double check)
     try {
         const perm = await LocalNotifications.checkPermissions();
