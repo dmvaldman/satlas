@@ -11,14 +11,22 @@ export class NotificationService {
   private static instance: NotificationService;
   private sits: Pick<Sit, 'id' | 'location' | 'imageCollectionId'>[] = [];
   private notifiedSits: Set<string> = new Set(); // Session cache
+
+  // Development mode toggle
+  // Set to false for production release
+  private readonly IS_DEV = process.env.NODE_ENV === 'development';
+
   private readonly NOTIFICATION_RADIUS_FEET = 5280; // 1 mile
-  private readonly COOLDOWN_MS = 0 * 60 * 1000; // 0 minutes for testing
-  private readonly INSTALL_DELAY_MS = 0 * 60 * 60 * 1000; // 0 hours grace period
-  private readonly ENABLE_INSTALL_DELAY = false; // flip to true before release
+
+  // Constants derived from IS_DEV
+  private readonly COOLDOWN_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
+  private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
+  private readonly ENABLE_INSTALL_DELAY = !this.IS_DEV;
+  private readonly FETCH_RADIUS_MILES = 3;
+  private readonly REFETCH_DISTANCE_MILES = this.IS_DEV ? 0.1 : 1; // Fetch more often in dev
+
   private watcherId: string | null = null;
   private lastFetchLocation: Location | null = null;
-  private readonly FETCH_RADIUS_MILES = 3;
-  private readonly REFETCH_DISTANCE_MILES = 1;
 
   private constructor() {
     // Private constructor for singleton
