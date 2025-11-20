@@ -8,10 +8,13 @@ const functions = require("firebase-functions");
 const {getFirestore} = require("firebase-admin/firestore");
 const { HttpsError } = require("firebase-functions/v2/https");
 const { getAuth } = require("firebase-admin/auth");
+const pushNotifications = require("./pushNotifications");
 
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
+
+exports.notifyOnNewSit = pushNotifications.notifyOnNewSit;
 
 exports.processImage = storage.onObjectFinalized({
   bucket: 'satlas-world.firebasestorage.app'

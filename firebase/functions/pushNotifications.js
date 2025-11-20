@@ -1,8 +1,10 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
-admin.initializeApp();
+// Initialize Firebase Admin SDK is handled in index.js
+// if (admin.apps.length === 0) {
+//   admin.initializeApp();
+// }
 
 /**
  * Firebase Cloud Function that runs on a schedule to check for users near sits
@@ -201,7 +203,7 @@ exports.notifyOnNewSit = functions.firestore
         // We need to fetch the image URL from the 'images' collection or from the sit data?
         // The sit data usually has 'imageCollectionId', we need to find the first image.
         // This might be too expensive to do N times.
-        // BETTER: The Sit document should ideally have a 'thumbnailUrl' or 'coverImage'.
+        // BETTER: The Sit documentce should ideally have a 'thumbnailUrl' or 'coverImage'.
         // If not, we might skip the image for now to keep it simple, or fetch it once.
 
         // Let's fetch the cover image ONCE for the batch
@@ -223,8 +225,8 @@ exports.notifyOnNewSit = functions.firestore
         const messages = tokensSnapshot.docs.map(tokenDoc => ({
             token: tokenDoc.data().token,
             notification: {
-                title: 'New Sit Nearby!',
-                body: 'A new sit was just added in your area. Tap to check it out.',
+                title: 'New Sit added nearby!',
+                body: 'Tap to open it in Satlas.',
                 imageUrl: imageUrl || undefined // FCM supports imageUrl
             },
             data: {
