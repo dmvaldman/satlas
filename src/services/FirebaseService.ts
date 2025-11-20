@@ -964,7 +964,6 @@ export class FirebaseService {
       // Default getDocs will try cache first when offline
       const querySnapshot = await getDocs(q);
       const sits = new Map<string, Sit>();
-
       // Log the source of the data
       const source = querySnapshot.metadata.fromCache ? "local cache" : "server";
       console.log(`[Firebase] loadSitsFromBounds: Data fetched from ${source}. Found ${querySnapshot.size} documents.`);

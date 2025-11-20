@@ -449,7 +449,11 @@ export class PushNotificationService {
     if (!Capacitor.isNativePlatform()) return;
     if (preferences.pushNotificationsEnabled) return;
 
-    await this.requestPermissionOnly();
+    const granted = await this.requestPermissionOnly();
+    if (granted) {
+        console.log('[PushNotificationService] Permission granted, enabling notifications...');
+        await this.enable();
+    }
   }
 
   public async requestPermissionOnly(): Promise<boolean> {
