@@ -21,8 +21,7 @@ export class NotificationService {
   private readonly NOTIFICATION_RADIUS_FEET = 5280; // 1 mile
 
   // Constants derived from IS_DEV
-  private readonly COOLDOWN_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
-  private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
+  private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 1 * 60 * 60 * 1000; // 1 hour in prod
   private readonly FETCH_RADIUS_MILES = 3;
   private readonly REFETCH_DISTANCE_MILES = this.IS_DEV ? 0.1 : 1; // Fetch more often in dev
 
@@ -108,7 +107,7 @@ export class NotificationService {
                 backgroundTitle: "Satlas is running in the background.",
                 requestPermissions: true,
                 stale: false,
-                distanceFilter: 100 // Only fire if moved 100 meters (saves battery)
+                distanceFilter: 100
             },
             (location, error) => {
                 if (error) {
@@ -127,7 +126,9 @@ export class NotificationService {
                         longitude: location.longitude
                     };
 
+                    console.log(`[NotificationService] Location update received: ${userLocation.latitude}, ${userLocation.longitude}`);
                     this.updateSitsIfNeeded(userLocation).then(() => {
+                        console.log(`[NotificationService] Checking proximity for ${this.sits.length} sits`);
                         this.checkProximity(userLocation);
                     });
                 }
@@ -169,7 +170,10 @@ export class NotificationService {
   }
 
   checkProximity(userLocation: Location) {
-    if (this.sits.length === 0) return;
+    if (this.sits.length === 0) {
+      console.log('[NotificationService] No sits loaded, skipping proximity check');
+      return;
+    }
 
     // 1. Find all sits within range (regardless of whether they've been notified)
     const nearbySits = this.sits
@@ -179,6 +183,8 @@ export class NotificationService {
       }))
       .filter(item => item.distance < this.NOTIFICATION_RADIUS_FEET)
       .sort((a, b) => a.distance - b.distance); // Sort by closest
+
+    console.log(`[NotificationService] Found ${nearbySits.length} sits within ${this.NOTIFICATION_RADIUS_FEET}ft. Closest: ${nearbySits.length > 0 ? Math.round(nearbySits[0].distance) + 'ft' : 'none'}`);
 
     if (nearbySits.length === 0) return;
 
@@ -193,37 +199,42 @@ export class NotificationService {
     } else {
       // If the closest sit is already notified, we do NOTHING.
       // We do NOT fall back to the second closest.
+      console.log(`[NotificationService] Sit ${closest.sit.id} is closest but already notified (cooldown active), skipping notification.`);
     }
   }
 
   private shouldNotify(sitId: string): boolean {
     // Check session cache first
-    if (this.notifiedSits.has(sitId)) return false;
+    if (this.notifiedSits.has(sitId)) {
+      console.log(`[NotificationService] Sit ${sitId} already notified in this session`);
+      return false;
+    }
 
-    // Check persistent storage
-    // Skip alerts during the first 24 hours after install (if delay is enabled)
+    // Check persistent storage - if a sit has been notified before, never notify again
+    const hasBeenNotified = localStorage.getItem(`notified_sit_${sitId}`);
+    if (hasBeenNotified) {
+      this.notifiedSits.add(sitId); // Cache it for this session
+      console.log(`[NotificationService] Sit ${sitId} was already notified before, skipping permanently`);
+      return false;
+    }
+
+    // Skip alerts during the first period after install (if delay is enabled)
     if (this.INSTALL_DELAY_MS > 0) {
       const installTs = localStorage.getItem('satlas_install_timestamp');
       if (installTs && Date.now() - Number(installTs) < this.INSTALL_DELAY_MS) {
-        console.log('[NotificationService] Skipping alert during first-day grace period.');
+        console.log('[NotificationService] Skipping alert during initial grace period.');
         return false;
       }
     }
 
-    const timestamp = localStorage.getItem(`notified_sit_${sitId}`);
-    if (timestamp) {
-      const timeSince = Date.now() - parseInt(timestamp, 10);
-      if (timeSince < this.COOLDOWN_MS) {
-        this.notifiedSits.add(sitId); // Cache it for this session
-        return false;
-      }
-    }
+    console.log(`[NotificationService] Sit ${sitId} is eligible for notification`);
     return true;
   }
 
   private markAsNotified(sitId: string) {
     this.notifiedSits.add(sitId);
-    localStorage.setItem(`notified_sit_${sitId}`, Date.now().toString());
+    // Mark as notified permanently (just store 'true' or timestamp, doesn't matter since we only check existence)
+    localStorage.setItem(`notified_sit_${sitId}`, '1');
   }
 
   private recordInstallTimestampIfNeeded() {
