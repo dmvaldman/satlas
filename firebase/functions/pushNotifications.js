@@ -155,7 +155,7 @@ exports.notifyOnNewSit = functions.firestore
 
       console.log(`Found ${usersSnapshot.size} candidate users in latitude band`);
 
-      const NOTIFICATION_RADIUS_METERS = 50000; // 50km radius
+      const NOTIFICATION_RADIUS_METERS = 16100; // 10 miles
 
       for (const userDoc of usersSnapshot.docs) {
         const userId = userDoc.id;
