@@ -1281,6 +1281,35 @@ class App extends React.Component<{}, AppState> {
 
     // NotificationService now handles its own background tracking,
     // so we don't need to explicitly feed it updates from here.
+
+    // Auto-set cityCoordinates if missing
+    this.checkAndSetCityCoordinates(location);
+  };
+
+  private checkAndSetCityCoordinates = async (location: Location) => {
+    const { user, userPreferences } = this.state;
+
+    // Only proceed if user is logged in and DOES NOT have cityCoordinates set
+    if (user && userPreferences && !userPreferences.cityCoordinates) {
+        console.log('[App] User has no cityCoordinates, auto-setting from current location');
+
+        // Create new preferences object
+        const newPrefs: UserPreferences = {
+            ...userPreferences,
+            cityCoordinates: location
+        };
+
+        // Update locally
+        this.updatePreferences(newPrefs);
+
+        // Update in Firebase (silently)
+        try {
+            await FirebaseService.saveUserPreferences(user.uid, newPrefs);
+            console.log('[App] Auto-set cityCoordinates success');
+        } catch (e) {
+            console.error('[App] Failed to auto-set cityCoordinates', e);
+        }
+    }
   };
 
   // Add a new method to update preferences without toggling the modal
