@@ -212,19 +212,20 @@ export class NotificationService {
   }
 
   private shouldNotify(sitId: string): boolean {
+    // TESTING: Commented out to allow multiple notifications per sit for testing
     // Check session cache first
-    if (this.notifiedSits.has(sitId)) {
-      console.log(`[NotificationService] Sit ${sitId} already notified in this session`);
-      return false;
-    }
+    // if (this.notifiedSits.has(sitId)) {
+    //   console.log(`[NotificationService] Sit ${sitId} already notified in this session`);
+    //   return false;
+    // }
 
     // Check persistent storage - if a sit has been notified before, never notify again
-    const hasBeenNotified = localStorage.getItem(`notified_sit_${sitId}`);
-    if (hasBeenNotified) {
-      this.notifiedSits.add(sitId); // Cache it for this session
-      console.log(`[NotificationService] Sit ${sitId} was already notified before, skipping permanently`);
-      return false;
-    }
+    // const hasBeenNotified = localStorage.getItem(`notified_sit_${sitId}`);
+    // if (hasBeenNotified) {
+    //   this.notifiedSits.add(sitId); // Cache it for this session
+    //   console.log(`[NotificationService] Sit ${sitId} was already notified before, skipping permanently`);
+    //   return false;
+    // }
 
     // Skip alerts during the first period after install (if delay is enabled)
     if (this.INSTALL_DELAY_MS > 0) {
