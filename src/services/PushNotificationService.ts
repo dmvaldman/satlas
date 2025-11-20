@@ -1,14 +1,23 @@
 import { Capacitor } from '@capacitor/core';
-import {
-  PushNotifications,
-  Token,
-  PushNotificationSchema,
-  ActionPerformed as PushActionPerformed,
-} from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { FirebaseService } from './FirebaseService';
 import { UserPreferences } from '../types';
 import { AndroidSettings, IOSSettings, NativeSettings } from 'capacitor-native-settings';
 import { App } from '@capacitor/app';
+
+export interface PushNotificationSchema {
+  title?: string;
+  subtitle?: string;
+  body?: string;
+  id: string;
+  badge?: number;
+  notification?: any;
+  data?: any;
+  click_action?: string;
+  link?: string;
+  group?: string;
+  groupSummary?: boolean;
+}
 
 // Notification listener type
 export type NotificationListener = (notification: PushNotificationSchema) => void;
@@ -109,7 +118,7 @@ export class PushNotificationService {
     }
 
     // Clean up Push Notification listeners
-    PushNotifications.removeAllListeners();
+    FirebaseMessaging.removeAllListeners();
   }
 
   /**
@@ -126,12 +135,12 @@ export class PushNotificationService {
 
     try {
       // Check current permission status first
-      const permissionStatus = await PushNotifications.checkPermissions();
+      const permissionStatus = await FirebaseMessaging.checkPermissions();
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       if (!isPermissionGranted) {
         console.log('[PushNotificationService] Notifications are currently disabled, requesting permission');
-        const permission = await PushNotifications.requestPermissions();
+        const permission = await FirebaseMessaging.requestPermissions();
 
         if (permission.receive !== 'granted') {
           console.log('[PushNotificationService] Permission denied, showing settings prompt');
@@ -175,7 +184,7 @@ export class PushNotificationService {
 
     try {
       // Check current permission status
-      const permissionStatus = await PushNotifications.checkPermissions();
+      const permissionStatus = await FirebaseMessaging.checkPermissions();
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       if (isPermissionGranted) {
@@ -267,36 +276,49 @@ export class PushNotificationService {
       console.log('[PushNotificationService] Registering with FCM...');
 
       // Remove any existing listeners first
-      await PushNotifications.removeAllListeners();
+      await FirebaseMessaging.removeAllListeners();
 
-      // Listen for registration token
-      await PushNotifications.addListener('registration', (token: Token) => {
-        console.log('[PushNotificationService] Got registration token:', token.value);
-        this.savePushToken(token.value);
-
-        // Notification of permission granted - registration only happens when permissions are granted
-        this.notifyPermissionListeners(true);
-      });
+      // Get the token (handles registration)
+      const result = await FirebaseMessaging.getToken();
+      console.log('[PushNotificationService] Got FCM token:', result.token);
+      this.savePushToken(result.token);
+      this.notifyPermissionListeners(true);
 
       // Listen for push notification received
-      await PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        console.log('[PushNotificationService] Push notification received:', notification);
-        this.notifyListeners(notification);
-      });
-
-      // Listen for push notification action performed
-      await PushNotifications.addListener('pushNotificationActionPerformed', (action: PushActionPerformed) => {
-        console.log('[PushNotificationService] Push notification action performed:', action);
-        // Also notify listeners of the action
-        if (action.notification) {
-          this.notifyListeners(action.notification);
+      await FirebaseMessaging.addListener('notificationReceived', (event) => {
+        console.log('[PushNotificationService] Push notification received (FCM):', event.notification);
+        if (event.notification) {
+            // Cast to compatible type, ensuring ID exists
+            const notification: PushNotificationSchema = {
+                id: event.notification.id || Date.now().toString(),
+                title: event.notification.title || '',
+                body: event.notification.body || '',
+                data: event.notification.data || {},
+                subtitle: '',
+                badge: 0,
+            };
+            this.notifyListeners(notification);
         }
       });
 
-      // Register with FCM
-      console.log('[PushNotificationService] Calling PushNotifications.register()...');
-      await PushNotifications.register();
-      console.log('[PushNotificationService] Successfully called register');
+      // Listen for push notification action performed
+      await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+        console.log('[PushNotificationService] Push notification action performed (FCM):', event);
+        // Also notify listeners of the action
+        if (event.notification) {
+            const notification: PushNotificationSchema = {
+                id: event.notification.id || Date.now().toString(),
+                title: event.notification.title || '',
+                body: event.notification.body || '',
+                data: event.notification.data || {},
+                subtitle: '',
+                badge: 0,
+            };
+          this.notifyListeners(notification);
+        }
+      });
+
+      console.log('[PushNotificationService] Successfully registered and added listeners');
     } catch (error) {
       console.error('[PushNotificationService] Error in registerPushNotifications():', error);
       throw error;
@@ -323,7 +345,7 @@ export class PushNotificationService {
       }
 
       // Remove all push notification listeners
-      PushNotifications.removeAllListeners();
+      FirebaseMessaging.removeAllListeners();
       console.log('[PushNotificationService] Removed all push notification listeners');
     } catch (error) {
       console.error('[PushNotificationService] Error unregistering push notifications:', error);
@@ -405,7 +427,7 @@ export class PushNotificationService {
     try {
       console.log('[PushNotificationService] Checking actual permission status');
       await new Promise(resolve => setTimeout(resolve, 500));
-      const permissionStatus = await PushNotifications.checkPermissions();
+      const permissionStatus = await FirebaseMessaging.checkPermissions();
       const isPermissionGranted = permissionStatus.receive === 'granted';
 
       console.log(`[PushNotificationService] Device permission status: ${isPermissionGranted ? 'granted' : 'denied'}`);
@@ -433,12 +455,12 @@ export class PushNotificationService {
   public async requestPermissionOnly(): Promise<boolean> {
     if (!Capacitor.isNativePlatform()) return false;
 
-    const currentStatus = await PushNotifications.checkPermissions();
+    const currentStatus = await FirebaseMessaging.checkPermissions();
     if (currentStatus.receive === 'granted') {
       return true;
     }
 
-    const permission = await PushNotifications.requestPermissions();
+    const permission = await FirebaseMessaging.requestPermissions();
     return permission.receive === 'granted';
   }
 
