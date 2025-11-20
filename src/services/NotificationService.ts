@@ -23,7 +23,6 @@ export class NotificationService {
   // Constants derived from IS_DEV
   private readonly COOLDOWN_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
   private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 24 * 60 * 60 * 1000; // 24 hours in prod
-  private readonly ENABLE_INSTALL_DELAY = !this.IS_DEV;
   private readonly FETCH_RADIUS_MILES = 3;
   private readonly REFETCH_DISTANCE_MILES = this.IS_DEV ? 0.1 : 1; // Fetch more often in dev
 
@@ -64,7 +63,7 @@ export class NotificationService {
 
     // 2. Load sits (initial load handled by watcher or explicit call if needed)
     try {
-      if (this.ENABLE_INSTALL_DELAY) {
+      if (this.INSTALL_DELAY_MS > 0) {
         this.recordInstallTimestampIfNeeded();
       }
       // We don't fetch all sits here anymore. We fetch on first location update.
@@ -196,8 +195,8 @@ export class NotificationService {
     if (this.notifiedSits.has(sitId)) return false;
 
     // Check persistent storage
-    // Uncomment the following block before release to avoid alerts during the first 24 hours after install.
-    if (this.ENABLE_INSTALL_DELAY) {
+    // Skip alerts during the first 24 hours after install (if delay is enabled)
+    if (this.INSTALL_DELAY_MS > 0) {
       const installTs = localStorage.getItem('satlas_install_timestamp');
       if (installTs && Date.now() - Number(installTs) < this.INSTALL_DELAY_MS) {
         console.log('[NotificationService] Skipping alert during first-day grace period.');
