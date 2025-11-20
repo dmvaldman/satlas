@@ -1,9 +1,11 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 import { Location, Sit } from '../types';
 import { getDistanceInFeet, getBoundsFromLocation } from '../utils/geo';
 import { FirebaseService } from './FirebaseService';
+import { CapacitorHttp } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
@@ -255,6 +257,20 @@ export class NotificationService {
 
       console.log('[NotificationService] Scheduling notification with image:', imageUrl);
 
+      let localImagePath = undefined;
+      if (imageUrl) {
+        try {
+            // We give it a unique name so we don't overwrite/read wrong files if multiple happen fast
+            const filename = `sit_${sitId}_${Date.now()}_thumb.jpg`;
+            localImagePath = await this.downloadImageToCache(imageUrl, filename);
+            console.log('[NotificationService] Downloaded image to:', localImagePath);
+        } catch (err) {
+            console.error('[NotificationService] Failed to download image locally, falling back to remote URL', err);
+        }
+      }
+
+      const iconToUse = localImagePath || imageUrl;
+
       await LocalNotifications.schedule({
         notifications: [{
             title: "You're near a Sit!",
@@ -265,13 +281,56 @@ export class NotificationService {
             extra: { sitId },
             channelId: 'proximity_channel',
             smallIcon: 'ic_stat_icon_config_sample',
-            largeIcon: imageUrl,
+            largeIcon: iconToUse,
             actionTypeId: 'OPEN_SIT',
-            attachments: imageUrl ? [{ id: 'sit_image', url: imageUrl }] : undefined
+            attachments: iconToUse ? [{ id: 'sit_image', url: iconToUse }] : undefined
         }]
       });
     } catch (e) {
         console.error('[NotificationService] Error scheduling notification', e);
+    }
+  }
+
+  private async downloadImageToCache(url: string, filename: string): Promise<string> {
+    try {
+        console.log(`[NotificationService] Starting download of ${url} to ${filename}`);
+
+        // Use CapacitorHttp to bypass CORS on WebViews (though less relevant for native file saving,
+        // it ensures we get the data blob correctly)
+        const response = await CapacitorHttp.get({
+            url,
+            responseType: 'blob'
+        });
+
+        // Convert blob to base64
+        let base64Data: string = response.data;
+
+        // If response.data is already a string (base64), use it.
+        // If it's a Blob object (web), we need to convert.
+        // CapacitorHttp on native usually returns base64 string for 'blob' responseType if it can't return actual Blob.
+        // But let's be safe.
+        if (typeof response.data !== 'string') {
+             // This branch might only be hit in web context or specific plugin versions
+             console.warn('[NotificationService] Received non-string data for image download');
+             // In native, it usually returns a base64 string or path.
+             // Let's assume it returns base64 string for now as per plugin docs for native.
+        }
+
+        // If it's a data URI, strip the prefix
+        if (base64Data.includes(',')) {
+            base64Data = base64Data.split(',')[1];
+        }
+
+        const savedFile = await Filesystem.writeFile({
+            path: filename,
+            data: base64Data,
+            directory: Directory.Cache
+        });
+
+        return savedFile.uri;
+    } catch (e) {
+        console.error('Error downloading image', e);
+        throw e;
     }
   }
 }

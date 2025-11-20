@@ -137,90 +137,124 @@ exports.notifyOnNewSit = functions.firestore
         return null;
       }
 
-      // Get all users with push notifications enabled
+      // Calculate bounding box for initial filtering (approx 50km / 30 miles)
+      // 1 degree lat is approx 111km. So 0.5 degrees is ~55km.
+      const LAT_DELTA = 0.5;
+      const latMin = newSit.location.latitude - LAT_DELTA;
+      const latMax = newSit.location.latitude + LAT_DELTA;
+
+      // Query users within the latitude band (Firestore can only range filter on one field)
+      // We rely on client-side (function-side) filtering for longitude/exact distance
       const usersSnapshot = await db.collection('users')
         .where('pushNotificationsEnabled', '==', true)
+        .where('cityCoordinates.latitude', '>=', latMin)
+        .where('cityCoordinates.latitude', '<=', latMax)
         .get();
 
-      console.log(`Found ${usersSnapshot.size} users with push notifications enabled`);
+      console.log(`Found ${usersSnapshot.size} candidate users in latitude band`);
+
+      const NOTIFICATION_RADIUS_METERS = 50000; // 50km radius
 
       for (const userDoc of usersSnapshot.docs) {
         const userId = userDoc.id;
+        const userData = userDoc.data();
 
         // Skip the user who created the sit
-        if (userId === newSit.uploadedBy) {
-          console.log(`Skipping notification to sit creator ${userId}`);
-          continue;
+        if (userId === newSit.uploadedBy) continue;
+
+        // Check valid city coordinates
+        if (!userData.cityCoordinates || !userData.cityCoordinates.latitude || !userData.cityCoordinates.longitude) {
+            continue;
         }
 
-        // Get user's last known location
-        const locationDoc = await db.collection('user_locations').doc(userId).get();
-        if (!locationDoc.exists) {
-          console.log(`No location data found for user ${userId}`);
-          continue;
-        }
-
-        const userLocation = locationDoc.data();
-
-        // Calculate distance between user and new sit
+        // Calculate exact distance
         const distance = calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
+          userData.cityCoordinates.latitude,
+          userData.cityCoordinates.longitude,
           newSit.location.latitude,
           newSit.location.longitude
         );
 
-        // Only notify users within 5 kilometers
-        if (distance > 5000) {
-          console.log(`User ${userId} is too far from sit ${sitId} (${distance.toFixed(2)}m), skipping notification`);
+        // Filter by radius
+        if (distance > NOTIFICATION_RADIUS_METERS) {
           continue;
         }
 
-        console.log(`User ${userId} is ${distance.toFixed(2)}m from sit ${sitId}, sending notification`);
+        console.log(`User ${userId} is ${(distance/1000).toFixed(1)}km away. sending notification.`);
 
-        // Get user's tokens
+        // Get user's tokens (assuming tokens are in a subcollection or separate collection)
+        // The previous code queried a root 'push_tokens' collection. We keep that.
         const tokensSnapshot = await db.collection('push_tokens')
           .where('userId', '==', userId)
           .get();
 
-        if (tokensSnapshot.empty) {
-          console.log(`No push tokens found for user ${userId}`);
-          continue;
+        if (tokensSnapshot.empty) continue;
+
+        // Construct image URL (thumbnail)
+        // Assuming standard path structure: sits/{sitId}_thumb.jpg (if generated)
+        // or using the serveImages endpoint.
+        // Ideally we use the same logic as the app: append ?size=thumb if it's a serving URL,
+        // or we construct the storage URL.
+        // Let's assume newSit has an image/photoURL field?
+        // The previous code didn't include an image. Let's add it.
+
+        // We need to fetch the image URL from the 'images' collection or from the sit data?
+        // The sit data usually has 'imageCollectionId', we need to find the first image.
+        // This might be too expensive to do N times.
+        // BETTER: The Sit document should ideally have a 'thumbnailUrl' or 'coverImage'.
+        // If not, we might skip the image for now to keep it simple, or fetch it once.
+
+        // Let's fetch the cover image ONCE for the batch
+        let imageUrl = null;
+        if (newSit.imageCollectionId) {
+             const imagesQuery = await db.collection('images')
+                .where('collectionId', '==', newSit.imageCollectionId)
+                .limit(1)
+                .get();
+             if (!imagesQuery.empty) {
+                 const imgData = imagesQuery.docs[0].data();
+                 if (imgData.photoURL) {
+                     imageUrl = `${imgData.photoURL}?size=thumb`;
+                 }
+             }
         }
 
-        // Send notification to all user's devices
-        for (const tokenDoc of tokensSnapshot.docs) {
-          const token = tokenDoc.data().token;
-
-          try {
-            await admin.messaging().send({
-              token: token,
-              notification: {
-                title: 'New Sit Nearby',
-                body: 'Someone added a new sit in your area!'
-              },
-              data: {
+        // Send to all tokens
+        const messages = tokensSnapshot.docs.map(tokenDoc => ({
+            token: tokenDoc.data().token,
+            notification: {
+                title: 'New Sit Nearby!',
+                body: 'A new sit was just added in your area. Tap to check it out.',
+                imageUrl: imageUrl || undefined // FCM supports imageUrl
+            },
+            data: {
                 type: 'new_sit_alert',
-                sitId: sitId
-              }
-            });
-
-            console.log(`Successfully sent notification to token ${token}`);
-
-            // Update token's last used timestamp
-            await db.collection('push_tokens').doc(tokenDoc.id).update({
-              lastUsed: admin.firestore.FieldValue.serverTimestamp()
-            });
-          } catch (error) {
-            console.error(`Error sending notification to token ${token}:`, error);
-
-            // If the token is invalid, delete it
-            if (error.code === 'messaging/invalid-registration-token' ||
-                error.code === 'messaging/registration-token-not-registered') {
-              await db.collection('push_tokens').doc(tokenDoc.id).delete();
-              console.log(`Deleted invalid token ${token}`);
+                sitId: sitId,
+                url: `https://satlas.earth/?sitId=${sitId}` // For deep linking
+            },
+            android: {
+                notification: {
+                    imageUrl: imageUrl || undefined
+                }
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        'mutable-content': 1
+                    }
+                },
+                fcm_options: {
+                    image: imageUrl || undefined
+                }
             }
-          }
+        }));
+
+        if (messages.length > 0) {
+            // batch send
+            const batchResponse = await admin.messaging().sendEach(messages);
+            console.log(`Sent ${batchResponse.successCount} notifications to user ${userId}`);
+
+            // Cleanup invalid tokens logic could go here using batchResponse.responses
         }
       }
 

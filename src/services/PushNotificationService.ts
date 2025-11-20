@@ -267,14 +267,10 @@ export class PushNotificationService {
       console.log('[PushNotificationService] Registering with FCM...');
 
       // Remove any existing listeners first
-      PushNotifications.removeAllListeners();
-
-      // Register with FCM
-      await PushNotifications.register();
-      console.log('[PushNotificationService] Successfully registered with FCM');
+      await PushNotifications.removeAllListeners();
 
       // Listen for registration token
-      PushNotifications.addListener('registration', (token: Token) => {
+      await PushNotifications.addListener('registration', (token: Token) => {
         console.log('[PushNotificationService] Got registration token:', token.value);
         this.savePushToken(token.value);
 
@@ -283,19 +279,24 @@ export class PushNotificationService {
       });
 
       // Listen for push notification received
-      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+      await PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
         console.log('[PushNotificationService] Push notification received:', notification);
         this.notifyListeners(notification);
       });
 
       // Listen for push notification action performed
-      PushNotifications.addListener('pushNotificationActionPerformed', (action: PushActionPerformed) => {
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action: PushActionPerformed) => {
         console.log('[PushNotificationService] Push notification action performed:', action);
         // Also notify listeners of the action
         if (action.notification) {
           this.notifyListeners(action.notification);
         }
       });
+
+      // Register with FCM
+      console.log('[PushNotificationService] Calling PushNotifications.register()...');
+      await PushNotifications.register();
+      console.log('[PushNotificationService] Successfully called register');
     } catch (error) {
       console.error('[PushNotificationService] Error in registerPushNotifications():', error);
       throw error;
