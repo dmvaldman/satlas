@@ -21,7 +21,7 @@ export class NotificationService {
   private readonly NOTIFICATION_RADIUS_FEET = 5280; // 1 mile
 
   // Constants derived from IS_DEV
-  private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 1 * 60 * 60 * 1000; // 1 hour in prod
+  private readonly INSTALL_DELAY_MS = this.IS_DEV ? 0 : 0 * 60 * 60 * 1000; // 1 hour in prod
   private readonly FETCH_RADIUS_MILES = 3;
   private readonly REFETCH_DISTANCE_MILES = this.IS_DEV ? 0.1 : 1; // Fetch more often in dev
 
