@@ -268,11 +268,33 @@ exports.notifyOnSitFavorited = functions.firestore
         console.log(`Sent ${batchResponse.successCount} favorited notifications to sit owner ${sitOwnerId}`);
         if (batchResponse.failureCount > 0) {
           console.error(`Failed to send ${batchResponse.failureCount} notification(s)`);
+          const invalidTokens = [];
           batchResponse.responses.forEach((response, index) => {
             if (!response.success) {
-              console.error(`Failed to send to token ${index}: ${response.error?.message || 'Unknown error'}`);
+              const errorCode = response.error?.code;
+              const errorMessage = response.error?.message || 'Unknown error';
+              console.error(`Failed to send to token ${index}: ${errorMessage}`);
+
+              // Clean up invalid tokens (not found, invalid argument, unregistered)
+              if (errorCode === 'messaging/invalid-registration-token' ||
+                  errorCode === 'messaging/registration-token-not-registered' ||
+                  errorMessage.includes('Requested entity was not found') ||
+                  errorMessage.includes('not found')) {
+                invalidTokens.push(tokensSnapshot.docs[index].id);
+              }
             }
           });
+
+          // Delete invalid tokens
+          if (invalidTokens.length > 0) {
+            console.log(`Deleting ${invalidTokens.length} invalid token(s)`);
+            const batch = db.batch();
+            invalidTokens.forEach(tokenId => {
+              batch.delete(db.collection('push_tokens').doc(tokenId));
+            });
+            await batch.commit();
+            console.log(`Deleted ${invalidTokens.length} invalid token(s)`);
+          }
         }
       } else {
         console.log(`No messages to send for sit owner ${sitOwnerId}`);
@@ -402,11 +424,33 @@ exports.notifyOnSitVisited = functions.firestore
         console.log(`Sent ${batchResponse.successCount} visited notifications to sit owner ${sitOwnerId}`);
         if (batchResponse.failureCount > 0) {
           console.error(`Failed to send ${batchResponse.failureCount} notification(s)`);
+          const invalidTokens = [];
           batchResponse.responses.forEach((response, index) => {
             if (!response.success) {
-              console.error(`Failed to send to token ${index}: ${response.error?.message || 'Unknown error'}`);
+              const errorCode = response.error?.code;
+              const errorMessage = response.error?.message || 'Unknown error';
+              console.error(`Failed to send to token ${index}: ${errorMessage}`);
+
+              // Clean up invalid tokens (not found, invalid argument, unregistered)
+              if (errorCode === 'messaging/invalid-registration-token' ||
+                  errorCode === 'messaging/registration-token-not-registered' ||
+                  errorMessage.includes('Requested entity was not found') ||
+                  errorMessage.includes('not found')) {
+                invalidTokens.push(tokensSnapshot.docs[index].id);
+              }
             }
           });
+
+          // Delete invalid tokens
+          if (invalidTokens.length > 0) {
+            console.log(`Deleting ${invalidTokens.length} invalid token(s)`);
+            const batch = db.batch();
+            invalidTokens.forEach(tokenId => {
+              batch.delete(db.collection('push_tokens').doc(tokenId));
+            });
+            await batch.commit();
+            console.log(`Deleted ${invalidTokens.length} invalid token(s)`);
+          }
         }
       } else {
         console.log(`No messages to send for sit owner ${sitOwnerId}`);
