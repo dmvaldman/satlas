@@ -157,6 +157,240 @@ exports.notifyOnNewSit = functions.firestore
   });
 
 /**
+ * Firebase Cloud Function that triggers when a sit is favorited
+ * and sends a notification to the sit owner
+ */
+exports.notifyOnSitFavorited = functions.firestore
+  .document('favorites/{favoriteId}')
+  .onCreate(async (snapshot, context) => {
+    const db = admin.firestore();
+    const markData = snapshot.data();
+    const userId = markData.userId; // Person who favorited
+    const sitId = markData.sitId;
+
+    try {
+      // Get the sit to find the owner
+      const sitDoc = await db.collection('sits').doc(sitId).get();
+      if (!sitDoc.exists) {
+        console.log(`Sit ${sitId} not found, skipping notification`);
+        return null;
+      }
+
+      const sit = sitDoc.data();
+      const sitOwnerId = sit.uploadedBy;
+
+      // Don't notify if they favorited their own sit
+      if (userId === sitOwnerId) {
+        console.log(`User ${userId} favorited their own sit, skipping notification`);
+        return null;
+      }
+
+      // Get the sit owner's user document to check push notification preferences
+      const ownerDoc = await db.collection('users').doc(sitOwnerId).get();
+      if (!ownerDoc.exists) {
+        console.log(`Sit owner ${sitOwnerId} not found, skipping notification`);
+        return null;
+      }
+
+      const ownerData = ownerDoc.data();
+      if (!ownerData.pushNotificationsEnabled) {
+        console.log(`Sit owner ${sitOwnerId} has push notifications disabled, skipping`);
+        return null;
+      }
+
+      // Get the username of the person who favorited
+      const markerDoc = await db.collection('users').doc(userId).get();
+      const markerUsername = markerDoc.exists ? markerDoc.data().username : 'Someone';
+
+      // Get owner's push tokens
+      const tokensSnapshot = await db.collection('push_tokens')
+        .where('userId', '==', sitOwnerId)
+        .get();
+
+      if (tokensSnapshot.empty) {
+        console.log(`No push tokens found for sit owner ${sitOwnerId}`);
+        return null;
+      }
+
+      // Get sit thumbnail image
+      let imageUrl = null;
+      if (sit.imageCollectionId) {
+        const imagesQuery = await db.collection('images')
+          .where('collectionId', '==', sit.imageCollectionId)
+          .limit(1)
+          .get();
+        if (!imagesQuery.empty) {
+          const imgData = imagesQuery.docs[0].data();
+          if (imgData.photoURL) {
+            imageUrl = `${imgData.photoURL}?size=thumb`;
+          }
+        }
+      }
+
+      // Send notifications to all owner's devices
+      const messages = tokensSnapshot.docs.map(tokenDoc => ({
+        token: tokenDoc.data().token,
+        notification: {
+          title: 'Your Sit was favorited!',
+          body: `${markerUsername} favorited your sit.`,
+          imageUrl: imageUrl || undefined
+        },
+        data: {
+          type: 'sit_favorited',
+          sitId: sitId,
+          url: `https://satlas.earth/?sitId=${sitId}`
+        },
+        android: {
+          notification: {
+            imageUrl: imageUrl || undefined
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              'mutable-content': 1
+            }
+          },
+          fcm_options: {
+            image: imageUrl || undefined,
+            link: `https://satlas.earth/?sitId=${sitId}`
+          }
+        },
+        fcm_options: {
+          link: `https://satlas.earth/?sitId=${sitId}`
+        }
+      }));
+
+      if (messages.length > 0) {
+        const batchResponse = await admin.messaging().sendEach(messages);
+        console.log(`Sent ${batchResponse.successCount} favorited notifications to sit owner ${sitOwnerId}`);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in notifyOnSitFavorited:', error);
+      return null;
+    }
+  });
+
+/**
+ * Firebase Cloud Function that triggers when a sit is visited
+ * and sends a notification to the sit owner
+ */
+exports.notifyOnSitVisited = functions.firestore
+  .document('visited/{visitedId}')
+  .onCreate(async (snapshot, context) => {
+    const db = admin.firestore();
+    const markData = snapshot.data();
+    const userId = markData.userId; // Person who visited
+    const sitId = markData.sitId;
+
+    try {
+      // Get the sit to find the owner
+      const sitDoc = await db.collection('sits').doc(sitId).get();
+      if (!sitDoc.exists) {
+        console.log(`Sit ${sitId} not found, skipping notification`);
+        return null;
+      }
+
+      const sit = sitDoc.data();
+      const sitOwnerId = sit.uploadedBy;
+
+      // Don't notify if they visited their own sit
+      if (userId === sitOwnerId) {
+        console.log(`User ${userId} visited their own sit, skipping notification`);
+        return null;
+      }
+
+      // Get the sit owner's user document to check push notification preferences
+      const ownerDoc = await db.collection('users').doc(sitOwnerId).get();
+      if (!ownerDoc.exists) {
+        console.log(`Sit owner ${sitOwnerId} not found, skipping notification`);
+        return null;
+      }
+
+      const ownerData = ownerDoc.data();
+      if (!ownerData.pushNotificationsEnabled) {
+        console.log(`Sit owner ${sitOwnerId} has push notifications disabled, skipping`);
+        return null;
+      }
+
+      // Get the username of the person who visited
+      const markerDoc = await db.collection('users').doc(userId).get();
+      const markerUsername = markerDoc.exists ? markerDoc.data().username : 'Someone';
+
+      // Get owner's push tokens
+      const tokensSnapshot = await db.collection('push_tokens')
+        .where('userId', '==', sitOwnerId)
+        .get();
+
+      if (tokensSnapshot.empty) {
+        console.log(`No push tokens found for sit owner ${sitOwnerId}`);
+        return null;
+      }
+
+      // Get sit thumbnail image
+      let imageUrl = null;
+      if (sit.imageCollectionId) {
+        const imagesQuery = await db.collection('images')
+          .where('collectionId', '==', sit.imageCollectionId)
+          .limit(1)
+          .get();
+        if (!imagesQuery.empty) {
+          const imgData = imagesQuery.docs[0].data();
+          if (imgData.photoURL) {
+            imageUrl = `${imgData.photoURL}?size=thumb`;
+          }
+        }
+      }
+
+      // Send notifications to all owner's devices
+      const messages = tokensSnapshot.docs.map(tokenDoc => ({
+        token: tokenDoc.data().token,
+        notification: {
+          title: 'Your Sit was visited!',
+          body: `${markerUsername} visited your sit.`,
+          imageUrl: imageUrl || undefined
+        },
+        data: {
+          type: 'sit_visited',
+          sitId: sitId,
+          url: `https://satlas.earth/?sitId=${sitId}`
+        },
+        android: {
+          notification: {
+            imageUrl: imageUrl || undefined
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              'mutable-content': 1
+            }
+          },
+          fcm_options: {
+            image: imageUrl || undefined,
+            link: `https://satlas.earth/?sitId=${sitId}`
+          }
+        },
+        fcm_options: {
+          link: `https://satlas.earth/?sitId=${sitId}`
+        }
+      }));
+
+      if (messages.length > 0) {
+        const batchResponse = await admin.messaging().sendEach(messages);
+        console.log(`Sent ${batchResponse.successCount} visited notifications to sit owner ${sitOwnerId}`);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in notifyOnSitVisited:', error);
+      return null;
+    }
+  });
+
+/**
  * Firebase Cloud Function that runs on a schedule to clean up old tokens
  * that haven't been used in 30 days
  */

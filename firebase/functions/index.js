@@ -15,6 +15,8 @@ initializeApp();
 const db = getFirestore();
 
 exports.notifyOnNewSit = pushNotifications.notifyOnNewSit;
+exports.notifyOnSitFavorited = pushNotifications.notifyOnSitFavorited;
+exports.notifyOnSitVisited = pushNotifications.notifyOnSitVisited;
 
 exports.processImage = storage.onObjectFinalized({
   bucket: 'satlas-world.firebasestorage.app'
