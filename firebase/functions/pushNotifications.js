@@ -111,7 +111,7 @@ exports.notifyOnNewSit = functions.firestore
             token: tokenDoc.data().token,
             notification: {
                 title: 'New Sit added nearby!',
-                body: 'Tap to open it in Satlas.',
+                body: 'Open in Satlas.',
                 imageUrl: imageUrl || undefined // FCM supports imageUrl
             },
             data: {
@@ -131,8 +131,12 @@ exports.notifyOnNewSit = functions.firestore
                     }
                 },
                 fcm_options: {
-                    image: imageUrl || undefined
+                    image: imageUrl || undefined,
+                    link: `https://satlas.earth/?sitId=${sitId}`
                 }
+            },
+            fcm_options: {
+                link: `https://satlas.earth/?sitId=${sitId}`
             }
         }));
 

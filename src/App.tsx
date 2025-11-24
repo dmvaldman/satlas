@@ -103,10 +103,11 @@ class App extends React.Component<{}, AppState> {
   private notificationsRef = React.createRef<Notifications>();
   private locationService: LocationService;
   private initialLoadTimestampMs: number | null = null;
+  private pushNotificationService = PushNotificationService.getInstance();
   private authUnsubscribe: (() => void) | null = null;
   private offlineServiceUnsubscribe: (() => void) | null = null;
   private firebaseListenersUnsubscribe: (() => void) | null = null;
-  private pushNotificationService = PushNotificationService.getInstance();
+  private pushNotificationListener: ((notification: any) => void) | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -169,6 +170,38 @@ class App extends React.Component<{}, AppState> {
     this.pushNotificationService.requestPermissionOnly().catch((error) => {
       console.error('[App] Unable to request push notification permission early:', error);
     });
+
+    // Set up push notification click listener
+    this.pushNotificationListener = (notification: any) => {
+      console.log('[App] Push notification clicked:', notification);
+
+      let sitId: string | null = null;
+
+      // Try to extract sitId from URL first (deep link format)
+      if (notification.data && notification.data.url) {
+        try {
+          const urlObj = new URL(notification.data.url);
+          sitId = urlObj.searchParams.get('sitId');
+          console.log('[App] Extracted sitId from URL:', sitId);
+        } catch (e) {
+          console.error('[App] Error parsing URL from notification:', e);
+        }
+      }
+
+      // Fallback: use sitId directly from data if URL parsing didn't work
+      if (!sitId && notification.data && notification.data.sitId) {
+        sitId = notification.data.sitId;
+        console.log('[App] Using sitId directly from notification data:', sitId);
+      }
+
+      if (sitId) {
+        console.log('[App] Opening sit from push notification:', sitId);
+        this.openSitById(sitId);
+      } else {
+        console.warn('[App] Push notification clicked but no sitId found in URL or data:', notification);
+      }
+    };
+    this.pushNotificationService.addNotificationListener(this.pushNotificationListener);
 
     // Run all async initializations in parallel
     Promise.all([
@@ -255,6 +288,12 @@ class App extends React.Component<{}, AppState> {
     // Clean up Firebase listeners
     if (this.firebaseListenersUnsubscribe) {
       this.firebaseListenersUnsubscribe();
+    }
+
+    // Clean up push notification listener
+    if (this.pushNotificationListener) {
+      this.pushNotificationService.removeNotificationListener(this.pushNotificationListener);
+      this.pushNotificationListener = null;
     }
 
     this.pushNotificationService.cleanup();
@@ -1462,7 +1501,17 @@ class App extends React.Component<{}, AppState> {
     if (this.state.sits.has(sitId)) {
       sit = this.state.sits.get(sitId);
     } else {
+      // Fetch the sit if it's not in cache
       sit = await FirebaseService.getSit(sitId);
+
+      // Add the fetched sit to state so it's available throughout the app
+      if (sit) {
+        this.setState(prevState => {
+          const newSits = new Map(prevState.sits);
+          newSits.set(sitId, sit!);
+          return { sits: newSits };
+        });
+      }
     }
 
     if (sit) {
