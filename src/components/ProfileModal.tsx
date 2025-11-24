@@ -581,6 +581,10 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
 
     // Don't try to save if there are validation errors
     if (this.state.usernameError || !this.state.username) {
+      // Show notification if username is taken
+      if (this.state.usernameError) {
+        this.props.showNotification('Username is taken. Changes not saved.', 'error');
+      }
       // Reset username to the previous value
       this.setState({
         username: this.props.preferences?.username || '',
