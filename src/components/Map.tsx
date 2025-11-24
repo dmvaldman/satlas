@@ -81,8 +81,15 @@ class MapComponent extends React.Component<MapProps, MapState> {
     }
 
     // If map is available and sits have changed, update the GeoJSON source
-    if (map && prevProps.sits !== sits && this.clusterManager.areClusterLayersReady(map)) {
-      this.clusterManager.updateClusterSource(map, sits);
+    if (map && prevProps.sits !== sits) {
+      // If cluster layers are ready, update them
+      if (this.clusterManager.areClusterLayersReady(map)) {
+        this.clusterManager.updateClusterSource(map, sits);
+      } else if (sits.size > 0) {
+        // If layers aren't ready yet but we have sits, initialize clusters now
+        // This handles the case where clusters were initialized with empty sits
+        this.clusterManager.setupClusterLayer(map, sits);
+      }
       this.updateVisibleMarkers();
     }
 
