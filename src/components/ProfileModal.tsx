@@ -683,9 +683,6 @@ class ProfileModal extends React.Component<ProfileModalProps, ProfileModalState>
               <div className="toggle-section">
                 <div className="toggle-text">
                   <label className="toggle-label">Enable Push Notifications</label>
-                  {!pushNotifications && (
-                    <span className="toggle-sublabel">Get notified when near a sit</span>
-                  )}
                 </div>
                 <label className="toggle-switch">
                   <input
