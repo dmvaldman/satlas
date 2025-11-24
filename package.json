@@ -15,7 +15,7 @@
     "release:web": "node -r dotenv/config scripts/deploy.js",
     "gen-assets": "npx capacitor-assets generate --ios",
     "logs": "adb logcat | grep -E 'Capacitor'",
-    "build:android": "npm run build && npx cap sync android && npx cap run android",
+    "build:android": "npm run build && rm -rf android/app/src/main/assets/public && npx cap sync android && npx cap run android",
     "clean:android": "cd android && ./gradlew clean && cd ..",
     "release:android": "npx cap sync android && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../build/satlas-android-release.apk && cd ..",
     "release:android-aab": "npm run build && npx cap sync android && cd android && ./gradlew bundleRelease && cp app/build/outputs/bundle/release/app-release.aab ../build/satlas-android-release.aab && cd ..",
