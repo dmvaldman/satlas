@@ -51,7 +51,7 @@ exports.notifyOnNewSit = functions.firestore
 
         // Check valid city coordinates
         if (!userData.cityCoordinates || !userData.cityCoordinates.latitude || !userData.cityCoordinates.longitude) {
-            continue;
+          continue;
         }
 
         // Calculate exact distance
@@ -109,12 +109,12 @@ exports.notifyOnNewSit = functions.firestore
         // Send to all tokens
         const messages = tokensSnapshot.docs.map(tokenDoc => ({
             token: tokenDoc.data().token,
-            notification: {
+              notification: {
                 title: 'New Sit added nearby!',
                 body: 'Open in Satlas.',
                 imageUrl: imageUrl || undefined // FCM supports imageUrl
-            },
-            data: {
+              },
+              data: {
                 type: 'new_sit_alert',
                 sitId: sitId,
                 url: `https://satlas.earth/?sitId=${sitId}` // For deep linking
@@ -129,14 +129,7 @@ exports.notifyOnNewSit = functions.firestore
                     aps: {
                         'mutable-content': 1
                     }
-                },
-                fcm_options: {
-                    image: imageUrl || undefined,
-                    link: `https://satlas.earth/?sitId=${sitId}`
                 }
-            },
-            fcm_options: {
-                link: `https://satlas.earth/?sitId=${sitId}`
             }
         }));
 
@@ -212,6 +205,8 @@ exports.notifyOnSitFavorited = functions.firestore
         return null;
       }
 
+      console.log(`Found ${tokensSnapshot.size} push token(s) for sit owner ${sitOwnerId}`);
+
       // Get sit thumbnail image
       let imageUrl = null;
       if (sit.imageCollectionId) {
@@ -228,42 +223,59 @@ exports.notifyOnSitFavorited = functions.firestore
       }
 
       // Send notifications to all owner's devices
-      const messages = tokensSnapshot.docs.map(tokenDoc => ({
-        token: tokenDoc.data().token,
-        notification: {
-          title: 'Your Sit was favorited!',
-          body: `${markerUsername} favorited your sit.`,
-          imageUrl: imageUrl || undefined
-        },
-        data: {
-          type: 'sit_favorited',
-          sitId: sitId,
-          url: `https://satlas.earth/?sitId=${sitId}`
-        },
-        android: {
-          notification: {
-            imageUrl: imageUrl || undefined
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              'mutable-content': 1
-            }
-          },
-          fcm_options: {
-            image: imageUrl || undefined,
-            link: `https://satlas.earth/?sitId=${sitId}`
-          }
-        },
-        fcm_options: {
-          link: `https://satlas.earth/?sitId=${sitId}`
+      const messages = tokensSnapshot.docs.map(tokenDoc => {
+        const token = tokenDoc.data().token;
+        if (!token) {
+          console.warn(`Push token document ${tokenDoc.id} has no token field`);
+          return null;
         }
-      }));
+
+        const message = {
+          token: token,
+          notification: {
+            title: 'Your Sit was favorited!',
+            body: `${markerUsername} favorited your sit.`
+          },
+          data: {
+            type: 'sit_favorited',
+            sitId: sitId,
+            url: `https://satlas.earth/?sitId=${sitId}`
+          },
+          android: {
+            notification: {}
+          },
+          apns: {
+            payload: {
+              aps: {
+                'mutable-content': 1
+              }
+            }
+          }
+        };
+
+        // Only include imageUrl if it exists
+        if (imageUrl) {
+          message.notification.imageUrl = imageUrl;
+          message.android.notification.imageUrl = imageUrl;
+        }
+
+        return message;
+      }).filter(msg => msg !== null);
 
       if (messages.length > 0) {
+        console.log(`Preparing to send ${messages.length} notification(s) to sit owner ${sitOwnerId}`);
         const batchResponse = await admin.messaging().sendEach(messages);
         console.log(`Sent ${batchResponse.successCount} favorited notifications to sit owner ${sitOwnerId}`);
+        if (batchResponse.failureCount > 0) {
+          console.error(`Failed to send ${batchResponse.failureCount} notification(s)`);
+          batchResponse.responses.forEach((response, index) => {
+            if (!response.success) {
+              console.error(`Failed to send to token ${index}: ${response.error?.message || 'Unknown error'}`);
+            }
+          });
+        }
+      } else {
+        console.log(`No messages to send for sit owner ${sitOwnerId}`);
       }
 
       return null;
@@ -345,42 +357,59 @@ exports.notifyOnSitVisited = functions.firestore
       }
 
       // Send notifications to all owner's devices
-      const messages = tokensSnapshot.docs.map(tokenDoc => ({
-        token: tokenDoc.data().token,
-        notification: {
-          title: 'Your Sit was visited!',
-          body: `${markerUsername} visited your sit.`,
-          imageUrl: imageUrl || undefined
-        },
-        data: {
-          type: 'sit_visited',
-          sitId: sitId,
-          url: `https://satlas.earth/?sitId=${sitId}`
-        },
-        android: {
-          notification: {
-            imageUrl: imageUrl || undefined
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              'mutable-content': 1
-            }
-          },
-          fcm_options: {
-            image: imageUrl || undefined,
-            link: `https://satlas.earth/?sitId=${sitId}`
-          }
-        },
-        fcm_options: {
-          link: `https://satlas.earth/?sitId=${sitId}`
+      const messages = tokensSnapshot.docs.map(tokenDoc => {
+        const token = tokenDoc.data().token;
+        if (!token) {
+          console.warn(`Push token document ${tokenDoc.id} has no token field`);
+          return null;
         }
-      }));
+
+        const message = {
+          token: token,
+          notification: {
+            title: 'Your Sit was visited!',
+            body: `${markerUsername} visited your sit.`
+          },
+          data: {
+            type: 'sit_visited',
+            sitId: sitId,
+            url: `https://satlas.earth/?sitId=${sitId}`
+          },
+          android: {
+            notification: {}
+          },
+          apns: {
+            payload: {
+              aps: {
+                'mutable-content': 1
+              }
+            }
+          }
+        };
+
+        // Only include imageUrl if it exists
+        if (imageUrl) {
+          message.notification.imageUrl = imageUrl;
+          message.android.notification.imageUrl = imageUrl;
+        }
+
+        return message;
+      }).filter(msg => msg !== null);
 
       if (messages.length > 0) {
+        console.log(`Preparing to send ${messages.length} notification(s) to sit owner ${sitOwnerId}`);
         const batchResponse = await admin.messaging().sendEach(messages);
         console.log(`Sent ${batchResponse.successCount} visited notifications to sit owner ${sitOwnerId}`);
+        if (batchResponse.failureCount > 0) {
+          console.error(`Failed to send ${batchResponse.failureCount} notification(s)`);
+          batchResponse.responses.forEach((response, index) => {
+            if (!response.success) {
+              console.error(`Failed to send to token ${index}: ${response.error?.message || 'Unknown error'}`);
+            }
+          });
+        }
+      } else {
+        console.log(`No messages to send for sit owner ${sitOwnerId}`);
       }
 
       return null;

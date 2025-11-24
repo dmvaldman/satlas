@@ -282,7 +282,7 @@ export class PushNotificationService {
       const result = await FirebaseMessaging.getToken();
       console.log('[PushNotificationService] Got FCM token:', result.token);
       this.savePushToken(result.token);
-      this.notifyPermissionListeners(true);
+        this.notifyPermissionListeners(true);
 
       // Listen for push notification received
       await FirebaseMessaging.addListener('notificationReceived', (event) => {
@@ -297,7 +297,7 @@ export class PushNotificationService {
                 subtitle: '',
                 badge: 0,
             };
-            this.notifyListeners(notification);
+        this.notifyListeners(notification);
         }
       });
 
